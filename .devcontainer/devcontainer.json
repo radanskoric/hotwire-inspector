@@ -1,0 +1,32 @@
+// For format details, see https://aka.ms/devcontainer.json.
+{
+  "name": "hotwire-inspector",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/hotwire_inspector",
+  "remoteUser": "node",
+  "updateRemoteUserUID": true,
+  "overrideCommand": false,
+  "forwardPorts": [
+    4173
+  ],
+  "portsAttributes": {
+    "4173": {
+      "label": "WXT Dev Server",
+      "onAutoForward": "notify"
+    }
+  },
+  "features": {
+    "ghcr.io/schlich/devcontainer-features/playwright:0": {}
+  },
+  "postCreateCommand": "npm install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-playwright.playwright"
+      ]
+    }
+  }
+}

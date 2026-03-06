@@ -1,0 +1,13 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspaces/hotwire_inspector:cached
+    working_dir: /workspaces/hotwire_inspector
+    command: sleep infinity
+    ports:
+      - "4173:4173"
+    environment:
+      WXT_DEV_SERVER_PORT: "4173"
