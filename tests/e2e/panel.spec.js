@@ -4,6 +4,7 @@ import {
   getExtensionDevtoolsFrame,
   getExtensionId,
 } from './helpers.js';
+import { ID_PREFIX } from '../../lib/constants.js';
 
 const fixtureScanResponse = {
   items: [
@@ -103,6 +104,25 @@ test.describe('Panel UI', () => {
 
       const nodeIds = await panelPage.locator('.node-id').allTextContents();
       expect(nodeIds).toEqual(['main-frame', 'nested-frame', 'modal-controller', 'sidebar-controller']);
+    });
+  });
+
+  test('does not render internal generated IDs', async ({ browserName }) => {
+    test.skip(browserName !== 'chromium');
+
+    await withChromiumExtension(async ({ context }) => {
+      const panelPage = await openPanelPage(context, {
+        scanResponse: {
+          items: [
+            { id: `${ID_PREFIX}-uuid-1`, parentId: null, type: 'controller', controllers: ['modal'] },
+            { id: 'user-controller', parentId: null, type: 'controller', controllers: ['menu'] },
+          ],
+        },
+      });
+
+      const nodeIds = await panelPage.locator('.node-id').allTextContents();
+      expect(nodeIds).not.toContain(`${ID_PREFIX}-uuid-1`);
+      expect(nodeIds).toContain('user-controller');
     });
   });
 

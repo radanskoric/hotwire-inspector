@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ContentInspector } from '../../lib/content-inspector.js';
+import { ID_PREFIX } from '../../lib/constants.js';
 
 function createElement(
   tagName,
@@ -125,8 +126,8 @@ describe('ContentInspector', () => {
     const firstScan = inspector.scan();
     const secondScan = inspector.scan();
 
-    expect(firstScan[0].id).toBe('hotwire-inspector-uuid-1');
-    expect(secondScan[0].id).toBe('hotwire-inspector-uuid-1');
+    expect(firstScan[0].id).toBe(`${ID_PREFIX}-uuid-1`);
+    expect(secondScan[0].id).toBe(`${ID_PREFIX}-uuid-1`);
   });
 
   it('stores weak references in the reverse element lookup', () => {
@@ -181,7 +182,7 @@ describe('ContentInspector', () => {
         controllers: [],
       },
       {
-        id: 'hotwire-inspector-uuid-1',
+        id: `${ID_PREFIX}-uuid-1`,
         parentId: 'parent-frame',
         type: 'controller',
         controllers: ['dropdown', 'menu'],

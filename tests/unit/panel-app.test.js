@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { ID_PREFIX } from '../../lib/constants.js';
 import { PanelApp } from '../../lib/panel-app.js';
 
 class FakeElement {
@@ -226,6 +227,45 @@ describe('PanelApp', () => {
     expect(row.listeners.has('mouseenter')).toBe(true);
     expect(row.listeners.has('mouseleave')).toBe(true);
     expect(row.listeners.has('click')).toBe(true);
+  });
+
+  it('does not render internal generated ids in node labels', () => {
+    const app = new PanelApp({
+      chromeApi: createChromeApi(() => Promise.resolve({})),
+      buildTree: () => [
+        {
+          id: `${ID_PREFIX}-uuid-1`,
+          type: 'controller',
+          controllers: ['modal'],
+          children: [],
+        },
+        {
+          id: 'user-controller',
+          type: 'controller',
+          controllers: ['menu'],
+          children: [],
+        },
+      ],
+      summaryElement,
+      treeElement,
+      emptyStateElement,
+      refreshButton,
+      nodeTemplate,
+      badgeTemplate,
+    });
+
+    app.renderTree([
+      { type: 'controller' },
+      { type: 'controller' },
+    ]);
+
+    const internalId = treeElement.children[0].querySelector('.node-id');
+    const userId = treeElement.children[1].querySelector('.node-id');
+
+    expect(internalId.textContent).toBe('');
+    expect(internalId.hidden).toBe(true);
+    expect(userId.textContent).toBe('user-controller');
+    expect(userId.hidden).toBe(false);
   });
 
   it('refreshes by requesting a scan and then rendering the result', async () => {
