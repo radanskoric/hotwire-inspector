@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import {
+  deepFixtureUrl,
   fixtureUrl,
   withChromiumExtension,
   getExtensionDevtoolsFrame,
@@ -148,6 +149,79 @@ test.describe('Content Script', () => {
       expect(nestedFrame.parentId).toBe('main-frame');
       expect(modalController.parentId).toBe('nested-frame');
       expect(sidebarController.parentId).toBeNull();
+    });
+  });
+
+  test('rescans after dynamic DOM changes', async ({ browserName }) => {
+    test.skip(browserName !== 'chromium');
+
+    await withChromiumExtension(async ({ page, context }) => {
+      await gotoFixture(page);
+
+      const frame = await getExtensionDevtoolsFrame(context);
+      const initialResult = await sendToContentScript(frame, { type: 'hotwire-inspector:scan' });
+
+      expect(initialResult.items.find((item) => item.id === 'dynamic-frame')).toBeUndefined();
+
+      await page.locator('#nested-frame').evaluate((nestedFrame) => {
+        const frameElement = document.createElement('turbo-frame');
+        frameElement.id = 'dynamic-frame';
+
+        const controllerElement = document.createElement('div');
+        controllerElement.id = 'dynamic-controller';
+        controllerElement.setAttribute('data-controller', 'dynamic');
+        controllerElement.textContent = 'Dynamic content';
+
+        frameElement.appendChild(controllerElement);
+        nestedFrame.appendChild(frameElement);
+      });
+
+      const updatedResult = await sendToContentScript(frame, { type: 'hotwire-inspector:scan' });
+      const dynamicFrame = updatedResult.items.find((item) => item.id === 'dynamic-frame');
+      const dynamicController = updatedResult.items.find((item) => item.id === 'dynamic-controller');
+
+      expect(dynamicFrame).toMatchObject({
+        id: 'dynamic-frame',
+        parentId: 'nested-frame',
+        type: 'frame',
+      });
+      expect(dynamicController).toMatchObject({
+        id: 'dynamic-controller',
+        parentId: 'dynamic-frame',
+        type: 'controller',
+        controllers: ['dynamic'],
+      });
+    });
+  });
+
+  test('handles deeply nested elements', async ({ browserName }) => {
+    test.skip(browserName !== 'chromium');
+
+    await withChromiumExtension(async ({ page, context }) => {
+      await page.goto(deepFixtureUrl);
+
+      const frame = await getExtensionDevtoolsFrame(context);
+      const result = await sendToContentScript(frame, { type: 'hotwire-inspector:scan' });
+      const parentIdsById = Object.fromEntries(result.items.map((item) => [item.id, item.parentId]));
+
+      expect(result.items.map((item) => item.id)).toEqual([
+        'level-1',
+        'level-2',
+        'level-3',
+        'level-4',
+        'level-5',
+        'level-6',
+        'level-7',
+      ]);
+      expect(parentIdsById).toMatchObject({
+        'level-1': null,
+        'level-2': 'level-1',
+        'level-3': 'level-2',
+        'level-4': 'level-3',
+        'level-5': 'level-4',
+        'level-6': 'level-5',
+        'level-7': 'level-6',
+      });
     });
   });
 });

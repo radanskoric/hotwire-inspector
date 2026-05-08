@@ -3,6 +3,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 
 export const fixtureUrl = `file://${path.resolve('tests/e2e/fixtures/test-page.html')}`;
+export const deepFixtureUrl = `file://${path.resolve('tests/e2e/fixtures/deep-page.html')}`;
 export const extensionPath = path.resolve('output/chrome-mv3');
 
 const xvfbDisplay = ':99';

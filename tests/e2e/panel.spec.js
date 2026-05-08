@@ -14,6 +14,18 @@ const fixtureScanResponse = {
   ],
 };
 
+const deepScanResponse = {
+  items: [
+    { id: 'level-1', src: null, parentId: null, type: 'frame', controllers: [] },
+    { id: 'level-2', src: null, parentId: 'level-1', type: 'frame', controllers: [] },
+    { id: 'level-3', parentId: 'level-2', type: 'controller', controllers: ['modal'] },
+    { id: 'level-4', src: null, parentId: 'level-3', type: 'frame', controllers: [] },
+    { id: 'level-5', parentId: 'level-4', type: 'controller', controllers: ['dropdown'] },
+    { id: 'level-6', src: null, parentId: 'level-5', type: 'frame', controllers: [] },
+    { id: 'level-7', parentId: 'level-6', type: 'controller', controllers: ['sidebar'] },
+  ],
+};
+
 async function openPanelPage(context, { scanResponse, scanError, scanResponses } = {}) {
   const frame = await getExtensionDevtoolsFrame(context);
   const extensionId = getExtensionId(frame);
@@ -22,16 +34,23 @@ async function openPanelPage(context, { scanResponse, scanError, scanResponses }
   const panelPage = await context.newPage();
 
   await panelPage.addInitScript(({ scanResponse, scanError, scanResponses }) => {
+    window.__hotwireInspectorMessages = [];
+    window.__hotwireInspectorEvalCalls = [];
+
     chrome.devtools = {
       inspectedWindow: {
         tabId: 1,
-        eval: () => { },
+        eval: (code) => {
+          window.__hotwireInspectorEvalCalls.push(code);
+        },
       },
     };
 
     let scanCallCount = 0;
 
     chrome.tabs.sendMessage = (_tabId, message) => {
+      window.__hotwireInspectorMessages.push(message);
+
       if (message.type === 'hotwire-inspector:scan') {
         if (scanError) {
           return Promise.reject(new Error(scanError));
@@ -54,6 +73,14 @@ async function openPanelPage(context, { scanResponse, scanError, scanResponses }
   await panelPage.waitForLoadState('networkidle');
 
   return panelPage;
+}
+
+async function getRecordedMessages(panelPage) {
+  return panelPage.evaluate(() => window.__hotwireInspectorMessages);
+}
+
+async function getRecordedEvalCalls(panelPage) {
+  return panelPage.evaluate(() => window.__hotwireInspectorEvalCalls);
 }
 
 test.describe('Panel UI', () => {
@@ -121,6 +148,33 @@ test.describe('Panel UI', () => {
     });
   });
 
+  test('renders deeply nested tree structure', async ({ browserName }) => {
+    test.skip(browserName !== 'chromium');
+
+    await withChromiumExtension(async ({ context }) => {
+      const panelPage = await openPanelPage(context, { scanResponse: deepScanResponse });
+
+      await expect(panelPage.locator('#summary')).toHaveText('4 frames, 3 controllers');
+      await expect(panelPage.locator('.node-id')).toHaveText([
+        'level-1',
+        'level-2',
+        'level-3',
+        'level-4',
+        'level-5',
+        'level-6',
+        'level-7',
+      ]);
+
+      let children = panelPage.locator('.node').filter({ hasText: 'level-1' }).first().locator('> .node-children');
+
+      for (const levelId of ['level-2', 'level-3', 'level-4', 'level-5', 'level-6', 'level-7']) {
+        await expect(children).not.toBeHidden();
+        await expect(children.locator('> .node > .node-row .node-id').first()).toHaveText(levelId);
+        children = children.locator('> .node').first().locator('> .node-children');
+      }
+    });
+  });
+
   test('shows empty state for no elements', async ({ browserName }) => {
     test.skip(browserName !== 'chromium');
 
@@ -158,6 +212,48 @@ test.describe('Panel UI', () => {
       await panelPage.locator('#refresh-button').click();
 
       await expect(panelPage.locator('#summary')).toHaveText('2 frames, 2 controllers');
+    });
+  });
+
+  test('hovering and leaving a row sends highlight messages', async ({ browserName }) => {
+    test.skip(browserName !== 'chromium');
+
+    await withChromiumExtension(async ({ context }) => {
+      const panelPage = await openPanelPage(context, { scanResponse: fixtureScanResponse });
+      const mainFrameRow = panelPage.locator('.node-row').filter({ hasText: 'main-frame' }).first();
+
+      await mainFrameRow.hover();
+      await panelPage.locator('h1').hover();
+
+      const messages = await getRecordedMessages(panelPage);
+
+      expect(messages).toEqual([
+        { type: 'hotwire-inspector:scan' },
+        { type: 'hotwire-inspector:highlight', id: 'main-frame' },
+        { type: 'hotwire-inspector:clear-highlight' },
+      ]);
+    });
+  });
+
+  test('clicking a row inspects the selected element', async ({ browserName }) => {
+    test.skip(browserName !== 'chromium');
+
+    await withChromiumExtension(async ({ context }) => {
+      const panelPage = await openPanelPage(context, { scanResponse: fixtureScanResponse });
+      const nestedFrameRow = panelPage.locator('.node-row').filter({ hasText: 'nested-frame' }).first();
+
+      await nestedFrameRow.dispatchEvent('click');
+
+      const messages = await getRecordedMessages(panelPage);
+      const evalCalls = await getRecordedEvalCalls(panelPage);
+
+      expect(messages).toEqual([
+        { type: 'hotwire-inspector:scan' },
+        { type: 'hotwire-inspector:inspect', id: 'nested-frame' },
+      ]);
+      expect(evalCalls).toEqual([
+        'inspect(document.querySelector("#mock"))',
+      ]);
     });
   });
 });
