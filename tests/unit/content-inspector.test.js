@@ -1,17 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ContentInspector } from '../../lib/content-inspector.js';
 
-function createElement(tagName, { id = '', attributes = {}, style = {}, nodeType = 1 } = {}) {
+function createElement(
+  tagName,
+  { id = '', attributes = {}, style = {}, nodeType = 1, rect = { top: 0, left: 0, width: 0, height: 0 } } = {},
+) {
   const attributeMap = new Map(Object.entries(attributes));
 
   const element = {
     id,
     tagName: tagName.toUpperCase(),
     nodeType,
-    style: {
-      outline: style.outline ?? '',
-      outlineOffset: style.outlineOffset ?? '',
-    },
+    style: { ...style },
     parentElement: null,
     previousElementSibling: null,
     children: [],
@@ -24,6 +24,24 @@ function createElement(tagName, { id = '', attributes = {}, style = {}, nodeType
       child.previousElementSibling = previousChild;
       this.children.push(child);
       return child;
+    },
+    remove() {
+      if (!this.parentElement) {
+        return;
+      }
+
+      const siblings = this.parentElement.children;
+      const index = siblings.indexOf(this);
+
+      if (index !== -1) {
+        siblings.splice(index, 1);
+      }
+
+      this.parentElement = null;
+      this.previousElementSibling = null;
+    },
+    getBoundingClientRect() {
+      return rect;
     },
     closest(selector) {
       let current = this;
@@ -47,7 +65,10 @@ function createElement(tagName, { id = '', attributes = {}, style = {}, nodeType
 }
 
 function createDocument(elements) {
+  const body = createElement('body');
+
   return {
+    body,
     querySelectorAll(selector) {
       if (selector !== 'turbo-frame, [data-controller]') {
         return [];
@@ -57,6 +78,9 @@ function createDocument(elements) {
     },
     getElementById(id) {
       return elements.find((element) => element.id === id) ?? null;
+    },
+    createElement(tagName) {
+      return createElement(tagName);
     },
   };
 }
@@ -129,20 +153,37 @@ describe('ContentInspector', () => {
     ]);
   });
 
-  it('highlights and clears highlight while restoring previous inline styles', () => {
+  it('highlights and clears highlight with an overlay while preserving target inline styles', () => {
     const controller = createElement('div', {
       attributes: { 'data-controller': 'modal' },
       style: { outline: '1px dashed red', outlineOffset: '1px' },
+      rect: { top: 10, left: 20, width: 300, height: 40 },
     });
     const document = createDocument([controller]);
     const inspector = new ContentInspector({ document, crypto, cssEscape });
     const [{ id }] = inspector.scan();
 
     expect(inspector.highlight(id)).toEqual({ success: true });
-    expect(controller.style.outline).toBe('3px dashed #2563eb');
-    expect(controller.style.outlineOffset).toBe('2px');
+    expect(controller.style.outline).toBe('1px dashed red');
+    expect(controller.style.outlineOffset).toBe('1px');
+
+    const overlay = document.body.children[0];
+    expect(overlay.style).toMatchObject({
+      position: 'fixed',
+      pointerEvents: 'none',
+      zIndex: '2147483647',
+      boxSizing: 'border-box',
+      outline: '3px dashed #2563eb',
+      background: 'rgba(168,85,247,0.12)',
+      borderRadius: '2px',
+      top: '10px',
+      left: '20px',
+      width: '300px',
+      height: '40px',
+    });
 
     expect(inspector.clearHighlight()).toEqual({ success: true });
+    expect(document.body.children).toHaveLength(0);
     expect(controller.style.outline).toBe('1px dashed red');
     expect(controller.style.outlineOffset).toBe('1px');
   });

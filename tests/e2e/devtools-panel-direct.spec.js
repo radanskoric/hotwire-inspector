@@ -8,7 +8,10 @@ import path from 'path';
 
 const extensionPath = path.resolve('output/chrome-mv3');
 
-test('interacts with DevTools panel directly via undock approach', async ({ browserName }) => {
+// Currently skipped because the undock approach is not working and I can't
+// "click" the Hotwire Inspector tab in the docked DevTools window since it's
+// behind the More tabs button.
+test.skip('interacts with DevTools panel directly via undock approach', async ({ browserName }) => {
   test.skip(browserName !== 'chromium');
   test.setTimeout(60000);
 
@@ -34,13 +37,34 @@ test('interacts with DevTools panel directly via undock approach', async ({ brow
     const page = context.pages().find((p) => p.url() === 'about:blank')
       ?? await context.newPage();
 
-    // Wait for DevTools to fully load
-    await new Promise((r) => setTimeout(r, 3000));
+    const start = Date.now();
+
+    while (
+      Date.now() - start < 10000
+      && !devtools.frames().some((frame) => frame.url().startsWith('chrome-extension'))
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    if (!devtools.frames().some((frame) => frame.url().startsWith('chrome-extension'))) {
+      throw new Error('Timed out waiting for extension frame in DevTools');
+    }
 
     // List all visible tabs for debugging
     console.log('Frames:', devtools.frames().map((f) => f.url()));
     const tabs = await devtools.getByRole('tab').allTextContents();
     console.log('Available tabs:', JSON.stringify(tabs));
+
+    // Click on Console tab first to ensure devtools are loaded
+    const consoleTab = devtools.getByRole('tab', { name: 'Console' });
+    await consoleTab.click();
+    console.log('Clicked Console tab');
+    await new Promise((resolve) => setTimeout(resolve, 15000));
+
+    // This fails to find the buttons but if undocking worked it would be easier to
+    // click the Hotwire Inspector tab
+    await devtools.getByRole('button', { name: 'Customize and control DevTools' }).click();
+    await devtools.getByRole('button', { name: 'Undock into separate window' }).click();
 
     // Try to find and click the Hotwire Inspector tab without undocking
     const hwTab = devtools.getByRole('tab', { name: 'Hotwire Inspector' });
@@ -55,7 +79,7 @@ test('interacts with DevTools panel directly via undock approach', async ({ brow
 
       if (moreCount > 0) {
         await moreTabs.click();
-        await new Promise((r) => setTimeout(r, 500));
+        // Currently this opens the menu but the next line doesn't see the entries
         const overflowTabs = await devtools.getByRole('menuitem').allTextContents();
         console.log('Overflow menu items:', JSON.stringify(overflowTabs));
       }

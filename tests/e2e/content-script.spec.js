@@ -71,12 +71,17 @@ test.describe('Content Script', () => {
 
       expect(result).toEqual({ success: true });
 
-      const styles = await page.locator('#main-frame').evaluate((el) => ({
-        outlineStyle: el.style.outlineStyle,
-        outlineWidth: el.style.outlineWidth,
-      }));
-      expect(styles.outlineStyle).toBe('solid');
-      expect(styles.outlineWidth).toBe('2px');
+      await expect(page.locator('body > div')).toHaveCount(2);
+      const overlay = page.locator('body > div').last();
+      await expect(overlay).toHaveCSS('position', 'fixed');
+      await expect(overlay).toHaveCSS('pointer-events', 'none');
+      await expect(overlay).toHaveCSS('z-index', '2147483647');
+      await expect(overlay).toHaveCSS('box-sizing', 'border-box');
+      await expect(overlay).toHaveCSS('outline-style', 'dashed');
+
+      const overlayBox = await overlay.boundingBox();
+      const targetBox = await page.locator('#main-frame').boundingBox();
+      expect(overlayBox).toEqual(targetBox);
     });
   });
 
@@ -90,8 +95,7 @@ test.describe('Content Script', () => {
       await sendToContentScript(frame, { type: 'hotwire-inspector:highlight', id: 'main-frame' });
       await sendToContentScript(frame, { type: 'hotwire-inspector:clear-highlight' });
 
-      const outlineStyle = await page.locator('#main-frame').evaluate((el) => el.style.outlineStyle);
-      expect(outlineStyle).toBe('');
+      await expect(page.locator('body > div')).toHaveCount(1);
     });
   });
 
