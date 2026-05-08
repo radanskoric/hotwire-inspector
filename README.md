@@ -1,12 +1,18 @@
 # Hotwire Inspector
 
-Cross-browser DevTools extension scaffold built with WXT, Vite, Vitest, and Playwright.
+Cross-browser DevTools extension for working with Hotwire powered applications. Built with WXT and Vite, and Vitest and Playwright for testing.
 
-## Why Hotwire Inspector
+## Why Hotwire Inspector?
 
 Hotwire Inspector exists to make it easier to understand the structure of Hotwire-powered pages, especially Turbo Frames and Stimulus controllers, directly from the browser's DevTools.
 
-An important goal of the project is to inspect the page without disturbing it. Hotwire Inspector works hard to avoid interfering with the page by keeping tracking and element identity inside the extension rather than writing tracking attributes into the target DOM. That helps reduce debugging noise, avoids surprising side effects, and keeps the inspected page behavior as close as possible to its normal runtime behavior.
+There are existing tools but I wanted a cross browser extension that integrates into the browser's DevTools panel rather than opening a separate window.
+
+An important goal of the project is to inspect the page without disturbing it. Hotwire Inspector works hard to avoid interfering with the page by:
+1. Tracking the elements on the page inside the extension rather than writing tracking attributes into the target DOM. This requires never holding a strong reference to the elements, so they can be garbage collected. Element's ID is used when possible and [WeakMap](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WeakMap) and [WeakRef](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WeakRef) are used whenever a direct reference to the element object is needed.
+2. Highlighting is done by inserting absolutely positioned elements into the root of the DOM rather than modifying the target elements directly. This is the minimal possible intrusion into the DOM that allows visual highlighting.
+
+This approach helps reduce debugging noise, avoids surprising side effects, and keeps the inspected page behavior as close as possible to its normal runtime behavior.
 
 ## Local development with hot reloading
 

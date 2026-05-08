@@ -129,6 +129,42 @@ describe('ContentInspector', () => {
     expect(secondScan[0].id).toBe('hotwire-inspector-uuid-1');
   });
 
+  it('stores weak references in the reverse element lookup', () => {
+    const controller = createElement('div', { attributes: { 'data-controller': 'modal' } });
+    const document = createDocument([controller]);
+    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const [{ id }] = inspector.scan();
+    const ref = inspector.elementsByKey.get(id);
+
+    expect(ref).toBeInstanceOf(WeakRef);
+    expect(ref.deref()).toBe(controller);
+  });
+
+  it('treats stale generated-key weak references as missing elements', () => {
+    const controller = createElement('div', { attributes: { 'data-controller': 'modal' } });
+    const document = createDocument([controller]);
+    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const [{ id }] = inspector.scan();
+
+    inspector.elementsByKey.set(id, { deref: () => undefined });
+
+    expect(inspector.highlight(id)).toEqual({ success: false });
+  });
+
+  it('falls back to document id lookup when a weak reference is stale', () => {
+    const frame = createElement('turbo-frame', { id: 'main-frame' });
+    const document = createDocument([frame]);
+    const inspector = new ContentInspector({ document, crypto, cssEscape });
+
+    inspector.scan();
+    inspector.elementsByKey.set('main-frame', { deref: () => undefined });
+
+    expect(inspector.inspect('main-frame')).toEqual({
+      success: true,
+      selector: '#main-frame',
+    });
+  });
+
   it('builds parent-child relationships during scan', () => {
     const frame = createElement('turbo-frame', { id: 'parent-frame' });
     const controller = createElement('div', { attributes: { 'data-controller': 'dropdown menu' } });
