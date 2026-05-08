@@ -1,3 +1,98 @@
 # Hotwire Inspector
 
 Cross-browser DevTools extension scaffold built with WXT, Vite, Vitest, and Playwright.
+
+## Why Hotwire Inspector
+
+Hotwire Inspector exists to make it easier to understand the structure of Hotwire-powered pages, especially Turbo Frames and Stimulus controllers, directly from the browser's DevTools.
+
+An important goal of the project is to inspect the page without disturbing it. Hotwire Inspector works hard to avoid interfering with the page by keeping tracking and element identity inside the extension rather than writing tracking attributes into the target DOM. That helps reduce debugging noise, avoids surprising side effects, and keeps the inspected page behavior as close as possible to its normal runtime behavior.
+
+## Local development with hot reloading
+
+To run the extension locally with hot reloading:
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Start the extension in development mode:
+
+```bash
+npm run dev
+```
+
+For Firefox, use:
+
+```bash
+npm run dev:firefox
+```
+
+WXT will build the extension in watch mode and reload it as you make changes.
+
+### Testing in the browser
+
+- Chrome
+  - run `npm run dev`
+  - open the browser instance started by WXT
+  - open DevTools on a page you want to inspect
+  - open the `Hotwire Inspector` panel
+
+- Firefox
+  - run `npm run dev:firefox`
+  - open the Firefox instance started by WXT
+  - open DevTools on a page you want to inspect
+  - open the `Hotwire Inspector` panel
+
+### Testing from a dev container
+
+If you are developing inside a dev container, the build and watch commands still run there, but browser launch usually does not cross from the container to the host browser automatically.
+
+- run `npm run dev` or `npm run dev:firefox` inside the container to keep the extension rebuilding in watch mode
+- load the extension manually in the browser running on your host machine from the appropriate `output/...` directory if needed
+- expect to reload the extension manually in the host browser after changes instead of relying on full automatic hot reload
+- refresh the inspected page or reopen the DevTools panel if the updated extension state is not picked up immediately
+
+### Useful verification commands
+
+```bash
+npm test -- --run
+npm run test:e2e
+npm run build
+```
+
+## How E2E tests work
+
+The E2E tests use Playwright to launch a real Chromium browser with the built extension loaded. They are split into two files that cover different parts of the extension.
+
+### Content-script tests (`content-script.spec.js`)
+
+Because Playwright's bundled Chromium does not visually render custom DevTools panels, these tests verify the content-script pipeline by messaging through the extension's devtools frame — the same way the real panel communicates:
+
+1. Launches Chromium with the extension and auto-opens DevTools
+2. Navigates to a fixture page containing Turbo Frames and Stimulus controllers
+3. Finds the extension's `devtools.html` frame inside the DevTools window
+4. Sends messages (scan, highlight, inspect, etc.) to the content script through that frame
+5. Asserts on the content script responses and on visible page-side effects like highlight styles
+
+### Panel UI tests (`panel.spec.js`)
+
+These test the panel rendering by loading `panel.html` directly as a standalone extension page:
+
+1. Launches Chromium with the extension loaded
+2. Injects a mock `chrome.devtools` API before the panel script runs
+3. Navigates to the panel page — it renders against the mock data
+4. Asserts on the rendered DOM: tree nodes, badges, summary text, empty and error states, refresh behavior
+
+Together, the two files exercise the full extension pipeline end-to-end: extension loading, DevTools registration, content script injection, DOM scanning, highlighting, element inspection, and panel rendering.
+
+A virtual display server (`Xvfb`) is started automatically on Linux when no display is available, so the tests work inside dev containers without extra setup.
+
+To run the E2E tests:
+
+```bash
+npm run build
+npm run test:e2e
+```
