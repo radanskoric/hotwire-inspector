@@ -38,7 +38,7 @@ Chromium tests use `tests/e2e/playwright.config.js` and the Chromium adapter in 
 They cover two paths:
 
 - **Content script pipeline**: launches Chromium with the extension loaded, opens DevTools, finds the extension `devtools.html` frame, and sends messages to the content script.
-- **Panel UI**: opens `panel.html` directly as a `chrome-extension://` page and injects mocked `chrome.devtools` / `chrome.tabs` APIs before the panel code runs.
+- **Panel UI**: opens `panel.html` directly as a `chrome-extension://` page and injects mocked extension APIs before the panel code runs.
 
 On Linux, the helpers start `Xvfb` when no display is available because extension DevTools testing needs headed Chromium.
 

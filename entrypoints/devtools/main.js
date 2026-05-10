@@ -1,5 +1,7 @@
+import { browser } from 'wxt/browser';
+
 console.log("ABOUT TO CREATE DEVTOOLS PANEL")
-chrome.devtools.panels.create(
+browser.devtools.panels.create(
   'Hotwire Inspector',
   'icon.svg',
   'panel.html',

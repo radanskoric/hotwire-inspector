@@ -88,7 +88,7 @@ Because Playwright's bundled Chromium does not visually render custom DevTools p
 These test the panel rendering by loading `panel.html` directly as a standalone extension page:
 
 1. Launches Chromium with the extension loaded
-2. Injects a mock `chrome.devtools` API before the panel script runs
+2. Injects mocked extension APIs before the panel script runs
 3. Navigates to the panel page — it renders against the mock data
 4. Asserts on the rendered DOM: tree nodes, badges, summary text, empty and error states, refresh behavior
 

@@ -104,7 +104,7 @@ function createBadgeTemplate() {
   };
 }
 
-function createChromeApi(sendMessageImplementation) {
+function createBrowserApi(sendMessageImplementation) {
   return {
     tabs: {
       sendMessage: sendMessageImplementation,
@@ -140,7 +140,7 @@ describe('PanelApp', () => {
 
   it('counts frames and controllers', () => {
     const app = new PanelApp({
-      chromeApi: createChromeApi(() => Promise.resolve({})),
+      browserApi: createBrowserApi(() => Promise.resolve({})),
       summaryElement,
       treeElement,
       emptyStateElement,
@@ -158,7 +158,7 @@ describe('PanelApp', () => {
 
   it('renders empty state when there are no nodes', () => {
     const app = new PanelApp({
-      chromeApi: createChromeApi(() => Promise.resolve({})),
+      browserApi: createBrowserApi(() => Promise.resolve({})),
       buildTree: () => [],
       summaryElement,
       treeElement,
@@ -178,7 +178,7 @@ describe('PanelApp', () => {
 
   it('renders nodes and badges from the built tree', () => {
     const app = new PanelApp({
-      chromeApi: createChromeApi(() => Promise.resolve({})),
+      browserApi: createBrowserApi(() => Promise.resolve({})),
       buildTree: () => [
         {
           id: 'frame-1',
@@ -231,7 +231,7 @@ describe('PanelApp', () => {
 
   it('does not render internal generated ids in node labels', () => {
     const app = new PanelApp({
-      chromeApi: createChromeApi(() => Promise.resolve({})),
+      browserApi: createBrowserApi(() => Promise.resolve({})),
       buildTree: () => [
         {
           id: `${ID_PREFIX}-uuid-1`,
@@ -271,7 +271,7 @@ describe('PanelApp', () => {
   it('refreshes by requesting a scan and then rendering the result', async () => {
     const sentMessages = [];
     const app = new PanelApp({
-      chromeApi: createChromeApi((tabId, message) => {
+      browserApi: createBrowserApi((tabId, message) => {
         sentMessages.push({ tabId, message });
         return Promise.resolve({ items: [{ id: 'frame-1', type: 'frame' }] });
       }),
@@ -298,7 +298,7 @@ describe('PanelApp', () => {
 
   it('shows an error message when refresh fails', async () => {
     const app = new PanelApp({
-      chromeApi: createChromeApi(() => Promise.reject(new Error('boom'))),
+      browserApi: createBrowserApi(() => Promise.reject(new Error('boom'))),
       buildTree: () => [],
       summaryElement,
       treeElement,
@@ -316,7 +316,7 @@ describe('PanelApp', () => {
   });
 
   it('inspects via selector when a rendered row is clicked', async () => {
-    const chromeApi = createChromeApi((_tabId, message) => {
+    const browserApi = createBrowserApi((_tabId, message) => {
       if (message.type === 'hotwire-inspector:inspect') {
         return Promise.resolve({ success: true, selector: '#frame-1' });
       }
@@ -324,7 +324,7 @@ describe('PanelApp', () => {
       return Promise.resolve({ success: true });
     });
     const app = new PanelApp({
-      chromeApi,
+      browserApi,
       buildTree: () => [
         {
           id: 'frame-1',
@@ -346,7 +346,7 @@ describe('PanelApp', () => {
     const row = treeElement.children[0].querySelector('.node-row');
     await row.listeners.get('click')();
 
-    expect(chromeApi.devtools.inspectedWindow.evalCalls).toEqual([
+    expect(browserApi.devtools.inspectedWindow.evalCalls).toEqual([
       'inspect(document.querySelector("#frame-1"))',
     ]);
   });
@@ -354,7 +354,7 @@ describe('PanelApp', () => {
   it('start wires the refresh button and triggers an initial refresh', async () => {
     const refreshCalls = [];
     const app = new PanelApp({
-      chromeApi: createChromeApi(() => Promise.resolve({ items: [] })),
+      browserApi: createBrowserApi(() => Promise.resolve({ items: [] })),
       summaryElement,
       treeElement,
       emptyStateElement,

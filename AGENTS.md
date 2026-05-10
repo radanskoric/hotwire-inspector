@@ -23,7 +23,7 @@ Core tooling currently includes:
 - `entrypoints/content.js`
   - content script logic for scanning, element lookup, highlighting, and inspect support
 - `entrypoints/devtools/`
-  - DevTools page entrypoint that registers the Hotwire Inspector panel via `chrome.devtools.panels.create`
+  - DevTools page entrypoint that registers the Hotwire Inspector panel via WXT's `browser.devtools.panels.create`
 - `entrypoints/panel/`
   - DevTools panel UI and interaction logic
 - `lib/tree-builder.js`
@@ -86,11 +86,11 @@ These test the panel rendering by loading `panel.html` directly as a `chrome-ext
 
 1. Launch Chromium with the extension loaded
 2. Extract the extension ID from the devtools frame URL
-3. Use `page.addInitScript()` to inject a mock `chrome.devtools` and `chrome.tabs.sendMessage` before `main.js` runs
+3. Use `page.addInitScript()` to inject mock extension APIs before `main.js` runs
 4. Navigate to `chrome-extension://<id>/panel.html` — `PanelApp` constructs against the mock and renders
 5. Assert on the rendered DOM (tree nodes, badges, summary text, empty/error states)
 
-The mock `chrome.tabs.sendMessage` is configured per-test to return controlled scan data, reject to simulate errors, or return different responses on successive calls (for refresh tests).
+The mock `browser.tabs.sendMessage` is configured per-test to return controlled scan data, reject to simulate errors, or return different responses on successive calls (for refresh tests).
 
 ### Key infrastructure details
 

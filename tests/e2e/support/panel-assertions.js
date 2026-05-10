@@ -3,12 +3,13 @@ import { ID_PREFIX } from '../../../lib/constants.js';
 
 export async function addMockPanelApis(page, { scanResponse, scanError, scanResponses } = {}) {
   await page.addInitScript(({ scanResponse, scanError, scanResponses }) => {
-    globalThis.chrome ??= {};
-    globalThis.chrome.tabs ??= {};
+    globalThis.browser ??= {};
+    globalThis.browser.tabs ??= {};
+    globalThis.chrome ??= globalThis.browser;
     globalThis.__hotwireInspectorMessages = [];
     globalThis.__hotwireInspectorEvalCalls = [];
 
-    chrome.devtools = {
+    browser.devtools = {
       inspectedWindow: {
         tabId: 1,
         eval: (code) => {
@@ -19,7 +20,7 @@ export async function addMockPanelApis(page, { scanResponse, scanError, scanResp
 
     let scanCallCount = 0;
 
-    chrome.tabs.sendMessage = (_tabId, message) => {
+    browser.tabs.sendMessage = (_tabId, message) => {
       globalThis.__hotwireInspectorMessages.push(message);
 
       if (message.type === 'hotwire-inspector:scan') {
@@ -38,6 +39,7 @@ export async function addMockPanelApis(page, { scanResponse, scanError, scanResp
 
       return Promise.resolve({ success: true, selector: '#mock' });
     };
+    globalThis.chrome = globalThis.browser;
   }, { scanResponse, scanError, scanResponses });
 }
 

@@ -1,3 +1,4 @@
+import { browser } from 'wxt/browser';
 import { ContentInspector } from '../lib/content-inspector.js';
 
 export default defineContentScript({
@@ -5,7 +6,7 @@ export default defineContentScript({
   main() {
     const inspector = new ContentInspector();
 
-    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (!message || typeof message !== 'object') {
         return false;
       }
