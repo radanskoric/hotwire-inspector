@@ -1,0 +1,41 @@
+import path from 'path';
+import { addMockPanelApis } from '../support/panel-assertions.js';
+import { withStaticServer } from '../support/static-server.js';
+
+export const firefoxAdapter = {
+  browserName: 'firefox',
+  extensionOutputPath: path.resolve('output/firefox-mv2'),
+  extensionUrlScheme: 'moz-extension://',
+  capabilities: {
+    loadsExtension: false,
+    opensDevtoolsPanel: false,
+    supportsContentScriptMessaging: false,
+    supportsDirectPanelPage: true,
+    usesMockedPanelApis: true,
+  },
+  withExtension,
+  openPanelPage,
+  sendToContentScript,
+};
+
+async function withExtension() {
+  throw new Error('Firefox extension loading is not supported by the E2E adapter yet');
+}
+
+export async function openPanelPage(page, options = {}) {
+  await addMockPanelApis(page, options);
+
+  let panelPage;
+
+  await withStaticServer(firefoxAdapter.extensionOutputPath, async (baseUrl) => {
+    panelPage = page;
+    await panelPage.goto(`${baseUrl}/panel.html`);
+    await panelPage.waitForLoadState('networkidle');
+  });
+
+  return panelPage;
+}
+
+async function sendToContentScript() {
+  throw new Error('Firefox content-script messaging is not supported by the E2E adapter yet');
+}

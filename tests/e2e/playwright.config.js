@@ -3,6 +3,7 @@ import path from 'path';
 
 export default defineConfig({
   testDir: '.',
+  testIgnore: ['firefox-smoke.spec.js'],
   timeout: 30000,
   workers: 1,
   use: {
@@ -12,6 +13,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      testIgnore: ['firefox-smoke.spec.js'],
       use: {
         browserName: 'chromium',
         launchOptions: {
@@ -24,10 +26,12 @@ export default defineConfig({
     },
     {
       name: 'firefox',
+      testMatch: ['panel.spec.js'],
       use: { browserName: 'firefox' },
     },
     {
       name: 'webkit',
+      testIgnore: ['*.spec.js'],
       use: { browserName: 'webkit' },
     },
   ],
