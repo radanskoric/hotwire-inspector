@@ -138,6 +138,33 @@ describe('PanelApp', () => {
     badgeTemplate = createBadgeTemplate();
   });
 
+  it('uses document lookups when elements and templates are not provided', () => {
+    const elementsById = {
+      summary: summaryElement,
+      tree: treeElement,
+      'empty-state': emptyStateElement,
+      'refresh-button': refreshButton,
+      'node-template': nodeTemplate,
+      'badge-template': badgeTemplate,
+    };
+    const document = {
+      getElementById(id) {
+        return elementsById[id];
+      },
+    };
+    const app = new PanelApp({
+      document,
+      browserApi: createBrowserApi(() => Promise.resolve({})),
+    });
+
+    expect(app.summaryElement).toBe(summaryElement);
+    expect(app.treeElement).toBe(treeElement);
+    expect(app.emptyStateElement).toBe(emptyStateElement);
+    expect(app.refreshButton).toBe(refreshButton);
+    expect(app.nodeTemplate).toBe(nodeTemplate);
+    expect(app.badgeTemplate).toBe(badgeTemplate);
+  });
+
   it('counts frames and controllers', () => {
     const app = new PanelApp({
       browserApi: createBrowserApi(() => Promise.resolve({})),
@@ -296,6 +323,25 @@ describe('PanelApp', () => {
     expect(treeElement.children).toHaveLength(1);
   });
 
+  it('renders an empty tree when refresh returns no items', async () => {
+    const app = new PanelApp({
+      browserApi: createBrowserApi(() => Promise.resolve({})),
+      buildTree: () => [],
+      summaryElement,
+      treeElement,
+      emptyStateElement,
+      refreshButton,
+      nodeTemplate,
+      badgeTemplate,
+    });
+
+    await app.refreshTree();
+
+    expect(summaryElement.textContent).toBe('0 frames, 0 controllers');
+    expect(emptyStateElement.hidden).toBe(false);
+    expect(treeElement.hidden).toBe(true);
+  });
+
   it('shows an error message when refresh fails', async () => {
     const app = new PanelApp({
       browserApi: createBrowserApi(() => Promise.reject(new Error('boom'))),
@@ -349,6 +395,75 @@ describe('PanelApp', () => {
     expect(browserApi.devtools.inspectedWindow.evalCalls).toEqual([
       'inspect(document.querySelector("#frame-1"))',
     ]);
+  });
+
+  it('sends highlight messages when a rendered row is hovered and left', async () => {
+    const sentMessages = [];
+    const app = new PanelApp({
+      browserApi: createBrowserApi((tabId, message) => {
+        sentMessages.push({ tabId, message });
+        return Promise.resolve({ success: true });
+      }),
+      buildTree: () => [
+        {
+          id: 'frame-1',
+          type: 'frame',
+          controllers: [],
+          children: [],
+        },
+      ],
+      summaryElement,
+      treeElement,
+      emptyStateElement,
+      refreshButton,
+      nodeTemplate,
+      badgeTemplate,
+    });
+
+    app.renderTree([{ type: 'frame' }]);
+
+    const row = treeElement.children[0].querySelector('.node-row');
+    await row.listeners.get('mouseenter')();
+    await row.listeners.get('mouseleave')();
+
+    expect(sentMessages).toEqual([
+      {
+        tabId: 42,
+        message: { type: 'hotwire-inspector:highlight', id: 'frame-1' },
+      },
+      {
+        tabId: 42,
+        message: { type: 'hotwire-inspector:clear-highlight' },
+      },
+    ]);
+  });
+
+  it('does not inspect when clicking a row returns no selector', async () => {
+    const browserApi = createBrowserApi(() => Promise.resolve({ success: false, selector: null }));
+    const app = new PanelApp({
+      browserApi,
+      buildTree: () => [
+        {
+          id: 'frame-1',
+          type: 'frame',
+          controllers: [],
+          children: [],
+        },
+      ],
+      summaryElement,
+      treeElement,
+      emptyStateElement,
+      refreshButton,
+      nodeTemplate,
+      badgeTemplate,
+    });
+
+    app.renderTree([{ type: 'frame' }]);
+
+    const row = treeElement.children[0].querySelector('.node-row');
+    await row.listeners.get('click')();
+
+    expect(browserApi.devtools.inspectedWindow.evalCalls).toEqual([]);
   });
 
   it('start wires the refresh button and triggers an initial refresh', async () => {

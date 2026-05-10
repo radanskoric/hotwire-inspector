@@ -6,6 +6,10 @@ describe('buildTree', () => {
     expect(buildTree([])).toEqual([]);
   });
 
+  it('returns empty array for non-array input', () => {
+    expect(buildTree(null)).toEqual([]);
+  });
+
   it('returns single root frame with no children', () => {
     const input = [{ id: 'main', src: '/page', parentId: null, type: 'frame' }];
     const result = buildTree(input);
@@ -39,6 +43,15 @@ describe('buildTree', () => {
     ];
     const result = buildTree(input);
     expect(result[0].children[0].type).toBe('controller');
+  });
+
+  it('promotes items with missing parents to roots', () => {
+    const input = [
+      { id: 'orphan', src: null, parentId: 'missing-parent', type: 'frame' },
+    ];
+    const result = buildTree(input);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('orphan');
   });
 
   it('handles frame with attached controllers', () => {

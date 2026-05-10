@@ -12,6 +12,16 @@ npm test -- --run
 
 They cover pure logic and DOM-level behavior that does not need a real browser extension context.
 
+## Unit test coverage
+
+Vitest coverage tracks unit-test coverage for source files in `entrypoints/` and `lib/`, including line and branch coverage.
+
+```bash
+npm run coverage
+```
+
+The command prints a text summary and writes an HTML report to `coverage/`. It does not include Playwright E2E coverage.
+
 ## E2E tests
 
 E2E tests live in `tests/e2e/` and run with Playwright.

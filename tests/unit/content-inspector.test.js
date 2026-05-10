@@ -102,6 +102,64 @@ describe('ContentInspector', () => {
     cssEscape = (value) => value.replace(/:/g, '\\:');
   });
 
+  it('can use global defaults with CSS escape and element node type', () => {
+    const previousDocument = globalThis.document;
+    const previousCrypto = globalThis.crypto;
+    const previousCss = globalThis.CSS;
+    const previousNode = globalThis.Node;
+    const frame = createElement('turbo-frame', { id: 'frame:main' });
+    const document = createDocument([frame]);
+
+    globalThis.document = document;
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      value: crypto,
+    });
+    globalThis.CSS = { escape: (value) => value.replace(/:/g, '\\:') };
+    globalThis.Node = { ELEMENT_NODE: 1 };
+
+    try {
+      const inspector = new ContentInspector();
+      inspector.scan();
+
+      expect(inspector.inspect('frame:main')).toEqual({
+        success: true,
+        selector: '#frame\\:main',
+      });
+    } finally {
+      globalThis.document = previousDocument;
+      Object.defineProperty(globalThis, 'crypto', {
+        configurable: true,
+        value: previousCrypto,
+      });
+      globalThis.CSS = previousCss;
+      globalThis.Node = previousNode;
+    }
+  });
+
+  it('falls back when CSS escape and Node globals are unavailable', () => {
+    const previousCss = globalThis.CSS;
+    const previousNode = globalThis.Node;
+    const frame = createElement('turbo-frame', { id: 'frame:main' });
+    const document = createDocument([frame]);
+
+    globalThis.CSS = undefined;
+    globalThis.Node = undefined;
+
+    try {
+      const inspector = new ContentInspector({ document, crypto });
+      inspector.scan();
+
+      expect(inspector.inspect('frame:main')).toEqual({
+        success: true,
+        selector: '#frame:main',
+      });
+    } finally {
+      globalThis.CSS = previousCss;
+      globalThis.Node = previousNode;
+    }
+  });
+
   it('uses real element ids when present during scan', () => {
     const frame = createElement('turbo-frame', { id: 'main-frame' });
     const document = createDocument([frame]);
@@ -235,6 +293,16 @@ describe('ContentInspector', () => {
     expect(inspector.inspect('frame:main')).toEqual({
       success: true,
       selector: '#frame\\:main',
+    });
+  });
+
+  it('returns no selector when inspecting a missing element', () => {
+    const document = createDocument([]);
+    const inspector = new ContentInspector({ document, crypto, cssEscape });
+
+    expect(inspector.inspect('missing')).toEqual({
+      success: false,
+      selector: null,
     });
   });
 

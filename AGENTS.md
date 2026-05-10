@@ -106,6 +106,8 @@ If you change content script message types, the devtools entrypoint, or the pane
 
 ## Working Style
 
+- Always use red/green TDD for behavior changes.
+- Keep unit-tested application logic at 100% coverage across statements, branches, functions, and lines; do not reduce coverage for functions in `lib/**/*.js`.
 - Prefer minimal, targeted changes.
 - Avoid introducing side effects in inspected pages.
 - Treat `docs/decisions/` as the authoritative record for architectural choices unless intentionally updating those decisions.
