@@ -12,7 +12,7 @@ export default defineConfig({
   }),
   manifest: {
     name: 'Hotwire Inspector',
-    permissions: ['activeTab', 'scripting'],
+    permissions: ['activeTab', 'scripting', 'tabs'],
     devtools_page: 'devtools.html',
   },
   webExt: {

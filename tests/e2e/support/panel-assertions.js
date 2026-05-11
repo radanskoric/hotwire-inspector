@@ -4,7 +4,7 @@ import { ID_PREFIX } from '../../../lib/constants.js';
 export async function addMockPanelApis(page, { scanResponse, scanError, scanResponses } = {}) {
   await page.addInitScript(({ scanResponse, scanError, scanResponses }) => {
     globalThis.browser ??= {};
-    globalThis.browser.tabs ??= {};
+    globalThis.browser.runtime ??= {};
     globalThis.chrome ??= globalThis.browser;
     globalThis.__hotwireInspectorMessages = [];
     globalThis.__hotwireInspectorEvalCalls = [];
@@ -20,7 +20,9 @@ export async function addMockPanelApis(page, { scanResponse, scanError, scanResp
 
     let scanCallCount = 0;
 
-    browser.tabs.sendMessage = (_tabId, message) => {
+    browser.runtime.sendMessage = (relayMessage) => {
+      const message = relayMessage.message;
+
       globalThis.__hotwireInspectorMessages.push(message);
 
       if (message.type === 'hotwire-inspector:scan') {

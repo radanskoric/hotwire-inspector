@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ID_PREFIX } from '../../lib/constants.js';
+import { ID_PREFIX, RELAY_ERROR_TYPE, RELAY_MESSAGE_TYPE } from '../../lib/constants.js';
 import { PanelApp } from '../../lib/panel-app.js';
 
 class FakeElement {
@@ -106,7 +106,7 @@ function createBadgeTemplate() {
 
 function createBrowserApi(sendMessageImplementation) {
   return {
-    tabs: {
+    runtime: {
       sendMessage: sendMessageImplementation,
     },
     devtools: {
@@ -298,8 +298,8 @@ describe('PanelApp', () => {
   it('refreshes by requesting a scan and then rendering the result', async () => {
     const sentMessages = [];
     const app = new PanelApp({
-      browserApi: createBrowserApi((tabId, message) => {
-        sentMessages.push({ tabId, message });
+      browserApi: createBrowserApi((message) => {
+        sentMessages.push(message);
         return Promise.resolve({ items: [{ id: 'frame-1', type: 'frame' }] });
       }),
       buildTree: (items) => items.map((item) => ({ ...item, children: [] })),
@@ -313,12 +313,11 @@ describe('PanelApp', () => {
 
     await app.refreshTree();
 
-    expect(sentMessages).toEqual([
-      {
-        tabId: 42,
-        message: { type: 'hotwire-inspector:scan' },
-      },
-    ]);
+    expect(sentMessages).toEqual([{
+      type: RELAY_MESSAGE_TYPE,
+      tabId: 42,
+      message: { type: 'hotwire-inspector:scan' },
+    }]);
     expect(summaryElement.textContent).toBe('1 frames, 0 controllers');
     expect(treeElement.children).toHaveLength(1);
   });
@@ -361,9 +360,31 @@ describe('PanelApp', () => {
     expect(treeElement.hidden).toBe(true);
   });
 
+  it('shows an error message when the background relay fails', async () => {
+    const app = new PanelApp({
+      browserApi: createBrowserApi(() => Promise.resolve({
+        type: RELAY_ERROR_TYPE,
+        message: 'relay failed',
+      })),
+      buildTree: () => [],
+      summaryElement,
+      treeElement,
+      emptyStateElement,
+      refreshButton,
+      nodeTemplate,
+      badgeTemplate,
+    });
+
+    await app.refreshTree();
+
+    expect(summaryElement.textContent).toBe('Unable to read the inspected page');
+    expect(emptyStateElement.hidden).toBe(false);
+    expect(treeElement.hidden).toBe(true);
+  });
+
   it('inspects via selector when a rendered row is clicked', async () => {
-    const browserApi = createBrowserApi((_tabId, message) => {
-      if (message.type === 'hotwire-inspector:inspect') {
+    const browserApi = createBrowserApi((relayMessage) => {
+      if (relayMessage.message.type === 'hotwire-inspector:inspect') {
         return Promise.resolve({ success: true, selector: '#frame-1' });
       }
 
@@ -400,8 +421,8 @@ describe('PanelApp', () => {
   it('sends highlight messages when a rendered row is hovered and left', async () => {
     const sentMessages = [];
     const app = new PanelApp({
-      browserApi: createBrowserApi((tabId, message) => {
-        sentMessages.push({ tabId, message });
+      browserApi: createBrowserApi((message) => {
+        sentMessages.push(message);
         return Promise.resolve({ success: true });
       }),
       buildTree: () => [
@@ -428,10 +449,12 @@ describe('PanelApp', () => {
 
     expect(sentMessages).toEqual([
       {
+        type: RELAY_MESSAGE_TYPE,
         tabId: 42,
         message: { type: 'hotwire-inspector:highlight', id: 'frame-1' },
       },
       {
+        type: RELAY_MESSAGE_TYPE,
         tabId: 42,
         message: { type: 'hotwire-inspector:clear-highlight' },
       },
