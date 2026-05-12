@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ID_PREFIX, RELAY_ERROR_TYPE, RELAY_MESSAGE_TYPE } from '../../lib/constants.js';
+import {
+  CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
+  CONTENT_HIGHLIGHT_MESSAGE_TYPE,
+  CONTENT_INSPECT_MESSAGE_TYPE,
+  CONTENT_SCAN_MESSAGE_TYPE,
+  ID_PREFIX,
+  RELAY_ERROR_TYPE,
+  RELAY_MESSAGE_TYPE,
+} from '../../lib/constants.js';
 import { PanelApp } from '../../lib/panel-app.js';
 
 class FakeElement {
@@ -316,7 +324,7 @@ describe('PanelApp', () => {
     expect(sentMessages).toEqual([{
       type: RELAY_MESSAGE_TYPE,
       tabId: 42,
-      message: { type: 'hotwire-inspector:scan' },
+      message: { type: CONTENT_SCAN_MESSAGE_TYPE },
     }]);
     expect(summaryElement.textContent).toBe('1 frames, 0 controllers');
     expect(treeElement.children).toHaveLength(1);
@@ -384,7 +392,7 @@ describe('PanelApp', () => {
 
   it('inspects via selector when a rendered row is clicked', async () => {
     const browserApi = createBrowserApi((relayMessage) => {
-      if (relayMessage.message.type === 'hotwire-inspector:inspect') {
+      if (relayMessage.message.type === CONTENT_INSPECT_MESSAGE_TYPE) {
         return Promise.resolve({ success: true, selector: '#frame-1' });
       }
 
@@ -451,12 +459,12 @@ describe('PanelApp', () => {
       {
         type: RELAY_MESSAGE_TYPE,
         tabId: 42,
-        message: { type: 'hotwire-inspector:highlight', id: 'frame-1' },
+        message: { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'frame-1' },
       },
       {
         type: RELAY_MESSAGE_TYPE,
         tabId: 42,
-        message: { type: 'hotwire-inspector:clear-highlight' },
+        message: { type: CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE },
       },
     ]);
   });

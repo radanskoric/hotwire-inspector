@@ -1,5 +1,11 @@
 import { expect } from '@playwright/test';
-import { ID_PREFIX } from '../../../lib/constants.js';
+import {
+  CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
+  CONTENT_HIGHLIGHT_MESSAGE_TYPE,
+  CONTENT_INSPECT_MESSAGE_TYPE,
+  CONTENT_SCAN_MESSAGE_TYPE,
+  ID_PREFIX,
+} from '../../../lib/constants.js';
 
 export async function addMockPanelApis(page, { scanResponse, scanError, scanResponses } = {}) {
   await page.addInitScript(({ scanResponse, scanError, scanResponses }) => {
@@ -25,7 +31,7 @@ export async function addMockPanelApis(page, { scanResponse, scanError, scanResp
 
       globalThis.__hotwireInspectorMessages.push(message);
 
-      if (message.type === 'hotwire-inspector:scan') {
+      if (message.type === CONTENT_SCAN_MESSAGE_TYPE) {
         if (scanError) {
           return Promise.reject(new Error(scanError));
         }
@@ -140,9 +146,9 @@ export async function expectHoverMessages(panelPage) {
   const messages = await getRecordedMessages(panelPage);
 
   expect(messages).toEqual([
-    { type: 'hotwire-inspector:scan' },
-    { type: 'hotwire-inspector:highlight', id: 'main-frame' },
-    { type: 'hotwire-inspector:clear-highlight' },
+    { type: CONTENT_SCAN_MESSAGE_TYPE },
+    { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'main-frame' },
+    { type: CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE },
   ]);
 }
 
@@ -155,8 +161,8 @@ export async function expectClickInspects(panelPage) {
   const evalCalls = await getRecordedEvalCalls(panelPage);
 
   expect(messages).toEqual([
-    { type: 'hotwire-inspector:scan' },
-    { type: 'hotwire-inspector:inspect', id: 'nested-frame' },
+    { type: CONTENT_SCAN_MESSAGE_TYPE },
+    { type: CONTENT_INSPECT_MESSAGE_TYPE, id: 'nested-frame' },
   ]);
   expect(evalCalls).toEqual([
     'inspect(document.querySelector("#mock"))',

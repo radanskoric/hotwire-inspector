@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
 import {
+  CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
+  CONTENT_HIGHLIGHT_MESSAGE_TYPE,
+  CONTENT_INSPECT_MESSAGE_TYPE,
+  CONTENT_SCAN_MESSAGE_TYPE,
+} from '../../lib/constants.js';
+import {
   deepFixtureUrl,
   fixtureUrl,
   withChromiumExtension,
@@ -30,7 +36,7 @@ test.describe('Content Script', () => {
       await gotoFixture(page);
 
       const frame = await getExtensionDevtoolsFrame(context);
-      const result = await sendToContentScript(frame, { type: 'hotwire-inspector:scan' });
+      const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
 
       const frames = result.items.filter((item) => item.type === 'frame');
       expect(frames).toHaveLength(2);
@@ -47,7 +53,7 @@ test.describe('Content Script', () => {
       await gotoFixture(page);
 
       const frame = await getExtensionDevtoolsFrame(context);
-      const result = await sendToContentScript(frame, { type: 'hotwire-inspector:scan' });
+      const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
 
       const controllers = result.items.filter((item) => item.type === 'controller');
       expect(controllers).toHaveLength(2);
@@ -68,7 +74,7 @@ test.describe('Content Script', () => {
       await gotoFixture(page);
 
       const frame = await getExtensionDevtoolsFrame(context);
-      const result = await sendToContentScript(frame, { type: 'hotwire-inspector:highlight', id: 'main-frame' });
+      const result = await sendToContentScript(frame, { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'main-frame' });
 
       expect(result).toEqual({ success: true });
 
@@ -93,8 +99,8 @@ test.describe('Content Script', () => {
       await gotoFixture(page);
 
       const frame = await getExtensionDevtoolsFrame(context);
-      await sendToContentScript(frame, { type: 'hotwire-inspector:highlight', id: 'main-frame' });
-      await sendToContentScript(frame, { type: 'hotwire-inspector:clear-highlight' });
+      await sendToContentScript(frame, { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'main-frame' });
+      await sendToContentScript(frame, { type: CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE });
 
       await expect(page.locator('body > div')).toHaveCount(1);
     });
@@ -107,7 +113,7 @@ test.describe('Content Script', () => {
       await gotoFixture(page);
 
       const frame = await getExtensionDevtoolsFrame(context);
-      const result = await sendToContentScript(frame, { type: 'hotwire-inspector:inspect', id: 'main-frame' });
+      const result = await sendToContentScript(frame, { type: CONTENT_INSPECT_MESSAGE_TYPE, id: 'main-frame' });
 
       expect(result.success).toBe(true);
       expect(result.selector).toBe('#main-frame');
@@ -126,7 +132,7 @@ test.describe('Content Script', () => {
       const frame = await getExtensionDevtoolsFrame(context);
 
       await expect(
-        sendToContentScript(frame, { type: 'hotwire-inspector:scan' }),
+        sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE }),
       ).rejects.toThrow();
     });
   });
@@ -138,7 +144,7 @@ test.describe('Content Script', () => {
       await gotoFixture(page);
 
       const frame = await getExtensionDevtoolsFrame(context);
-      const result = await sendToContentScript(frame, { type: 'hotwire-inspector:scan' });
+      const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
 
       const mainFrame = result.items.find((i) => i.id === 'main-frame');
       const nestedFrame = result.items.find((i) => i.id === 'nested-frame');
@@ -159,7 +165,7 @@ test.describe('Content Script', () => {
       await gotoFixture(page);
 
       const frame = await getExtensionDevtoolsFrame(context);
-      const initialResult = await sendToContentScript(frame, { type: 'hotwire-inspector:scan' });
+      const initialResult = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
 
       expect(initialResult.items.find((item) => item.id === 'dynamic-frame')).toBeUndefined();
 
@@ -176,7 +182,7 @@ test.describe('Content Script', () => {
         nestedFrame.appendChild(frameElement);
       });
 
-      const updatedResult = await sendToContentScript(frame, { type: 'hotwire-inspector:scan' });
+      const updatedResult = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
       const dynamicFrame = updatedResult.items.find((item) => item.id === 'dynamic-frame');
       const dynamicController = updatedResult.items.find((item) => item.id === 'dynamic-controller');
 
@@ -201,7 +207,7 @@ test.describe('Content Script', () => {
       await page.goto(deepFixtureUrl);
 
       const frame = await getExtensionDevtoolsFrame(context);
-      const result = await sendToContentScript(frame, { type: 'hotwire-inspector:scan' });
+      const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
       const parentIdsById = Object.fromEntries(result.items.map((item) => [item.id, item.parentId]));
 
       expect(result.items.map((item) => item.id)).toEqual([
