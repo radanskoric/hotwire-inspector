@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+// @vitest-environment happy-dom
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
@@ -10,130 +12,60 @@ import {
 } from '../../lib/constants.js';
 import { PanelApp } from '../../lib/panel-app.js';
 
-class FakeElement {
-  constructor(tagName, { id = '', className = '', textContent = '', hidden = false } = {}) {
-    this.tagName = tagName.toUpperCase();
-    this.id = id;
-    this.className = className;
-    this.textContent = textContent;
-    this.hidden = hidden;
-    this.children = [];
-    this.parentElement = null;
-    this.listeners = new Map();
-    this.dataset = {};
-    this.value = '';
-  }
-
-  removeAttribute(name) {
-    if (name === 'data-theme') {
-      delete this.dataset.theme;
-    }
-  }
-
-  setAttribute(name, value) {
-    if (name.startsWith('data-')) {
-      const key = name
-        .slice(5)
-        .replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-      this.dataset[key] = value;
-      return;
-    }
-
-    if (name === 'data-theme') {
-      this.dataset.theme = value;
-    }
-  }
-
-  appendChild(child) {
-    child.parentElement = this;
-    this.children.push(child);
-    return child;
-  }
-
-  replaceChildren(...children) {
-    this.children = [];
-
-    for (const child of children) {
-      this.appendChild(child);
-    }
-  }
-
-  addEventListener(type, handler) {
-    this.listeners.set(type, handler);
-  }
-
-  querySelector(selector) {
-    if (!selector.startsWith('.')) {
-      return null;
-    }
-
-    const className = selector.slice(1);
-    const queue = [...this.children];
-
-    while (queue.length) {
-      const element = queue.shift();
-
-      if (element.className.split(/\s+/).includes(className)) {
-        return element;
-      }
-
-      queue.push(...element.children);
-    }
-
-    return null;
-  }
-
-  cloneNode(deep = false) {
-    const clone = new FakeElement(this.tagName, {
-      id: this.id,
-      className: this.className,
-      textContent: this.textContent,
-      hidden: this.hidden,
-    });
-    clone.dataset = { ...this.dataset };
-
-    if (deep) {
-      for (const child of this.children) {
-        clone.appendChild(child.cloneNode(true));
-      }
-    }
-
-    return clone;
-  }
-}
-
-function createNodeTemplate() {
-  const node = new FakeElement('div', { className: 'node' });
-  const row = new FakeElement('button', { className: 'node-row' });
-  const main = new FakeElement('span', { className: 'node-main' });
-  const kind = new FakeElement('span', { className: 'node-kind' });
-  const id = new FakeElement('span', { className: 'node-id' });
-  const src = new FakeElement('span', { className: 'node-src', hidden: true });
-  const badges = new FakeElement('span', { className: 'badges', hidden: true });
-  const children = new FakeElement('div', { className: 'node-children', hidden: true });
-
-  row.setAttribute('data-controller', 'panel-node');
-  row.setAttribute('data-action', 'mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight click->panel-node#inspect');
-  main.appendChild(kind);
-  main.appendChild(id);
-  main.appendChild(src);
-  row.appendChild(main);
-  row.appendChild(badges);
-  node.appendChild(row);
-  node.appendChild(children);
+function mountPanelDom() {
+  document.body.innerHTML = `
+    <div class="app">
+      <header class="toolbar">
+        <div>
+          <h1>Hotwire Inspector</h1>
+          <p id="summary">Loading…</p>
+        </div>
+        <div class="toolbar-actions">
+          <label class="theme-control">
+            <span>Theme</span>
+            <select id="theme-select" class="theme-select">
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </label>
+          <button id="refresh-button" class="btn" type="button">Refresh</button>
+        </div>
+      </header>
+      <main>
+        <div id="empty-state" class="empty-state" hidden>No turbo frames or Stimulus controllers found.</div>
+        <div id="tree" class="tree" role="tree"></div>
+      </main>
+    </div>
+    <template id="node-template">
+      <div class="node">
+        <button type="button" class="node-row" role="treeitem" data-controller="panel-node"
+          data-action="mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight click->panel-node#inspect">
+          <img src="/icons/reveal-in-elements.svg" class="icon" />
+          <span class="node-main">
+            <span class="node-kind"></span>
+            <span class="node-id"></span>
+            <span class="node-src" hidden></span>
+          </span>
+          <span class="badges" hidden></span>
+        </button>
+        <div class="node-children" role="group" hidden></div>
+      </div>
+    </template>
+    <template id="badge-template">
+      <span class="badge"></span>
+    </template>
+  `;
 
   return {
-    content: {
-      firstElementChild: node,
-    },
-  };
-}
-
-function createBadgeTemplate() {
-  return {
-    content: {
-      firstElementChild: new FakeElement('span', { className: 'badge' }),
-    },
+    summaryElement: document.getElementById('summary'),
+    treeElement: document.getElementById('tree'),
+    emptyStateElement: document.getElementById('empty-state'),
+    refreshButton: document.getElementById('refresh-button'),
+    themeSelectElement: document.getElementById('theme-select'),
+    rootElement: document.documentElement,
+    nodeTemplate: document.getElementById('node-template'),
+    badgeTemplate: document.getElementById('badge-template'),
   };
 }
 
@@ -154,6 +86,19 @@ function createBrowserApi(sendMessageImplementation) {
   };
 }
 
+function createStorage() {
+  const storedValues = new Map();
+
+  return {
+    getItem(key) {
+      return storedValues.get(key) ?? null;
+    },
+    setItem(key, value) {
+      storedValues.set(key, value);
+    },
+  };
+}
+
 describe('PanelApp', () => {
   let summaryElement;
   let treeElement;
@@ -164,32 +109,41 @@ describe('PanelApp', () => {
   let nodeTemplate;
   let badgeTemplate;
 
+  function createPanelApp(options = {}) {
+    return new PanelApp({
+      browserApi: createBrowserApi(() => Promise.resolve({})),
+      summaryElement,
+      treeElement,
+      emptyStateElement,
+      refreshButton,
+      themeSelectElement,
+      rootElement,
+      storage: createStorage(),
+      nodeTemplate,
+      badgeTemplate,
+      ...options,
+    });
+  }
+
   beforeEach(() => {
-    summaryElement = new FakeElement('p');
-    treeElement = new FakeElement('div');
-    emptyStateElement = new FakeElement('div', { hidden: true });
-    refreshButton = new FakeElement('button');
-    themeSelectElement = new FakeElement('select');
-    rootElement = new FakeElement('html');
-    nodeTemplate = createNodeTemplate();
-    badgeTemplate = createBadgeTemplate();
+    ({
+      summaryElement,
+      treeElement,
+      emptyStateElement,
+      refreshButton,
+      themeSelectElement,
+      rootElement,
+      nodeTemplate,
+      badgeTemplate,
+    } = mountPanelDom());
+  });
+
+  afterEach(() => {
+    document.documentElement.removeAttribute('data-theme');
+    document.body.innerHTML = '';
   });
 
   it('uses document lookups when elements and templates are not provided', () => {
-    const elementsById = {
-      summary: summaryElement,
-      tree: treeElement,
-      'empty-state': emptyStateElement,
-      'refresh-button': refreshButton,
-      'theme-select': themeSelectElement,
-      'node-template': nodeTemplate,
-      'badge-template': badgeTemplate,
-    };
-    const document = {
-      getElementById(id) {
-        return elementsById[id];
-      },
-    };
     const app = new PanelApp({
       document,
       browserApi: createBrowserApi(() => Promise.resolve({})),
@@ -214,18 +168,7 @@ describe('PanelApp', () => {
         storedValues.set(key, value);
       },
     };
-    const app = new PanelApp({
-      browserApi: createBrowserApi(() => Promise.resolve({})),
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      themeSelectElement,
-      rootElement,
-      storage,
-      nodeTemplate,
-      badgeTemplate,
-    });
+    const app = createPanelApp({ storage });
 
     app.initializeTheme();
 
@@ -241,18 +184,7 @@ describe('PanelApp', () => {
       },
       setItem() { },
     };
-    const app = new PanelApp({
-      browserApi: createBrowserApi(() => Promise.resolve({})),
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      themeSelectElement,
-      rootElement,
-      storage,
-      nodeTemplate,
-      badgeTemplate,
-    });
+    const app = createPanelApp({ storage });
 
     app.initializeTheme();
 
@@ -270,28 +202,17 @@ describe('PanelApp', () => {
         storedValues.set(key, value);
       },
     };
-    const app = new PanelApp({
-      browserApi: createBrowserApi(() => Promise.resolve({})),
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      themeSelectElement,
-      rootElement,
-      storage,
-      nodeTemplate,
-      badgeTemplate,
-    });
+    const app = createPanelApp({ storage });
 
     app.initializeTheme();
     themeSelectElement.value = 'light';
-    themeSelectElement.listeners.get('change')();
+    themeSelectElement.dispatchEvent(new Event('change'));
 
     expect(rootElement.dataset.theme).toBe('light');
     expect(storedValues.get('hotwire-inspector.theme')).toBe('light');
 
     themeSelectElement.value = 'system';
-    themeSelectElement.listeners.get('change')();
+    themeSelectElement.dispatchEvent(new Event('change'));
 
     expect(rootElement.dataset.theme).toBeUndefined();
     expect(storedValues.get('hotwire-inspector.theme')).toBe('system');
@@ -307,18 +228,7 @@ describe('PanelApp', () => {
         storedValues.set(key, value);
       },
     };
-    const app = new PanelApp({
-      browserApi: createBrowserApi(() => Promise.resolve({})),
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      themeSelectElement,
-      rootElement,
-      storage,
-      nodeTemplate,
-      badgeTemplate,
-    });
+    const app = createPanelApp({ storage });
 
     app.setTheme('unknown');
 
@@ -326,16 +236,24 @@ describe('PanelApp', () => {
     expect(storedValues.get('hotwire-inspector.theme')).toBe('system');
   });
 
-  it('counts frames and controllers', () => {
+  it('skips theme initialization when theme controls are unavailable', () => {
     const app = new PanelApp({
+      document: {
+        getElementById() {
+          return undefined;
+        },
+      },
       browserApi: createBrowserApi(() => Promise.resolve({})),
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      nodeTemplate,
-      badgeTemplate,
+      storage: createStorage(),
     });
+
+    app.initializeTheme();
+
+    expect(rootElement.dataset.theme).toBeUndefined();
+  });
+
+  it('counts frames and controllers', () => {
+    const app = createPanelApp();
 
     expect(app.countItems([
       { type: 'frame', controllers: ['lazy'] },
@@ -345,28 +263,18 @@ describe('PanelApp', () => {
   });
 
   it('renders empty state when there are no nodes', () => {
-    const app = new PanelApp({
-      browserApi: createBrowserApi(() => Promise.resolve({})),
-      buildTree: () => [],
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      nodeTemplate,
-      badgeTemplate,
-    });
+    const app = createPanelApp({ buildTree: () => [] });
 
     app.renderTree([]);
 
     expect(summaryElement.textContent).toBe('0 frames, 0 controllers');
     expect(emptyStateElement.hidden).toBe(false);
     expect(treeElement.hidden).toBe(true);
-    expect(treeElement.children).toHaveLength(0);
+    expect(treeElement.children.length).toBe(0);
   });
 
   it('renders nodes and badges from the built tree', () => {
-    const app = new PanelApp({
-      browserApi: createBrowserApi(() => Promise.resolve({})),
+    const app = createPanelApp({
       buildTree: () => [
         {
           id: 'frame-1',
@@ -383,12 +291,6 @@ describe('PanelApp', () => {
           ],
         },
       ],
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      nodeTemplate,
-      badgeTemplate,
     });
 
     app.renderTree([
@@ -408,17 +310,17 @@ describe('PanelApp', () => {
     expect(src.textContent).toBe('/posts');
     expect(src.hidden).toBe(false);
     expect(badges.hidden).toBe(false);
-    expect(badges.children).toHaveLength(1);
+    expect(badges.children.length).toBe(1);
     expect(badges.children[0].textContent).toBe('lazy');
     expect(children.hidden).toBe(false);
-    expect(children.children).toHaveLength(1);
+    expect(children.children.length).toBe(1);
     expect(row.dataset.controller).toBe('panel-node');
+    expect(row.dataset.action).toBe('mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight click->panel-node#inspect');
     expect(row.dataset.panelNodeIdValue).toBe('frame-1');
   });
 
   it('does not render internal generated ids in node labels', () => {
-    const app = new PanelApp({
-      browserApi: createBrowserApi(() => Promise.resolve({})),
+    const app = createPanelApp({
       buildTree: () => [
         {
           id: `${ID_PREFIX}-uuid-1`,
@@ -433,12 +335,6 @@ describe('PanelApp', () => {
           children: [],
         },
       ],
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      nodeTemplate,
-      badgeTemplate,
     });
 
     app.renderTree([
@@ -457,18 +353,12 @@ describe('PanelApp', () => {
 
   it('refreshes by requesting a scan and then rendering the result', async () => {
     const sentMessages = [];
-    const app = new PanelApp({
+    const app = createPanelApp({
       browserApi: createBrowserApi((message) => {
         sentMessages.push(message);
         return Promise.resolve({ items: [{ id: 'frame-1', type: 'frame' }] });
       }),
       buildTree: (items) => items.map((item) => ({ ...item, children: [] })),
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      nodeTemplate,
-      badgeTemplate,
     });
 
     await app.refreshTree();
@@ -479,20 +369,11 @@ describe('PanelApp', () => {
       message: { type: CONTENT_SCAN_MESSAGE_TYPE },
     }]);
     expect(summaryElement.textContent).toBe('1 frames, 0 controllers');
-    expect(treeElement.children).toHaveLength(1);
+    expect(treeElement.children.length).toBe(1);
   });
 
   it('renders an empty tree when refresh returns no items', async () => {
-    const app = new PanelApp({
-      browserApi: createBrowserApi(() => Promise.resolve({})),
-      buildTree: () => [],
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      nodeTemplate,
-      badgeTemplate,
-    });
+    const app = createPanelApp({ buildTree: () => [] });
 
     await app.refreshTree();
 
@@ -502,15 +383,9 @@ describe('PanelApp', () => {
   });
 
   it('shows an error message when refresh fails', async () => {
-    const app = new PanelApp({
+    const app = createPanelApp({
       browserApi: createBrowserApi(() => Promise.reject(new Error('boom'))),
       buildTree: () => [],
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      nodeTemplate,
-      badgeTemplate,
     });
 
     await app.refreshTree();
@@ -521,18 +396,12 @@ describe('PanelApp', () => {
   });
 
   it('shows an error message when the background relay fails', async () => {
-    const app = new PanelApp({
+    const app = createPanelApp({
       browserApi: createBrowserApi(() => Promise.resolve({
         type: RELAY_ERROR_TYPE,
         message: 'relay failed',
       })),
       buildTree: () => [],
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      nodeTemplate,
-      badgeTemplate,
     });
 
     await app.refreshTree();
@@ -550,7 +419,7 @@ describe('PanelApp', () => {
 
       return Promise.resolve({ success: true });
     });
-    const app = new PanelApp({
+    const app = createPanelApp({
       browserApi,
       buildTree: () => [
         {
@@ -560,12 +429,6 @@ describe('PanelApp', () => {
           children: [],
         },
       ],
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      nodeTemplate,
-      badgeTemplate,
     });
 
     await app.inspectNode('frame-1');
@@ -577,7 +440,7 @@ describe('PanelApp', () => {
 
   it('sends highlight messages for a node and clears them', async () => {
     const sentMessages = [];
-    const app = new PanelApp({
+    const app = createPanelApp({
       browserApi: createBrowserApi((message) => {
         sentMessages.push(message);
         return Promise.resolve({ success: true });
@@ -590,12 +453,6 @@ describe('PanelApp', () => {
           children: [],
         },
       ],
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      nodeTemplate,
-      badgeTemplate,
     });
 
     await app.highlightNode('frame-1');
@@ -617,7 +474,7 @@ describe('PanelApp', () => {
 
   it('does not inspect when a node returns no selector', async () => {
     const browserApi = createBrowserApi(() => Promise.resolve({ success: false, selector: null }));
-    const app = new PanelApp({
+    const app = createPanelApp({
       browserApi,
       buildTree: () => [
         {
@@ -627,12 +484,6 @@ describe('PanelApp', () => {
           children: [],
         },
       ],
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      nodeTemplate,
-      badgeTemplate,
     });
 
     await app.inspectNode('frame-1');
@@ -642,22 +493,15 @@ describe('PanelApp', () => {
 
   it('start wires the refresh button and triggers an initial refresh', async () => {
     const refreshCalls = [];
-    const app = new PanelApp({
-      browserApi: createBrowserApi(() => Promise.resolve({ items: [] })),
-      summaryElement,
-      treeElement,
-      emptyStateElement,
-      refreshButton,
-      nodeTemplate,
-      badgeTemplate,
-    });
+    const app = createPanelApp();
 
     app.refreshTree = async () => {
       refreshCalls.push('refresh');
     };
 
     app.start();
-    await refreshButton.listeners.get('click')();
+    refreshButton.dispatchEvent(new Event('click'));
+    await Promise.resolve();
 
     expect(refreshCalls).toEqual(['refresh', 'refresh']);
   });
