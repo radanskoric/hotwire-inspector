@@ -7,13 +7,17 @@ import {
   ID_PREFIX,
 } from '../../../lib/constants.js';
 
-export async function addMockPanelApis(page, { scanResponse, scanError, scanResponses } = {}) {
-  await page.addInitScript(({ scanResponse, scanError, scanResponses }) => {
+export async function addMockPanelApis(page, { scanResponse, scanError, scanResponses, persistedTheme } = {}) {
+  await page.addInitScript(({ scanResponse, scanError, scanResponses, persistedTheme, scanMessageType }) => {
     globalThis.browser ??= {};
     globalThis.browser.runtime ??= {};
     globalThis.chrome ??= globalThis.browser;
     globalThis.__hotwireInspectorMessages = [];
     globalThis.__hotwireInspectorEvalCalls = [];
+
+    if (persistedTheme) {
+      localStorage.setItem('hotwire-inspector.theme', persistedTheme);
+    }
 
     browser.devtools = {
       inspectedWindow: {
@@ -31,7 +35,7 @@ export async function addMockPanelApis(page, { scanResponse, scanError, scanResp
 
       globalThis.__hotwireInspectorMessages.push(message);
 
-      if (message.type === CONTENT_SCAN_MESSAGE_TYPE) {
+      if (message.type === scanMessageType) {
         if (scanError) {
           return Promise.reject(new Error(scanError));
         }
@@ -48,7 +52,7 @@ export async function addMockPanelApis(page, { scanResponse, scanError, scanResp
       return Promise.resolve({ success: true, selector: '#mock' });
     };
     globalThis.chrome = globalThis.browser;
-  }, { scanResponse, scanError, scanResponses });
+  }, { scanResponse, scanError, scanResponses, persistedTheme, scanMessageType: CONTENT_SCAN_MESSAGE_TYPE });
 }
 
 export async function getRecordedMessages(panelPage) {
@@ -135,6 +139,39 @@ export async function expectRefreshRescans(panelPage) {
   await panelPage.locator('#refresh-button').click();
 
   await expect(panelPage.locator('#summary')).toHaveText('2 frames, 2 controllers');
+}
+
+export async function expectThemeSwitcher(panelPage) {
+  const actions = panelPage.locator('.toolbar-actions');
+  const themeSelect = actions.locator('#theme-select');
+
+  await expect(themeSelect).toBeVisible();
+  await expect(themeSelect.locator('option')).toHaveText(['System', 'Light', 'Dark']);
+  await expect(actions.locator('#refresh-button')).toBeVisible();
+}
+
+export async function expectThemeChanges(panelPage) {
+  const themeSelect = panelPage.locator('#theme-select');
+
+  await expect(themeSelect).toHaveValue('system');
+  await expect(panelPage.locator('html')).not.toHaveAttribute('data-theme', /.+/);
+
+  await themeSelect.selectOption('dark');
+  await expect(panelPage.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(themeSelect).toHaveValue('dark');
+
+  await themeSelect.selectOption('light');
+  await expect(panelPage.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(themeSelect).toHaveValue('light');
+
+  await themeSelect.selectOption('system');
+  await expect(panelPage.locator('html')).not.toHaveAttribute('data-theme', /.+/);
+  await expect(themeSelect).toHaveValue('system');
+}
+
+export async function expectPersistedTheme(panelPage) {
+  await expect(panelPage.locator('#theme-select')).toHaveValue('dark');
+  await expect(panelPage.locator('html')).toHaveAttribute('data-theme', 'dark');
 }
 
 export async function expectHoverMessages(panelPage) {

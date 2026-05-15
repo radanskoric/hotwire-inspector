@@ -52,6 +52,12 @@ WXT will build the extension in watch mode and reload it as you make changes.
   - open DevTools on a page you want to inspect
   - open the `Hotwire Inspector` panel
 
+### Panel appearance
+
+The panel follows the operating system color scheme by default. Use the theme switcher next to `Refresh` to choose `System`, `Light`, or `Dark`.
+
+The selected mode is saved locally for the extension panel. It only changes Hotwire Inspector's DevTools UI and does not modify the inspected page.
+
 ### Testing from a dev container
 
 If you are developing inside a dev container, the build and watch commands still run there, but browser launch usually does not cross from the container to the host browser automatically.

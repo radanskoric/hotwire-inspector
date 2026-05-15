@@ -19,7 +19,10 @@ import {
   expectHoverMessages,
   expectInternalIdsHidden,
   expectNestedTree,
+  expectPersistedTheme,
   expectRefreshRescans,
+  expectThemeChanges,
+  expectThemeSwitcher,
 } from './support/panel-assertions.js';
 
 const adaptersByBrowserName = {
@@ -118,6 +121,27 @@ test.describe('Panel UI', () => {
       { scanResponses: [emptyScanResponse, fixtureScanResponse] },
       expectRefreshRescans,
     );
+  });
+
+  test('renders the theme switcher next to refresh', async ({ browserName, page }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, expectThemeSwitcher);
+  });
+
+  test('updates the panel theme from the switcher', async ({ browserName, page }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, expectThemeChanges);
+  });
+
+  test('applies a persisted panel theme override', async ({ browserName, page }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(adapter, page, { scanResponse: fixtureScanResponse, persistedTheme: 'dark' }, expectPersistedTheme);
   });
 
   test('hovering and leaving a row sends highlight messages', async ({ browserName, page }) => {

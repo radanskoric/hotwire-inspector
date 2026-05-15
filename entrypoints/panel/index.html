@@ -1,41 +1,54 @@
 <!doctype html>
 <html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hotwire Inspector</title>
-    <link rel="stylesheet" href="./style.css" />
-  </head>
-  <body>
-    <div class="app">
-      <header class="toolbar">
-        <div>
-          <h1>Hotwire Inspector</h1>
-          <p id="summary">Loading…</p>
-        </div>
-        <button id="refresh-button" type="button">Refresh</button>
-      </header>
-      <main>
-        <div id="empty-state" class="empty-state" hidden>No turbo frames or Stimulus controllers found.</div>
-        <div id="tree" class="tree" role="tree"></div>
-      </main>
-    </div>
-    <template id="node-template">
-      <div class="node">
-        <button type="button" class="node-row" role="treeitem">
-          <span class="node-main">
-            <span class="node-kind"></span>
-            <span class="node-id"></span>
-            <span class="node-src" hidden></span>
-          </span>
-          <span class="badges" hidden></span>
-        </button>
-        <div class="node-children" role="group" hidden></div>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hotwire Inspector</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+
+<body>
+  <div class="app">
+    <header class="toolbar">
+      <div>
+        <h1>Hotwire Inspector</h1>
+        <p id="summary">Loading…</p>
       </div>
-    </template>
-    <template id="badge-template">
-      <span class="badge"></span>
-    </template>
-    <script type="module" src="./main.js"></script>
-  </body>
+      <div class="toolbar-actions">
+        <label class="theme-control">
+          <span>Theme</span>
+          <select id="theme-select" class="theme-select">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+        <button id="refresh-button" class="btn" type="button">Refresh</button>
+      </div>
+    </header>
+    <main>
+      <div id="empty-state" class="empty-state" hidden>No turbo frames or Stimulus controllers found.</div>
+      <div id="tree" class="tree" role="tree"></div>
+    </main>
+  </div>
+  <template id="node-template">
+    <div class="node">
+      <button type="button" class="node-row" role="treeitem">
+        <span class="node-main">
+          <span class="node-kind"></span>
+          <span class="node-id"></span>
+          <span class="node-src" hidden></span>
+        </span>
+        <span class="badges" hidden></span>
+      </button>
+      <div class="node-children" role="group" hidden></div>
+    </div>
+  </template>
+  <template id="badge-template">
+    <span class="badge"></span>
+  </template>
+  <script type="module" src="./main.js"></script>
+</body>
+
 </html>
