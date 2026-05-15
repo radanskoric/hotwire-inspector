@@ -59,6 +59,12 @@ export async function getRecordedMessages(panelPage) {
   return panelPage.evaluate(() => globalThis.__hotwireInspectorMessages);
 }
 
+export async function clearRecordedMessages(panelPage) {
+  await panelPage.evaluate(() => {
+    globalThis.__hotwireInspectorMessages = [];
+  });
+}
+
 export async function getRecordedEvalCalls(panelPage) {
   return panelPage.evaluate(() => globalThis.__hotwireInspectorEvalCalls);
 }
@@ -180,13 +186,13 @@ export async function expectPersistedTheme(panelPage) {
 export async function expectHoverMessages(panelPage) {
   const mainFrameRow = panelPage.locator('.node-row').filter({ hasText: 'main-frame' }).first();
 
+  await clearRecordedMessages(panelPage);
   await mainFrameRow.hover();
   await panelPage.locator('h1').hover();
 
   const messages = await getRecordedMessages(panelPage);
 
   expect(messages).toEqual([
-    { type: CONTENT_SCAN_MESSAGE_TYPE },
     { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'main-frame' },
     { type: CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE },
   ]);
@@ -195,13 +201,13 @@ export async function expectHoverMessages(panelPage) {
 export async function expectClickInspects(panelPage) {
   const nestedFrameRow = panelPage.locator('.node-row').filter({ hasText: 'nested-frame' }).first();
 
+  await clearRecordedMessages(panelPage);
   await nestedFrameRow.dispatchEvent('click');
 
   const messages = await getRecordedMessages(panelPage);
   const evalCalls = await getRecordedEvalCalls(panelPage);
 
   expect(messages).toEqual([
-    { type: CONTENT_SCAN_MESSAGE_TYPE },
     { type: CONTENT_INSPECT_MESSAGE_TYPE, id: 'nested-frame' },
   ]);
   expect(evalCalls).toEqual([

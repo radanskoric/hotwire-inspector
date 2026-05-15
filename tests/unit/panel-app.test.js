@@ -31,6 +31,14 @@ class FakeElement {
   }
 
   setAttribute(name, value) {
+    if (name.startsWith('data-')) {
+      const key = name
+        .slice(5)
+        .replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+      this.dataset[key] = value;
+      return;
+    }
+
     if (name === 'data-theme') {
       this.dataset.theme = value;
     }
@@ -82,6 +90,7 @@ class FakeElement {
       textContent: this.textContent,
       hidden: this.hidden,
     });
+    clone.dataset = { ...this.dataset };
 
     if (deep) {
       for (const child of this.children) {
@@ -103,6 +112,8 @@ function createNodeTemplate() {
   const badges = new FakeElement('span', { className: 'badges', hidden: true });
   const children = new FakeElement('div', { className: 'node-children', hidden: true });
 
+  row.setAttribute('data-controller', 'panel-node');
+  row.setAttribute('data-action', 'mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight click->panel-node#inspect');
   main.appendChild(kind);
   main.appendChild(id);
   main.appendChild(src);
@@ -401,9 +412,8 @@ describe('PanelApp', () => {
     expect(badges.children[0].textContent).toBe('lazy');
     expect(children.hidden).toBe(false);
     expect(children.children).toHaveLength(1);
-    expect(row.listeners.has('mouseenter')).toBe(true);
-    expect(row.listeners.has('mouseleave')).toBe(true);
-    expect(row.listeners.has('click')).toBe(true);
+    expect(row.dataset.controller).toBe('panel-node');
+    expect(row.dataset.panelNodeIdValue).toBe('frame-1');
   });
 
   it('does not render internal generated ids in node labels', () => {
@@ -532,7 +542,7 @@ describe('PanelApp', () => {
     expect(treeElement.hidden).toBe(true);
   });
 
-  it('inspects via selector when a rendered row is clicked', async () => {
+  it('inspects a node via selector', async () => {
     const browserApi = createBrowserApi((relayMessage) => {
       if (relayMessage.message.type === CONTENT_INSPECT_MESSAGE_TYPE) {
         return Promise.resolve({ success: true, selector: '#frame-1' });
@@ -558,17 +568,14 @@ describe('PanelApp', () => {
       badgeTemplate,
     });
 
-    app.renderTree([{ type: 'frame' }]);
-
-    const row = treeElement.children[0].querySelector('.node-row');
-    await row.listeners.get('click')();
+    await app.inspectNode('frame-1');
 
     expect(browserApi.devtools.inspectedWindow.evalCalls).toEqual([
       'inspect(document.querySelector("#frame-1"))',
     ]);
   });
 
-  it('sends highlight messages when a rendered row is hovered and left', async () => {
+  it('sends highlight messages for a node and clears them', async () => {
     const sentMessages = [];
     const app = new PanelApp({
       browserApi: createBrowserApi((message) => {
@@ -591,11 +598,8 @@ describe('PanelApp', () => {
       badgeTemplate,
     });
 
-    app.renderTree([{ type: 'frame' }]);
-
-    const row = treeElement.children[0].querySelector('.node-row');
-    await row.listeners.get('mouseenter')();
-    await row.listeners.get('mouseleave')();
+    await app.highlightNode('frame-1');
+    await app.clearHighlight();
 
     expect(sentMessages).toEqual([
       {
@@ -611,7 +615,7 @@ describe('PanelApp', () => {
     ]);
   });
 
-  it('does not inspect when clicking a row returns no selector', async () => {
+  it('does not inspect when a node returns no selector', async () => {
     const browserApi = createBrowserApi(() => Promise.resolve({ success: false, selector: null }));
     const app = new PanelApp({
       browserApi,
@@ -631,10 +635,7 @@ describe('PanelApp', () => {
       badgeTemplate,
     });
 
-    app.renderTree([{ type: 'frame' }]);
-
-    const row = treeElement.children[0].querySelector('.node-row');
-    await row.listeners.get('click')();
+    await app.inspectNode('frame-1');
 
     expect(browserApi.devtools.inspectedWindow.evalCalls).toEqual([]);
   });

@@ -34,7 +34,8 @@
   </div>
   <template id="node-template">
     <div class="node">
-      <button type="button" class="node-row" role="treeitem">
+      <button type="button" class="node-row" role="treeitem" data-controller="panel-node"
+        data-action="mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight click->panel-node#inspect">
         <img src="/icons/reveal-in-elements.svg" class="icon" />
         <span class="node-main">
           <span class="node-kind"></span>
