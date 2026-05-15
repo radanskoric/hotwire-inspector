@@ -23,7 +23,7 @@ function mountPanelDom() {
         <div class="toolbar-actions">
           <label class="theme-control">
             <span>Theme</span>
-            <select id="theme-select" class="theme-select">
+            <select id="theme-select" class="theme-select" data-controller="theme" data-action="change->theme#setTheme">
               <option value="system">System</option>
               <option value="light">Light</option>
               <option value="dark">Dark</option>
@@ -62,8 +62,6 @@ function mountPanelDom() {
     treeElement: document.getElementById('tree'),
     emptyStateElement: document.getElementById('empty-state'),
     refreshButton: document.getElementById('refresh-button'),
-    themeSelectElement: document.getElementById('theme-select'),
-    rootElement: document.documentElement,
     nodeTemplate: document.getElementById('node-template'),
     badgeTemplate: document.getElementById('badge-template'),
   };
@@ -86,26 +84,11 @@ function createBrowserApi(sendMessageImplementation) {
   };
 }
 
-function createStorage() {
-  const storedValues = new Map();
-
-  return {
-    getItem(key) {
-      return storedValues.get(key) ?? null;
-    },
-    setItem(key, value) {
-      storedValues.set(key, value);
-    },
-  };
-}
-
 describe('PanelApp', () => {
   let summaryElement;
   let treeElement;
   let emptyStateElement;
   let refreshButton;
-  let themeSelectElement;
-  let rootElement;
   let nodeTemplate;
   let badgeTemplate;
 
@@ -116,9 +99,6 @@ describe('PanelApp', () => {
       treeElement,
       emptyStateElement,
       refreshButton,
-      themeSelectElement,
-      rootElement,
-      storage: createStorage(),
       nodeTemplate,
       badgeTemplate,
       ...options,
@@ -131,15 +111,12 @@ describe('PanelApp', () => {
       treeElement,
       emptyStateElement,
       refreshButton,
-      themeSelectElement,
-      rootElement,
       nodeTemplate,
       badgeTemplate,
     } = mountPanelDom());
   });
 
   afterEach(() => {
-    document.documentElement.removeAttribute('data-theme');
     document.body.innerHTML = '';
   });
 
@@ -153,103 +130,8 @@ describe('PanelApp', () => {
     expect(app.treeElement).toBe(treeElement);
     expect(app.emptyStateElement).toBe(emptyStateElement);
     expect(app.refreshButton).toBe(refreshButton);
-    expect(app.themeSelectElement).toBe(themeSelectElement);
     expect(app.nodeTemplate).toBe(nodeTemplate);
     expect(app.badgeTemplate).toBe(badgeTemplate);
-  });
-
-  it('applies system theme by default without storing an override', () => {
-    const storedValues = new Map();
-    const storage = {
-      getItem(key) {
-        return storedValues.get(key) ?? null;
-      },
-      setItem(key, value) {
-        storedValues.set(key, value);
-      },
-    };
-    const app = createPanelApp({ storage });
-
-    app.initializeTheme();
-
-    expect(themeSelectElement.value).toBe('system');
-    expect(rootElement.dataset.theme).toBeUndefined();
-    expect(storedValues.size).toBe(0);
-  });
-
-  it('applies a persisted dark theme override', () => {
-    const storage = {
-      getItem() {
-        return 'dark';
-      },
-      setItem() { },
-    };
-    const app = createPanelApp({ storage });
-
-    app.initializeTheme();
-
-    expect(themeSelectElement.value).toBe('dark');
-    expect(rootElement.dataset.theme).toBe('dark');
-  });
-
-  it('persists and applies theme changes from the switcher', () => {
-    const storedValues = new Map();
-    const storage = {
-      getItem(key) {
-        return storedValues.get(key) ?? null;
-      },
-      setItem(key, value) {
-        storedValues.set(key, value);
-      },
-    };
-    const app = createPanelApp({ storage });
-
-    app.initializeTheme();
-    themeSelectElement.value = 'light';
-    themeSelectElement.dispatchEvent(new Event('change'));
-
-    expect(rootElement.dataset.theme).toBe('light');
-    expect(storedValues.get('hotwire-inspector.theme')).toBe('light');
-
-    themeSelectElement.value = 'system';
-    themeSelectElement.dispatchEvent(new Event('change'));
-
-    expect(rootElement.dataset.theme).toBeUndefined();
-    expect(storedValues.get('hotwire-inspector.theme')).toBe('system');
-  });
-
-  it('falls back to system when setting an unknown theme value', () => {
-    const storedValues = new Map();
-    const storage = {
-      getItem() {
-        return null;
-      },
-      setItem(key, value) {
-        storedValues.set(key, value);
-      },
-    };
-    const app = createPanelApp({ storage });
-
-    app.setTheme('unknown');
-
-    expect(rootElement.dataset.theme).toBeUndefined();
-    expect(storedValues.get('hotwire-inspector.theme')).toBe('system');
-  });
-
-  it('skips theme initialization when theme controls are unavailable', () => {
-    const app = new PanelApp({
-      document: {
-        getElementById() {
-          return undefined;
-        },
-      },
-      browserApi: createBrowserApi(() => Promise.resolve({})),
-      storage: createStorage(),
-    });
-
-    app.initializeTheme();
-
-    expect(rootElement.dataset.theme).toBeUndefined();
   });
 
   it('counts frames and controllers', () => {

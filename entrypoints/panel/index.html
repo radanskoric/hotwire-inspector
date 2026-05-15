@@ -18,7 +18,7 @@
       <div class="toolbar-actions">
         <label class="theme-control">
           <span>Theme</span>
-          <select id="theme-select" class="theme-select">
+          <select id="theme-select" class="theme-select" data-controller="theme" data-action="change->theme#setTheme">
             <option value="system">System</option>
             <option value="light">Light</option>
             <option value="dark">Dark</option>

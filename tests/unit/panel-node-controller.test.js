@@ -4,6 +4,7 @@ import { Application } from '@hotwired/stimulus';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PANEL_APP_PROPERTY, PanelNodeController } from '../../lib/panel/controllers/panel-node-controller.js';
 import { registerPanelControllers } from '../../lib/panel/controllers/index.js';
+import { ThemeController } from '../../lib/panel/controllers/theme-controller.js';
 
 describe('PanelNodeController', () => {
   let application;
@@ -70,7 +71,7 @@ describe('PanelNodeController', () => {
 });
 
 describe('registerPanelControllers', () => {
-  it('exposes the panel app to controllers and registers the node controller', () => {
+  it('exposes the panel app to controllers and registers panel controllers', () => {
     const registrations = [];
     const application = {
       register(identifier, controller) {
@@ -83,6 +84,7 @@ describe('registerPanelControllers', () => {
     registerPanelControllers(application, panelApp, document);
 
     expect(document[PANEL_APP_PROPERTY]).toBe(panelApp);
-    expect(registrations).toEqual([['panel-node', PanelNodeController]]);
+    expect(registrations).toContainEqual(['panel-node', PanelNodeController]);
+    expect(registrations).toContainEqual(['theme', ThemeController]);
   });
 });
