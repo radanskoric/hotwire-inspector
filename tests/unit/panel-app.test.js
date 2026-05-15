@@ -327,10 +327,10 @@ describe('PanelApp', () => {
     });
 
     expect(app.countItems([
-      { type: 'frame' },
-      { type: 'controller' },
-      { type: 'frame' },
-    ])).toEqual({ frames: 2, controllers: 1 });
+      { type: 'frame', controllers: ['lazy'] },
+      { type: 'controller', controllers: ['modal', 'dropdown'] },
+      { type: 'frame', controllers: [] },
+    ])).toEqual({ frames: 2, controllers: 3 });
   });
 
   it('renders empty state when there are no nodes', () => {
@@ -381,8 +381,8 @@ describe('PanelApp', () => {
     });
 
     app.renderTree([
-      { type: 'frame' },
-      { type: 'controller' },
+      { type: 'frame', controllers: ['lazy'] },
+      { type: 'controller', controllers: ['modal'] },
     ]);
 
     const rootNode = treeElement.children[0];
@@ -391,7 +391,7 @@ describe('PanelApp', () => {
     const badges = rootNode.querySelector('.badges');
     const children = rootNode.querySelector('.node-children');
 
-    expect(summaryElement.textContent).toBe('1 frames, 1 controllers');
+    expect(summaryElement.textContent).toBe('1 frames, 2 controllers');
     expect(emptyStateElement.hidden).toBe(true);
     expect(treeElement.hidden).toBe(false);
     expect(src.textContent).toBe('/posts');

@@ -2,7 +2,7 @@ import { ID_PREFIX } from '../../../lib/constants.js';
 
 export const fixtureScanResponse = {
   items: [
-    { id: 'main-frame', src: '/main', parentId: null, type: 'frame', controllers: [] },
+    { id: 'main-frame', src: '/main', parentId: null, type: 'frame', controllers: ['sidebar'] },
     { id: 'nested-frame', src: null, parentId: 'main-frame', type: 'frame', controllers: [] },
     { id: 'modal-controller', parentId: 'nested-frame', type: 'controller', controllers: ['modal', 'dropdown'] },
     { id: 'sidebar-controller', parentId: null, type: 'controller', controllers: ['sidebar'] },

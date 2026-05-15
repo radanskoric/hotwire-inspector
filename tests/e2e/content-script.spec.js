@@ -42,6 +42,7 @@ test.describe('Content Script', () => {
       expect(frames).toHaveLength(2);
       expect(frames.map((f) => f.id)).toEqual(['main-frame', 'nested-frame']);
       expect(frames[0].src).toBe('/main');
+      expect(frames[0].controllers).toEqual(['sidebar']);
       expect(frames[1].parentId).toBe('main-frame');
     });
   });

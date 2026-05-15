@@ -94,6 +94,11 @@ select {
   flex-direction: column;
 }
 
+.icon {
+  width: 16px;
+  height: 16px;
+}
+
 .toolbar {
   display: flex;
   justify-content: space-between;

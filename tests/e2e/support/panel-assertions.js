@@ -65,7 +65,7 @@ export async function getRecordedEvalCalls(panelPage) {
 
 export async function expectHeadingAndSummary(panelPage) {
   await expect(panelPage.locator('h1')).toHaveText('Hotwire Inspector');
-  await expect(panelPage.locator('#summary')).toHaveText('2 frames, 2 controllers');
+  await expect(panelPage.locator('#summary')).toHaveText('2 frames, 4 controllers');
 }
 
 export async function expectFixtureNodeIds(panelPage) {
@@ -87,10 +87,13 @@ export async function expectFrameSrc(panelPage) {
 }
 
 export async function expectControllerBadges(panelPage) {
-  const modalNode = panelPage.locator('.node').filter({ hasText: 'modal-controller' }).first();
-  const badges = await modalNode.locator('.badge').allTextContents();
+  const mainFrameRow = panelPage.locator('.node-row').filter({ hasText: 'main-frame' }).first();
+  const frameBadges = await mainFrameRow.locator('.badge').allTextContents();
+  const modalRow = panelPage.locator('.node-row').filter({ hasText: 'modal-controller' }).first();
+  const controllerBadges = await modalRow.locator('.badge').allTextContents();
 
-  expect(badges).toEqual(['modal', 'dropdown']);
+  expect(frameBadges).toEqual(['sidebar']);
+  expect(controllerBadges).toEqual(['modal', 'dropdown']);
 }
 
 export async function expectNestedTree(panelPage) {
@@ -138,7 +141,7 @@ export async function expectRefreshRescans(panelPage) {
 
   await panelPage.locator('#refresh-button').click();
 
-  await expect(panelPage.locator('#summary')).toHaveText('2 frames, 2 controllers');
+  await expect(panelPage.locator('#summary')).toHaveText('2 frames, 4 controllers');
 }
 
 export async function expectThemeSwitcher(panelPage) {

@@ -176,6 +176,25 @@ describe('ContentInspector', () => {
     ]);
   });
 
+  it('includes controllers attached directly to frames during scan', () => {
+    const frame = createElement('turbo-frame', {
+      id: 'main-frame',
+      attributes: { 'data-controller': 'sidebar frame-loader' },
+    });
+    const document = createDocument([frame]);
+    const inspector = new ContentInspector({ document, crypto, cssEscape });
+
+    expect(inspector.scan()).toEqual([
+      {
+        id: 'main-frame',
+        src: null,
+        parentId: null,
+        type: 'frame',
+        controllers: ['sidebar', 'frame-loader'],
+      },
+    ]);
+  });
+
   it('generates stable in-memory keys for elements without ids', () => {
     const controller = createElement('div', { attributes: { 'data-controller': 'modal' } });
     const document = createDocument([controller]);
