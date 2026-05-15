@@ -2,9 +2,10 @@
 
 import { Application } from '@hotwired/stimulus';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { PANEL_APP_PROPERTY, PanelNodeController } from '../../lib/panel/controllers/panel-node-controller.js';
+import { PanelNodeController } from '../../lib/panel/controllers/panel-node-controller.js';
 import { registerPanelControllers } from '../../lib/panel/controllers/index.js';
 import { ThemeController } from '../../lib/panel/controllers/theme-controller.js';
+import { PANEL_BRIDGE_PROPERTY } from '../../lib/constants.js';
 
 describe('PanelNodeController', () => {
   let application;
@@ -20,7 +21,7 @@ describe('PanelNodeController', () => {
         data-action="mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight click->panel-node#inspect"
       ></button>
     `;
-    document[PANEL_APP_PROPERTY] = {
+    document[PANEL_BRIDGE_PROPERTY] = {
       highlightNode(id) {
         calls.push(['highlightNode', id]);
         return Promise.resolve('highlighted');
@@ -44,7 +45,7 @@ describe('PanelNodeController', () => {
   afterEach(() => {
     application.stop();
     document.body.innerHTML = '';
-    delete document[PANEL_APP_PROPERTY];
+    delete document[PANEL_BRIDGE_PROPERTY];
   });
 
   it('highlights the node through the panel app', async () => {
@@ -71,7 +72,7 @@ describe('PanelNodeController', () => {
 });
 
 describe('registerPanelControllers', () => {
-  it('exposes the panel app to controllers and registers panel controllers', () => {
+  it('exposes the panel bridge to controllers and registers panel controllers', () => {
     const registrations = [];
     const application = {
       register(identifier, controller) {
@@ -79,11 +80,11 @@ describe('registerPanelControllers', () => {
       },
     };
     const document = {};
-    const panelApp = {};
+    const panelBridge = {};
 
-    registerPanelControllers(application, panelApp, document);
+    registerPanelControllers(application, panelBridge, document);
 
-    expect(document[PANEL_APP_PROPERTY]).toBe(panelApp);
+    expect(document[PANEL_BRIDGE_PROPERTY]).toBe(panelBridge);
     expect(registrations).toContainEqual(['panel-node', PanelNodeController]);
     expect(registrations).toContainEqual(['theme', ThemeController]);
   });

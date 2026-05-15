@@ -39,8 +39,7 @@ function mountPanelDom() {
     </div>
     <template id="node-template">
       <div class="node">
-        <button type="button" class="node-row" role="treeitem" data-controller="panel-node"
-          data-action="mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight click->panel-node#inspect">
+        <button type="button" class="node-row" role="treeitem" data-controller="panel-node">
           <img src="/icons/reveal-in-elements.svg" class="icon" />
           <span class="node-main">
             <span class="node-kind"></span>
@@ -84,6 +83,12 @@ function createBrowserApi(sendMessageImplementation) {
   };
 }
 
+function createBridge(sendToInspectedTabImplementation) {
+  return {
+    sendToInspectedTab: sendToInspectedTabImplementation,
+  };
+}
+
 describe('PanelApp', () => {
   let summaryElement;
   let treeElement;
@@ -95,6 +100,7 @@ describe('PanelApp', () => {
   function createPanelApp(options = {}) {
     return new PanelApp({
       browserApi: createBrowserApi(() => Promise.resolve({})),
+      bridge: createBridge(() => Promise.resolve({})),
       summaryElement,
       treeElement,
       emptyStateElement,
@@ -124,6 +130,7 @@ describe('PanelApp', () => {
     const app = new PanelApp({
       document,
       browserApi: createBrowserApi(() => Promise.resolve({})),
+      bridge: createBridge(() => Promise.resolve({})),
     });
 
     expect(app.summaryElement).toBe(summaryElement);
@@ -197,7 +204,6 @@ describe('PanelApp', () => {
     expect(children.hidden).toBe(false);
     expect(children.children.length).toBe(1);
     expect(row.dataset.controller).toBe('panel-node');
-    expect(row.dataset.action).toBe('mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight click->panel-node#inspect');
     expect(row.dataset.panelNodeIdValue).toBe('frame-1');
   });
 
@@ -236,7 +242,7 @@ describe('PanelApp', () => {
   it('refreshes by requesting a scan and then rendering the result', async () => {
     const sentMessages = [];
     const app = createPanelApp({
-      browserApi: createBrowserApi((message) => {
+      bridge: createBridge((message) => {
         sentMessages.push(message);
         return Promise.resolve({ items: [{ id: 'frame-1', type: 'frame' }] });
       }),
@@ -245,17 +251,16 @@ describe('PanelApp', () => {
 
     await app.refreshTree();
 
-    expect(sentMessages).toEqual([{
-      type: RELAY_MESSAGE_TYPE,
-      tabId: 42,
-      message: { type: CONTENT_SCAN_MESSAGE_TYPE },
-    }]);
+    expect(sentMessages).toEqual([{ type: CONTENT_SCAN_MESSAGE_TYPE }]);
     expect(summaryElement.textContent).toBe('1 frames, 0 controllers');
     expect(treeElement.children.length).toBe(1);
   });
 
   it('renders an empty tree when refresh returns no items', async () => {
-    const app = createPanelApp({ buildTree: () => [] });
+    const app = createPanelApp({
+      bridge: createBridge(() => Promise.resolve({ items: [] })),
+      buildTree: () => [],
+    });
 
     await app.refreshTree();
 
@@ -266,7 +271,7 @@ describe('PanelApp', () => {
 
   it('shows an error message when refresh fails', async () => {
     const app = createPanelApp({
-      browserApi: createBrowserApi(() => Promise.reject(new Error('boom'))),
+      bridge: createBridge(() => Promise.reject(new Error('boom'))),
       buildTree: () => [],
     });
 
@@ -279,10 +284,7 @@ describe('PanelApp', () => {
 
   it('shows an error message when the background relay fails', async () => {
     const app = createPanelApp({
-      browserApi: createBrowserApi(() => Promise.resolve({
-        type: RELAY_ERROR_TYPE,
-        message: 'relay failed',
-      })),
+      bridge: createBridge(() => Promise.reject(new Error('relay failed'))),
       buildTree: () => [],
     });
 
@@ -291,86 +293,6 @@ describe('PanelApp', () => {
     expect(summaryElement.textContent).toBe('Unable to read the inspected page');
     expect(emptyStateElement.hidden).toBe(false);
     expect(treeElement.hidden).toBe(true);
-  });
-
-  it('inspects a node via selector', async () => {
-    const browserApi = createBrowserApi((relayMessage) => {
-      if (relayMessage.message.type === CONTENT_INSPECT_MESSAGE_TYPE) {
-        return Promise.resolve({ success: true, selector: '#frame-1' });
-      }
-
-      return Promise.resolve({ success: true });
-    });
-    const app = createPanelApp({
-      browserApi,
-      buildTree: () => [
-        {
-          id: 'frame-1',
-          type: 'frame',
-          controllers: [],
-          children: [],
-        },
-      ],
-    });
-
-    await app.inspectNode('frame-1');
-
-    expect(browserApi.devtools.inspectedWindow.evalCalls).toEqual([
-      'inspect(document.querySelector("#frame-1"))',
-    ]);
-  });
-
-  it('sends highlight messages for a node and clears them', async () => {
-    const sentMessages = [];
-    const app = createPanelApp({
-      browserApi: createBrowserApi((message) => {
-        sentMessages.push(message);
-        return Promise.resolve({ success: true });
-      }),
-      buildTree: () => [
-        {
-          id: 'frame-1',
-          type: 'frame',
-          controllers: [],
-          children: [],
-        },
-      ],
-    });
-
-    await app.highlightNode('frame-1');
-    await app.clearHighlight();
-
-    expect(sentMessages).toEqual([
-      {
-        type: RELAY_MESSAGE_TYPE,
-        tabId: 42,
-        message: { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'frame-1' },
-      },
-      {
-        type: RELAY_MESSAGE_TYPE,
-        tabId: 42,
-        message: { type: CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE },
-      },
-    ]);
-  });
-
-  it('does not inspect when a node returns no selector', async () => {
-    const browserApi = createBrowserApi(() => Promise.resolve({ success: false, selector: null }));
-    const app = createPanelApp({
-      browserApi,
-      buildTree: () => [
-        {
-          id: 'frame-1',
-          type: 'frame',
-          controllers: [],
-          children: [],
-        },
-      ],
-    });
-
-    await app.inspectNode('frame-1');
-
-    expect(browserApi.devtools.inspectedWindow.evalCalls).toEqual([]);
   });
 
   it('start wires the refresh button and triggers an initial refresh', async () => {
