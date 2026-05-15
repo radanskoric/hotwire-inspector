@@ -269,6 +269,19 @@ describe('PanelApp', () => {
     expect(treeElement.hidden).toBe(true);
   });
 
+  it('renders an empty tree when refresh returns response without items', async () => {
+    const app = createPanelApp({
+      bridge: createBridge(() => Promise.resolve({})),
+      buildTree: () => [],
+    });
+
+    await app.refreshTree();
+
+    expect(summaryElement.textContent).toBe('0 frames, 0 controllers');
+    expect(emptyStateElement.hidden).toBe(false);
+    expect(treeElement.hidden).toBe(true);
+  });
+
   it('shows an error message when refresh fails', async () => {
     const app = createPanelApp({
       bridge: createBridge(() => Promise.reject(new Error('boom'))),

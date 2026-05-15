@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
-  CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
   RELAY_ERROR_TYPE,
   RELAY_MESSAGE_TYPE,
@@ -76,40 +74,6 @@ describe('PanelBridge', () => {
       'inspect(document.querySelector("div\\\\:with\\\\:backslashes"))',
       'inspect(document.querySelector("div[both\\\\\\"and\\\\\\\\\\"]"))',
     ]);
-  });
-
-  it('highlightNode sends CONTENT_HIGHLIGHT_MESSAGE_TYPE with id', async () => {
-    const sentMessages = [];
-    const browserApi = createBrowserApi((message) => {
-      sentMessages.push(message);
-      return Promise.resolve({ success: true });
-    });
-    const bridge = new PanelBridge({ browserApi });
-
-    await bridge.highlightNode('frame-1');
-
-    expect(sentMessages).toEqual([{
-      type: RELAY_MESSAGE_TYPE,
-      tabId: 42,
-      message: { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'frame-1' },
-    }]);
-  });
-
-  it('clearHighlight sends CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE', async () => {
-    const sentMessages = [];
-    const browserApi = createBrowserApi((message) => {
-      sentMessages.push(message);
-      return Promise.resolve({ success: true });
-    });
-    const bridge = new PanelBridge({ browserApi });
-
-    await bridge.clearHighlight();
-
-    expect(sentMessages).toEqual([{
-      type: RELAY_MESSAGE_TYPE,
-      tabId: 42,
-      message: { type: CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE },
-    }]);
   });
 
   it('inspectNode sends CONTENT_INSPECT_MESSAGE_TYPE and calls inspectElementBySelector on success with selector', async () => {

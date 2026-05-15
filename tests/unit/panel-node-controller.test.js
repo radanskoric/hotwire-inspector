@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PanelNodeController } from '../../lib/panel/controllers/panel-node-controller.js';
 import { registerPanelControllers } from '../../lib/panel/controllers/index.js';
 import { ThemeController } from '../../lib/panel/controllers/theme-controller.js';
-import { PANEL_BRIDGE_PROPERTY } from '../../lib/constants.js';
+import {
+  PANEL_BRIDGE_PROPERTY,
+  CONTENT_HIGHLIGHT_MESSAGE_TYPE,
+  CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
+} from '../../lib/constants.js';
 
 describe('PanelNodeController', () => {
   let application;
@@ -22,13 +26,9 @@ describe('PanelNodeController', () => {
       ></button>
     `;
     document[PANEL_BRIDGE_PROPERTY] = {
-      highlightNode(id) {
-        calls.push(['highlightNode', id]);
-        return Promise.resolve('highlighted');
-      },
-      clearHighlight() {
-        calls.push(['clearHighlight']);
-        return Promise.resolve('cleared');
+      sendToInspectedTab(message) {
+        calls.push(['sendToInspectedTab', message]);
+        return Promise.resolve('sent');
       },
       inspectNode(id) {
         calls.push(['inspectNode', id]);
@@ -52,14 +52,14 @@ describe('PanelNodeController', () => {
     button.dispatchEvent(new Event('mouseenter'));
     await Promise.resolve();
 
-    expect(calls).toEqual([['highlightNode', 'frame-1']]);
+    expect(calls).toEqual([['sendToInspectedTab', { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'frame-1' }]]);
   });
 
   it('clears the current highlight through the panel app', async () => {
     button.dispatchEvent(new Event('mouseleave'));
     await Promise.resolve();
 
-    expect(calls).toEqual([['clearHighlight']]);
+    expect(calls).toEqual([['sendToInspectedTab', { type: CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE }]]);
   });
 
   it('inspects the node through the panel app', async () => {
