@@ -33,18 +33,18 @@
     </main>
   </div>
   <template id="node-template">
-    <div class="node">
-      <button type="button" class="node-row" role="treeitem" data-controller="panel-node"
-        data-action="mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight click->panel-node#inspect">
-        <img src="/icons/reveal-in-elements.svg" class="icon" />
+    <div class="node" data-controller="node">
+      <div class="node-row" role="treeitem" data-controller="panel-node"
+        data-action="mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight dblclick->node#toggleChildren">
+        <img src="/icons/reveal-in-elements.svg" class="icon icon-btn" data-action="click->panel-node#inspect" />
         <span class="node-main">
           <span class="node-kind"></span>
           <span class="node-id"></span>
           <span class="node-src" hidden></span>
         </span>
         <span class="badges" hidden></span>
-      </button>
-      <div class="node-children" role="group" hidden></div>
+      </div>
+      <div class="node-children" role="group" hidden data-node-target="children"></div>
     </div>
   </template>
   <template id="badge-template">

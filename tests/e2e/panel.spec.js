@@ -11,6 +11,7 @@ import {
   expectClickInspects,
   expectControllerBadges,
   expectDeepTree,
+  expectDoubleClickTogglesNodeChildren,
   expectEmptyState,
   expectErrorState,
   expectFixtureNodeIds,
@@ -156,5 +157,12 @@ test.describe('Panel UI', () => {
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
     await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, expectClickInspects);
+  });
+
+  test('double-clicking a row toggles node children visibility', async ({ browserName, page }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, expectDoubleClickTogglesNodeChildren);
   });
 });

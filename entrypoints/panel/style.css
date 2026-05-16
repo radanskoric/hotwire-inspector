@@ -83,6 +83,10 @@ body {
   color: var(--color-ink);
 }
 
+[hidden] {
+  display: none !important;
+}
+
 button,
 select {
   font: inherit;
@@ -95,8 +99,12 @@ select {
 }
 
 .icon {
-  width: 16px;
-  height: 16px;
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.icon-btn {
+  cursor: pointer;
 }
 
 .toolbar {
@@ -164,7 +172,7 @@ main {
 .empty-state {
   padding: calc(var(--space-block) * 1.5) calc(var(--space-inline) * 3);
   border: 1px dashed var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   text-align: center;
   color: var(--color-ink-muted);
 }
@@ -177,7 +185,7 @@ main {
 
 .node {
   border: 1px solid var(--color-border-soft);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--color-surface-elevated);
 }
 
@@ -192,7 +200,6 @@ main {
   color: inherit;
   border: 0;
   text-align: left;
-  cursor: pointer;
 }
 
 .node-row:hover {

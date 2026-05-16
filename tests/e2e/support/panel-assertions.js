@@ -214,3 +214,20 @@ export async function expectClickInspects(panelPage) {
     'inspect(document.querySelector("#mock"))',
   ]);
 }
+
+export async function expectDoubleClickTogglesNodeChildren(panelPage) {
+  const mainFrameNode = panelPage.locator('.node').filter({ hasText: 'main-frame' }).first();
+  const mainFrameRow = mainFrameNode.locator('> .node-row');
+  const mainFrameChildren = mainFrameNode.locator('> .node-children');
+
+  // Initial state: children are visible (expanded by default)
+  await expect(mainFrameChildren).not.toBeHidden();
+
+  // Double-click to collapse
+  await mainFrameRow.dblclick();
+  await expect(mainFrameChildren).toBeHidden();
+
+  // Double-click again to expand
+  await mainFrameRow.dblclick();
+  await expect(mainFrameChildren).not.toBeHidden();
+}

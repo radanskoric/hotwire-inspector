@@ -2,6 +2,7 @@
 
 import { Application } from '@hotwired/stimulus';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { NodeController } from '../../lib/panel/controllers/node-controller.js';
 import { PanelNodeController } from '../../lib/panel/controllers/panel-node-controller.js';
 import { registerPanelControllers } from '../../lib/panel/controllers/index.js';
 import { ThemeController } from '../../lib/panel/controllers/theme-controller.js';
@@ -85,6 +86,7 @@ describe('registerPanelControllers', () => {
     registerPanelControllers(application, panelBridge, document);
 
     expect(document[PANEL_BRIDGE_PROPERTY]).toBe(panelBridge);
+    expect(registrations).toContainEqual(['node', NodeController]);
     expect(registrations).toContainEqual(['panel-node', PanelNodeController]);
     expect(registrations).toContainEqual(['theme', ThemeController]);
   });
