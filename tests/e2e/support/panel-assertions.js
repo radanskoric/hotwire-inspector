@@ -78,6 +78,13 @@ export async function expectFixtureNodeIds(panelPage) {
   await expect(panelPage.locator('.node-id')).toHaveText(['main-frame', 'nested-frame', 'modal-controller', 'sidebar-controller']);
 }
 
+export function withExpectedTagNames(expectedTagNames) {
+  return async (panelPage) => {
+    const nodeKinds = await panelPage.locator('.node-kind').allTextContents();
+    expect(nodeKinds).toEqual(expectedTagNames);
+  };
+}
+
 export async function expectInternalIdsHidden(panelPage) {
   const nodeIds = await panelPage.locator('.node-id').allTextContents();
   expect(nodeIds).not.toContain(`${ID_PREFIX}-uuid-1`);
@@ -200,14 +207,16 @@ export async function expectHoverMessages(panelPage) {
 
 export async function expectClickInspects(panelPage) {
   const nestedFrameRow = panelPage.locator('.node-row').filter({ hasText: 'nested-frame' }).first();
+  const inspectIcon = nestedFrameRow.locator('.icon-btn');
 
   await clearRecordedMessages(panelPage);
-  await nestedFrameRow.dispatchEvent('click');
+  await inspectIcon.click();
 
   const messages = await getRecordedMessages(panelPage);
   const evalCalls = await getRecordedEvalCalls(panelPage);
 
   expect(messages).toEqual([
+    { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'nested-frame' },
     { type: CONTENT_INSPECT_MESSAGE_TYPE, id: 'nested-frame' },
   ]);
   expect(evalCalls).toEqual([

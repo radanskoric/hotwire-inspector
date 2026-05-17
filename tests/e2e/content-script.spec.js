@@ -38,7 +38,7 @@ test.describe('Content Script', () => {
       const frame = await getExtensionDevtoolsFrame(context);
       const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
 
-      const frames = result.items.filter((item) => item.type === 'frame');
+      const frames = result.items.filter((item) => item.tagName === 'turbo-frame');
       expect(frames).toHaveLength(2);
       expect(frames.map((f) => f.id)).toEqual(['main-frame', 'nested-frame']);
       expect(frames[0].src).toBe('/main');
@@ -56,7 +56,7 @@ test.describe('Content Script', () => {
       const frame = await getExtensionDevtoolsFrame(context);
       const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
 
-      const controllers = result.items.filter((item) => item.type === 'controller');
+      const controllers = result.items.filter((item) => item.tagName === 'div');
       expect(controllers).toHaveLength(2);
 
       const multi = controllers.find((c) => c.controllers.includes('modal'));
@@ -190,12 +190,12 @@ test.describe('Content Script', () => {
       expect(dynamicFrame).toMatchObject({
         id: 'dynamic-frame',
         parentId: 'nested-frame',
-        type: 'frame',
+        tagName: 'turbo-frame',
       });
       expect(dynamicController).toMatchObject({
         id: 'dynamic-controller',
         parentId: 'dynamic-frame',
-        type: 'controller',
+        tagName: 'div',
         controllers: ['dynamic'],
       });
     });

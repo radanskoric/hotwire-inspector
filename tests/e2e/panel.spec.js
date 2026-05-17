@@ -24,6 +24,7 @@ import {
   expectRefreshRescans,
   expectThemeChanges,
   expectThemeSwitcher,
+  withExpectedTagNames,
 } from './support/panel-assertions.js';
 
 const adaptersByBrowserName = {
@@ -61,6 +62,13 @@ test.describe('Panel UI', () => {
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
     await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, expectFixtureNodeIds);
+  });
+
+  test('displays tag names for each node', async ({ browserName, page }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedTagNames(['turbo-frame', 'turbo-frame', 'div', 'div']));
   });
 
   test('does not render internal generated IDs', async ({ browserName, page }) => {

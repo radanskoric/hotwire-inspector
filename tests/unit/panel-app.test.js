@@ -145,9 +145,9 @@ describe('PanelApp', () => {
     const app = createPanelApp();
 
     expect(app.countItems([
-      { type: 'frame', controllers: ['lazy'] },
-      { type: 'controller', controllers: ['modal', 'dropdown'] },
-      { type: 'frame', controllers: [] },
+      { tagName: 'turbo-frame', controllers: ['lazy'] },
+      { tagName: 'div', controllers: ['modal', 'dropdown'] },
+      { tagName: 'turbo-frame', controllers: [] },
     ])).toEqual({ frames: 2, controllers: 3 });
   });
 
@@ -167,13 +167,13 @@ describe('PanelApp', () => {
       buildTree: () => [
         {
           id: 'frame-1',
-          type: 'frame',
+          tagName: 'turbo-frame',
           src: '/posts',
           controllers: ['lazy'],
           children: [
             {
               id: 'ctrl-1',
-              type: 'controller',
+              tagName: 'div',
               controllers: ['modal'],
               children: [],
             },
@@ -183,8 +183,8 @@ describe('PanelApp', () => {
     });
 
     app.renderTree([
-      { type: 'frame', controllers: ['lazy'] },
-      { type: 'controller', controllers: ['modal'] },
+      { tagName: 'turbo-frame', controllers: ['lazy'] },
+      { tagName: 'div', controllers: ['modal'] },
     ]);
 
     const rootNode = treeElement.children[0];
@@ -212,13 +212,13 @@ describe('PanelApp', () => {
       buildTree: () => [
         {
           id: `${ID_PREFIX}-uuid-1`,
-          type: 'controller',
+          tagName: 'div',
           controllers: ['modal'],
           children: [],
         },
         {
           id: 'user-controller',
-          type: 'controller',
+          tagName: 'div',
           controllers: ['menu'],
           children: [],
         },
@@ -226,8 +226,8 @@ describe('PanelApp', () => {
     });
 
     app.renderTree([
-      { type: 'controller' },
-      { type: 'controller' },
+      { tagName: 'div' },
+      { tagName: 'div' },
     ]);
 
     const internalId = treeElement.children[0].querySelector('.node-id');
@@ -244,7 +244,7 @@ describe('PanelApp', () => {
     const app = createPanelApp({
       bridge: createBridge((message) => {
         sentMessages.push(message);
-        return Promise.resolve({ items: [{ id: 'frame-1', type: 'frame' }] });
+        return Promise.resolve({ items: [{ id: 'frame-1', tagName: 'turbo-frame' }] });
       }),
       buildTree: (items) => items.map((item) => ({ ...item, children: [] })),
     });

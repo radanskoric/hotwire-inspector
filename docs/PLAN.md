@@ -134,7 +134,7 @@ describe("buildTree", () => {
   });
 
   it("returns single root frame with no children", () => {
-    const input = [{ id: "main", src: "/page", parentId: null, type: "frame" }];
+    const input = [{ id: "main", src: "/page", parentId: null, tagName: "turbo-frame" }];
     const result = buildTree(input);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("main");
@@ -143,8 +143,8 @@ describe("buildTree", () => {
 
   it("creates nested structure from parent-child relationship", () => {
     const input = [
-      { id: "parent", src: null, parentId: null, type: "frame" },
-      { id: "child", src: "/sub", parentId: "parent", type: "frame" },
+      { id: "parent", src: null, parentId: null, tagName: "turbo-frame" },
+      { id: "child", src: "/sub", parentId: "parent", tagName: "turbo-frame" },
     ];
     const result = buildTree(input);
     expect(result[0].children[0].id).toBe("child");
@@ -156,26 +156,26 @@ describe("buildTree", () => {
         id: "el-1",
         controllers: ["modal", "dropdown"],
         parentId: null,
-        type: "controller",
+        tagName: "div",
       },
     ];
     const result = buildTree(input);
-    expect(result[0].type).toBe("controller");
+    expect(result[0].tagName).toBe("div");
     expect(result[0].controllers).toEqual(["modal", "dropdown"]);
   });
 
   it("handles mixed frames and controllers", () => {
     const input = [
-      { id: "frame-1", src: null, parentId: null, type: "frame" },
+      { id: "frame-1", src: null, parentId: null, tagName: "turbo-frame" },
       {
         id: "ctrl-1",
         controllers: ["tabs"],
         parentId: "frame-1",
-        type: "controller",
+        tagName: "div",
       },
     ];
     const result = buildTree(input);
-    expect(result[0].children[0].type).toBe("controller");
+    expect(result[0].children[0].tagName).toBe("div");
   });
 
   it("handles frame with attached controllers", () => {
@@ -184,12 +184,12 @@ describe("buildTree", () => {
         id: "frame-1",
         src: "/page",
         parentId: null,
-        type: "frame",
+        tagName: "turbo-frame",
         controllers: ["lazy"],
       },
     ];
     const result = buildTree(input);
-    expect(result[0].type).toBe("frame");
+    expect(result[0].tagName).toBe("turbo-frame");
     expect(result[0].controllers).toEqual(["lazy"]);
   });
 });
@@ -453,7 +453,7 @@ xcrun safari-web-extension-converter output/safari-mv3 --project-location ./safa
 
 1. **Scan both turbo-frames and data-controller elements** – Single pass with `querySelectorAll('turbo-frame, [data-controller]')`
 2. **Flat array → tree structure** – Content script sends flat data, panel builds tree
-3. **Type field distinguishes frames vs controllers** – `type: 'frame'` or `type: 'controller'`
+3. **tagName field identifies element type** – `tagName: 'turbo-frame'` or `tagName: 'div'` (or other element tag)
 4. **Controllers array on frames** – Frames can have attached controllers
 
 ### Code Patterns to Reuse
@@ -541,9 +541,9 @@ function inspectElement(id) {
 **Data model:**
 
 ```js
-{ id, src, parentId, type: 'frame' }
-{ id, controllers: ['modal', 'dropdown'], parentId, type: 'controller' }
-{ id, src, parentId, type: 'frame', controllers: ['lazy'] } // frame with controllers
+{ id, src, parentId, tagName: 'turbo-frame' }
+{ id, controllers: ['modal', 'dropdown'], parentId, tagName: 'div' }
+{ id, src, parentId, tagName: 'turbo-frame', controllers: ['lazy'] } // frame with controllers
 ```
 
 **Tree rendering:**

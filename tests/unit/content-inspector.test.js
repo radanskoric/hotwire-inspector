@@ -170,7 +170,7 @@ describe('ContentInspector', () => {
         id: 'main-frame',
         src: null,
         parentId: null,
-        type: 'frame',
+        tagName: 'turbo-frame',
         controllers: [],
       },
     ]);
@@ -189,7 +189,7 @@ describe('ContentInspector', () => {
         id: 'main-frame',
         src: null,
         parentId: null,
-        type: 'frame',
+        tagName: 'turbo-frame',
         controllers: ['sidebar', 'frame-loader'],
       },
     ]);
@@ -255,13 +255,13 @@ describe('ContentInspector', () => {
         id: 'parent-frame',
         src: null,
         parentId: null,
-        type: 'frame',
+        tagName: 'turbo-frame',
         controllers: [],
       },
       {
         id: `${ID_PREFIX}-uuid-1`,
         parentId: 'parent-frame',
-        type: 'controller',
+        tagName: 'div',
         controllers: ['dropdown', 'menu'],
       },
     ]);
