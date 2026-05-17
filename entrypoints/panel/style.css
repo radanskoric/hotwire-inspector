@@ -191,8 +191,7 @@ main {
 
 .node-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: left;
   gap: calc(var(--space-inline) * 1.5);
   width: 100%;
   padding: 0.625rem calc(var(--space-inline) * 1.5);

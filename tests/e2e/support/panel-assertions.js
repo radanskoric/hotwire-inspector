@@ -69,13 +69,17 @@ export async function getRecordedEvalCalls(panelPage) {
   return panelPage.evaluate(() => globalThis.__hotwireInspectorEvalCalls);
 }
 
-export async function expectHeadingAndSummary(panelPage) {
-  await expect(panelPage.locator('h1')).toHaveText('Hotwire Inspector');
-  await expect(panelPage.locator('#summary')).toHaveText('2 frames, 4 controllers');
+export function withExpectedHeadingAndSummary(heading, summary) {
+  return async (panelPage) => {
+    await expect(panelPage.locator('h1')).toHaveText(heading);
+    await expect(panelPage.locator('#summary')).toHaveText(summary);
+  };
 }
 
-export async function expectFixtureNodeIds(panelPage) {
-  await expect(panelPage.locator('.node-id')).toHaveText(['main-frame', 'nested-frame', 'modal-controller', 'sidebar-controller']);
+export function withExpectedNodeIds(expectedIds) {
+  return async (panelPage) => {
+    await expect(panelPage.locator('.node-id')).toHaveText(expectedIds);
+  };
 }
 
 export function withExpectedTagNames(expectedTagNames) {
@@ -85,68 +89,71 @@ export function withExpectedTagNames(expectedTagNames) {
   };
 }
 
-export async function expectInternalIdsHidden(panelPage) {
-  const nodeIds = await panelPage.locator('.node-id').allTextContents();
-  expect(nodeIds).not.toContain(`${ID_PREFIX}-uuid-1`);
-  expect(nodeIds).toContain('user-controller');
+export function withExpectedInternalIdsHidden(internalIdPrefix, visibleId) {
+  return async (panelPage) => {
+    const nodeIds = await panelPage.locator('.node-id').allTextContents();
+    expect(nodeIds).not.toContain(`${internalIdPrefix}-uuid-1`);
+    expect(nodeIds).toContain(visibleId);
+  };
 }
 
-export async function expectFrameSrc(panelPage) {
-  const mainFrameRow = panelPage.locator('.node-row').filter({ hasText: 'main-frame' }).first();
-  const src = mainFrameRow.locator('.node-src');
+export function withExpectedFrameSrc(nodeId, expectedSrc) {
+  return async (panelPage) => {
+    const nodeRow = panelPage.locator('.node-row').filter({ hasText: nodeId }).first();
+    const src = nodeRow.locator('.node-src');
 
-  await expect(src).toBeVisible();
-  await expect(src).toHaveText('/main');
+    await expect(src).toBeVisible();
+    await expect(src).toHaveText(expectedSrc);
+  };
 }
 
-export async function expectControllerBadges(panelPage) {
-  const mainFrameRow = panelPage.locator('.node-row').filter({ hasText: 'main-frame' }).first();
-  const frameBadges = await mainFrameRow.locator('.badge').allTextContents();
-  const modalRow = panelPage.locator('.node-row').filter({ hasText: 'modal-controller' }).first();
-  const controllerBadges = await modalRow.locator('.badge').allTextContents();
+export function withExpectedControllerBadges(nodeId, expectedBadges) {
+  return async (panelPage) => {
+    const nodeRow = panelPage.locator('.node-row').filter({ hasText: nodeId }).first();
+    const badges = await nodeRow.locator('.badge').allTextContents();
 
-  expect(frameBadges).toEqual(['sidebar']);
-  expect(controllerBadges).toEqual(['modal', 'dropdown']);
+    expect(badges).toEqual(expectedBadges);
+  };
 }
 
-export async function expectNestedTree(panelPage) {
-  const mainFrameChildren = panelPage.locator('.node').filter({ hasText: 'main-frame' }).first().locator('> .node-children');
-  await expect(mainFrameChildren).not.toBeHidden();
-  await expect(mainFrameChildren.locator('.node-id').first()).toHaveText('nested-frame');
+export function withExpectedNestedTree(parentId, childId, grandchildId) {
+  return async (panelPage) => {
+    const parentChildren = panelPage.locator('.node').filter({ hasText: parentId }).first().locator('> .node-children');
+    await expect(parentChildren).not.toBeHidden();
+    await expect(parentChildren.locator('.node-id').first()).toHaveText(childId);
 
-  const nestedChildren = mainFrameChildren.locator('.node').filter({ hasText: 'nested-frame' }).first().locator('> .node-children');
-  await expect(nestedChildren.locator('.node-id').first()).toHaveText('modal-controller');
+    const childChildren = parentChildren.locator('.node').filter({ hasText: childId }).first().locator('> .node-children');
+    await expect(childChildren.locator('.node-id').first()).toHaveText(grandchildId);
+  };
 }
 
-export async function expectDeepTree(panelPage) {
-  await expect(panelPage.locator('#summary')).toHaveText('4 frames, 3 controllers');
-  await expect(panelPage.locator('.node-id')).toHaveText([
-    'level-1',
-    'level-2',
-    'level-3',
-    'level-4',
-    'level-5',
-    'level-6',
-    'level-7',
-  ]);
+export function withExpectedDeepTree(summaryText, levelIds) {
+  return async (panelPage) => {
+    await expect(panelPage.locator('#summary')).toHaveText(summaryText);
+    await expect(panelPage.locator('.node-id')).toHaveText(levelIds);
 
-  let children = panelPage.locator('.node').filter({ hasText: 'level-1' }).first().locator('> .node-children');
+    let children = panelPage.locator('.node').filter({ hasText: levelIds[0] }).first().locator('> .node-children');
 
-  for (const levelId of ['level-2', 'level-3', 'level-4', 'level-5', 'level-6', 'level-7']) {
-    await expect(children).not.toBeHidden();
-    await expect(children.locator('> .node > .node-row .node-id').first()).toHaveText(levelId);
-    children = children.locator('> .node').first().locator('> .node-children');
-  }
+    for (let i = 1; i < levelIds.length; i++) {
+      await expect(children).not.toBeHidden();
+      await expect(children.locator('> .node > .node-row .node-id').first()).toHaveText(levelIds[i]);
+      children = children.locator('> .node').first().locator('> .node-children');
+    }
+  };
 }
 
-export async function expectEmptyState(panelPage) {
-  await expect(panelPage.locator('#empty-state')).toBeVisible();
-  await expect(panelPage.locator('#tree')).toBeHidden();
-  await expect(panelPage.locator('#summary')).toHaveText('0 frames, 0 controllers');
+export function withExpectedEmptyState(summaryText) {
+  return async (panelPage) => {
+    await expect(panelPage.locator('#empty-state')).toBeVisible();
+    await expect(panelPage.locator('#tree')).toBeHidden();
+    await expect(panelPage.locator('#summary')).toHaveText(summaryText);
+  };
 }
 
-export async function expectErrorState(panelPage) {
-  await expect(panelPage.locator('#summary')).toHaveText('Unable to read the inspected page');
+export function withExpectedErrorState(errorMessage) {
+  return async (panelPage) => {
+    await expect(panelPage.locator('#summary')).toHaveText(errorMessage);
+  };
 }
 
 export async function expectRefreshRescans(panelPage) {
@@ -185,43 +192,41 @@ export async function expectThemeChanges(panelPage) {
   await expect(themeSelect).toHaveValue('system');
 }
 
-export async function expectPersistedTheme(panelPage) {
-  await expect(panelPage.locator('#theme-select')).toHaveValue('dark');
-  await expect(panelPage.locator('html')).toHaveAttribute('data-theme', 'dark');
+export function withExpectedPersistedTheme(expectedTheme) {
+  return async (panelPage) => {
+    await expect(panelPage.locator('#theme-select')).toHaveValue(expectedTheme);
+    await expect(panelPage.locator('html')).toHaveAttribute('data-theme', expectedTheme);
+  };
 }
 
-export async function expectHoverMessages(panelPage) {
-  const mainFrameRow = panelPage.locator('.node-row').filter({ hasText: 'main-frame' }).first();
+export function withExpectedHoverMessages(nodeId, expectedMessages) {
+  return async (panelPage) => {
+    const nodeRow = panelPage.locator('.node-row').filter({ hasText: nodeId }).first();
 
-  await clearRecordedMessages(panelPage);
-  await mainFrameRow.hover();
-  await panelPage.locator('h1').hover();
+    await clearRecordedMessages(panelPage);
+    await nodeRow.hover();
+    await panelPage.locator('h1').hover();
 
-  const messages = await getRecordedMessages(panelPage);
+    const messages = await getRecordedMessages(panelPage);
 
-  expect(messages).toEqual([
-    { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'main-frame' },
-    { type: CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE },
-  ]);
+    expect(messages).toEqual(expectedMessages);
+  };
 }
 
-export async function expectClickInspects(panelPage) {
-  const nestedFrameRow = panelPage.locator('.node-row').filter({ hasText: 'nested-frame' }).first();
-  const inspectIcon = nestedFrameRow.locator('.icon-btn');
+export function withExpectedClickInspects(nodeId, expectedMessages, expectedEvalCall) {
+  return async (panelPage) => {
+    const nodeRow = panelPage.locator('.node-row').filter({ hasText: nodeId }).first();
+    const inspectIcon = nodeRow.locator('.icon-btn');
 
-  await clearRecordedMessages(panelPage);
-  await inspectIcon.click();
+    await clearRecordedMessages(panelPage);
+    await inspectIcon.click();
 
-  const messages = await getRecordedMessages(panelPage);
-  const evalCalls = await getRecordedEvalCalls(panelPage);
+    const messages = await getRecordedMessages(panelPage);
+    const evalCalls = await getRecordedEvalCalls(panelPage);
 
-  expect(messages).toEqual([
-    { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'nested-frame' },
-    { type: CONTENT_INSPECT_MESSAGE_TYPE, id: 'nested-frame' },
-  ]);
-  expect(evalCalls).toEqual([
-    'inspect(document.querySelector("#mock"))',
-  ]);
+    expect(messages).toEqual(expectedMessages);
+    expect(evalCalls).toEqual(expectedEvalCall);
+  };
 }
 
 export async function expectDoubleClickTogglesNodeChildren(panelPage) {
