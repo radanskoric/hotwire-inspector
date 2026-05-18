@@ -108,3 +108,8 @@ To run the E2E tests:
 npm run build
 npm run test:e2e
 ```
+
+## Acknowledgements
+
+- The extension icon is a color customized version of "Lightning spanner" icon from the [game-icons.net](https://game-icons.net/) project.
+- The UI icons are from [heroicons.com](https://heroicons.com/).

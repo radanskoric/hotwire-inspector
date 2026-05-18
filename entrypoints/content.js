@@ -8,7 +8,7 @@ import {
 import { ContentInspector } from '../lib/content-inspector.js';
 
 export default defineContentScript({
-  matches: ['<all_urls>'],
+  matches: ['http://*/*', 'https://*/*'],
   main() {
     const inspector = new ContentInspector();
 
