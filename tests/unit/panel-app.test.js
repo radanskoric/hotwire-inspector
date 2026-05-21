@@ -201,6 +201,8 @@ describe('PanelApp', () => {
     expect(badges.hidden).toBe(false);
     expect(badges.children.length).toBe(1);
     expect(badges.children[0].textContent).toBe('lazy');
+    expect(badges.children[0].dataset.action).toBe('click->panel-node#storeController');
+    expect(badges.children[0].dataset.controllerIdentifier).toBe('lazy');
     expect(children.hidden).toBe(false);
     expect(children.children.length).toBe(1);
     expect(row.dataset.controller).toBe('panel-node');

@@ -31,15 +31,15 @@ describe('NodeController', () => {
 
   it('toggles children visibility on double-click', async () => {
     const row = node.querySelector('.node-row');
-    
+
     // Initial state: children are visible (hidden=false by default in HTML)
     expect(children.hidden).toBe(false);
-    
+
     // First double-click: hide children
     row.dispatchEvent(new Event('dblclick'));
     await Promise.resolve();
     expect(children.hidden).toBe(true);
-    
+
     // Second double-click: show children again
     row.dispatchEvent(new Event('dblclick'));
     await Promise.resolve();
@@ -47,6 +47,7 @@ describe('NodeController', () => {
   });
 
   it('no-ops when children target is not present', async () => {
+    application.stop();
     document.body.innerHTML = `
       <div data-controller="node">
         <div class="node-row" data-action="dblclick->node#toggleChildren"></div>
@@ -56,7 +57,8 @@ describe('NodeController', () => {
     application.register('node', NodeController);
     node = document.querySelector('[data-controller="node"]');
     const row = node.querySelector('.node-row');
-    
+    await Promise.resolve();
+
     // Should not throw
     row.dispatchEvent(new Event('dblclick'));
     await Promise.resolve();

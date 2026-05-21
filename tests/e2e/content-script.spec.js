@@ -4,17 +4,29 @@ import {
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
+  CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
 } from '../../lib/constants.js';
 import {
   deepFixtureUrl,
+  fixturesRoot,
   fixtureUrl,
   withChromiumExtension,
   getExtensionDevtoolsFrame,
   sendToContentScript,
+  withStaticServer,
 } from './helpers.js';
 
-async function gotoFixture(page) {
-  await page.goto(fixtureUrl);
+async function gotoFixture(page, origin) {
+  await page.goto(fixtureUrl(origin));
+}
+
+async function withFixturePage(testBody) {
+  await withStaticServer(fixturesRoot, async (origin) => {
+    await withChromiumExtension(async ({ page, context }) => {
+      await gotoFixture(page, origin);
+      await testBody({ page, context });
+    });
+  });
 }
 
 test.describe('Content Script', () => {
@@ -32,27 +44,27 @@ test.describe('Content Script', () => {
   test('scans and displays turbo-frames', async ({ browserName }) => {
     test.skip(browserName !== 'chromium');
 
-    await withChromiumExtension(async ({ page, context }) => {
-      await gotoFixture(page);
+    await withStaticServer(fixturesRoot, async (origin) => {
+      await withChromiumExtension(async ({ page, context }) => {
+        await gotoFixture(page, origin);
 
-      const frame = await getExtensionDevtoolsFrame(context);
-      const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
+        const frame = await getExtensionDevtoolsFrame(context);
+        const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
 
-      const frames = result.items.filter((item) => item.tagName === 'turbo-frame');
-      expect(frames).toHaveLength(2);
-      expect(frames.map((f) => f.id)).toEqual(['main-frame', 'nested-frame']);
-      expect(frames[0].src).toBe('/main');
-      expect(frames[0].controllers).toEqual(['sidebar']);
-      expect(frames[1].parentId).toBe('main-frame');
+        const frames = result.items.filter((item) => item.tagName === 'turbo-frame');
+        expect(frames).toHaveLength(2);
+        expect(frames.map((f) => f.id)).toEqual(['main-frame', 'nested-frame']);
+        expect(frames[0].src).toBe('/main');
+        expect(frames[0].controllers).toEqual(['sidebar']);
+        expect(frames[1].parentId).toBe('main-frame');
+      });
     });
   });
 
   test('scans and displays Stimulus controllers', async ({ browserName }) => {
     test.skip(browserName !== 'chromium');
 
-    await withChromiumExtension(async ({ page, context }) => {
-      await gotoFixture(page);
-
+    await withFixturePage(async ({ context }) => {
       const frame = await getExtensionDevtoolsFrame(context);
       const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
 
@@ -71,9 +83,7 @@ test.describe('Content Script', () => {
   test('highlights element on hover', async ({ browserName }) => {
     test.skip(browserName !== 'chromium');
 
-    await withChromiumExtension(async ({ page, context }) => {
-      await gotoFixture(page);
-
+    await withFixturePage(async ({ page, context }) => {
       const frame = await getExtensionDevtoolsFrame(context);
       const result = await sendToContentScript(frame, { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'main-frame' });
 
@@ -96,9 +106,7 @@ test.describe('Content Script', () => {
   test('removes highlight on mouse leave', async ({ browserName }) => {
     test.skip(browserName !== 'chromium');
 
-    await withChromiumExtension(async ({ page, context }) => {
-      await gotoFixture(page);
-
+    await withFixturePage(async ({ page, context }) => {
       const frame = await getExtensionDevtoolsFrame(context);
       await sendToContentScript(frame, { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'main-frame' });
       await sendToContentScript(frame, { type: CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE });
@@ -110,9 +118,7 @@ test.describe('Content Script', () => {
   test('inspect returns a valid selector', async ({ browserName }) => {
     test.skip(browserName !== 'chromium');
 
-    await withChromiumExtension(async ({ page, context }) => {
-      await gotoFixture(page);
-
+    await withFixturePage(async ({ page, context }) => {
       const frame = await getExtensionDevtoolsFrame(context);
       const result = await sendToContentScript(frame, { type: CONTENT_INSPECT_MESSAGE_TYPE, id: 'main-frame' });
 
@@ -121,6 +127,30 @@ test.describe('Content Script', () => {
 
       const found = await page.locator(result.selector).count();
       expect(found).toBe(1);
+    });
+  });
+
+  test('stores a Stimulus controller as a temp variable', async ({ browserName }) => {
+    test.skip(browserName !== 'chromium');
+
+    await withFixturePage(async ({ page, context }) => {
+      const frame = await getExtensionDevtoolsFrame(context);
+      const scanResult = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
+      const modalController = scanResult.items.find((item) => item.controllers?.includes('modal'));
+      const result = await sendToContentScript(frame, {
+        type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+        id: modalController.id,
+        identifier: 'modal',
+      });
+
+      expect(result).toEqual({
+        requestId: expect.any(String),
+        success: true,
+        name: 'temp1',
+        identifier: 'modal',
+      });
+      await expect(page.locator('body > div')).toHaveCount(1);
+      await expect.poll(() => page.evaluate(() => window.temp1 === window.modalController)).toBe(true);
     });
   });
 
@@ -141,9 +171,7 @@ test.describe('Content Script', () => {
   test('builds correct parent-child relationships', async ({ browserName }) => {
     test.skip(browserName !== 'chromium');
 
-    await withChromiumExtension(async ({ page, context }) => {
-      await gotoFixture(page);
-
+    await withFixturePage(async ({ context }) => {
       const frame = await getExtensionDevtoolsFrame(context);
       const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
 
@@ -162,9 +190,7 @@ test.describe('Content Script', () => {
   test('rescans after dynamic DOM changes', async ({ browserName }) => {
     test.skip(browserName !== 'chromium');
 
-    await withChromiumExtension(async ({ page, context }) => {
-      await gotoFixture(page);
-
+    await withFixturePage(async ({ page, context }) => {
       const frame = await getExtensionDevtoolsFrame(context);
       const initialResult = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
 
@@ -204,30 +230,32 @@ test.describe('Content Script', () => {
   test('handles deeply nested elements', async ({ browserName }) => {
     test.skip(browserName !== 'chromium');
 
-    await withChromiumExtension(async ({ page, context }) => {
-      await page.goto(deepFixtureUrl);
+    await withStaticServer(fixturesRoot, async (origin) => {
+      await withChromiumExtension(async ({ page, context }) => {
+        await page.goto(deepFixtureUrl(origin));
 
-      const frame = await getExtensionDevtoolsFrame(context);
-      const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
-      const parentIdsById = Object.fromEntries(result.items.map((item) => [item.id, item.parentId]));
+        const frame = await getExtensionDevtoolsFrame(context);
+        const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
+        const parentIdsById = Object.fromEntries(result.items.map((item) => [item.id, item.parentId]));
 
-      expect(result.items.map((item) => item.id)).toEqual([
-        'level-1',
-        'level-2',
-        'level-3',
-        'level-4',
-        'level-5',
-        'level-6',
-        'level-7',
-      ]);
-      expect(parentIdsById).toMatchObject({
-        'level-1': null,
-        'level-2': 'level-1',
-        'level-3': 'level-2',
-        'level-4': 'level-3',
-        'level-5': 'level-4',
-        'level-6': 'level-5',
-        'level-7': 'level-6',
+        expect(result.items.map((item) => item.id)).toEqual([
+          'level-1',
+          'level-2',
+          'level-3',
+          'level-4',
+          'level-5',
+          'level-6',
+          'level-7',
+        ]);
+        expect(parentIdsById).toMatchObject({
+          'level-1': null,
+          'level-2': 'level-1',
+          'level-3': 'level-2',
+          'level-4': 'level-3',
+          'level-5': 'level-4',
+          'level-6': 'level-5',
+          'level-7': 'level-6',
+        });
       });
     });
   });

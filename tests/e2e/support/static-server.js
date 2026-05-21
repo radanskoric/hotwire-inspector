@@ -9,6 +9,10 @@ const contentTypes = {
   '.svg': 'image/svg+xml',
 };
 
+// Use this for E2E pages that must behave like normal web pages, especially
+// content-script fixtures. The production extension only injects into HTTP(S)
+// pages, so tests should wrap fixture navigation in this helper and build URLs
+// from the origin passed to `testBody`.
 export async function withStaticServer(rootDir, testBody) {
   const server = createServer(async (request, response) => {
     const requestUrl = new URL(request.url, 'http://127.0.0.1');

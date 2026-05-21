@@ -3,6 +3,18 @@
 
 <head>
   <title>Test Page</title>
+  <script>
+    window.modalController = { name: 'modal-controller' };
+    window.Stimulus = {
+      getControllerForElementAndIdentifier(element, identifier) {
+        if (identifier === 'modal' && element.matches('[data-controller~="modal"]')) {
+          return window.modalController;
+        }
+
+        return null;
+      },
+    };
+  </script>
 </head>
 
 <body>

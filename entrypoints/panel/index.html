@@ -50,6 +50,12 @@
   <template id="badge-template">
     <span class="badge"></span>
   </template>
+  <template id="notice-template">
+    <div class="status-notice" data-controller="status" data-action="click->panel-node#storeController" role="status"
+      aria-live="polite">
+      <span slot="text"></span>
+    </div>
+  </template>
   <script type="module" src="./main.js"></script>
 </body>
 

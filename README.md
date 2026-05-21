@@ -8,11 +8,57 @@ Hotwire Inspector exists to make it easier to understand the structure of Hotwir
 
 There are existing tools but I wanted a cross browser extension that integrates into the browser's DevTools panel rather than opening a separate window.
 
+### Hotwire Inspector works hard to not interfere with your application
+
 An important goal of the project is to inspect the page without disturbing it. Hotwire Inspector works hard to avoid interfering with the page by:
 1. Tracking the elements on the page inside the extension rather than writing tracking attributes into the target DOM. This requires never holding a strong reference to the elements, so they can be garbage collected. Element's ID is used when possible and [WeakMap](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WeakMap) and [WeakRef](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WeakRef) are used whenever a direct reference to the element object is needed.
 2. Highlighting is done by inserting absolutely positioned elements into the root of the DOM rather than modifying the target elements directly. This is the minimal possible intrusion into the DOM that allows visual highlighting.
+3. Controller instance storage uses a WXT-injected page script element to find and track controller instances. The script listens only on its own element. The only writes to the page's global scope are `window.tempN` variables that are only set after a user requests it. This approach is selected because the only alternative is eval-ing code in the context of the page. A single isolated script is a cleaner approach.
 
 This approach helps reduce debugging noise, avoids surprising side effects, and keeps the inspected page behavior as close as possible to its normal runtime behavior.
+
+## Architecture
+
+Hotwire Inspector is split across the extension's DevTools panel, background script, content script, and a small injected page-context script. Messages flow from the panel toward the inspected page, while scan results and inspection data flow back through the same path.
+
+```text
+┌──────────────────────────────┐
+│ Browser DevTools             │
+│  ┌─────────────────────────┐ │
+│  │ Hotwire Inspector Panel │ │
+│  │                         │ │
+│  │ entrypoints/panel/      │ │
+│  └───────────┬─────────────┘ │
+└──────────────▲───────────────┘
+               │ extension messages
+               ▼
+┌──────────────────────────────┐
+│ Background script            │
+│                              │
+│ entrypoints/background.js    │
+└──────────────┬───────────────┘
+               ▲
+               | tab/content-script messages
+               ▼
+┌──────────────────────────────┐
+│ Content script               │
+│                              │
+│ entrypoints/content.js       │
+│                              │
+│ - scans Turbo Frames         │
+│ - detects Stimulus metadata  │
+│ - highlights inspected nodes │
+└──────────────┬───────────────┘
+               │ injects page-context script
+               ▼
+┌──────────────────────────────┐
+│ Inspected page context       │
+│                              │
+│ inspected-page-inject.js     │
+│                              │
+│ - track controller instances │
+└──────────────────────────────┘
+```
 
 ## Local development with hot reloading
 

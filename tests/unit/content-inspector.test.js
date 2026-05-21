@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ContentInspector } from '../../lib/content-inspector.js';
-import { ID_PREFIX } from '../../lib/constants.js';
+import {
+  ID_PREFIX,
+  STORE_CONTROLLER_REQUEST_EVENT,
+  STORE_CONTROLLER_RESPONSE_EVENT,
+} from '../../lib/constants.js';
 
 function createElement(
   tagName,
@@ -84,6 +88,13 @@ function createDocument(elements) {
       return createElement(tagName);
     },
   };
+}
+
+class TestCustomEvent extends Event {
+  constructor(type, options = {}) {
+    super(type);
+    this.detail = options.detail;
+  }
 }
 
 describe('ContentInspector', () => {
@@ -359,5 +370,140 @@ describe('ContentInspector', () => {
     inspector.scan();
 
     expect(observedCalls).toEqual([]);
+  });
+
+  it('returns an error when storing a controller for a missing element', async () => {
+    const document = createDocument([]);
+    const inspector = new ContentInspector({ document, crypto, cssEscape });
+
+    await expect(inspector.storeController('missing', 'modal')).resolves.toEqual({
+      success: false,
+      error: 'Element not found',
+    });
+  });
+
+  it('stores a controller through the injected page script', async () => {
+    const controller = createElement('div', {
+      id: 'modal-controller',
+      attributes: { 'data-controller': 'modal' },
+    });
+    const document = createDocument([controller]);
+    document.defaultView = { CustomEvent: TestCustomEvent };
+    const script = new EventTarget();
+    const injectScript = () => Promise.resolve({ script });
+    const inspector = new ContentInspector({ document, crypto, cssEscape, injectScript });
+
+    script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
+      script.dispatchEvent(new TestCustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
+        detail: {
+          requestId: 'unrelated-request',
+          success: false,
+        },
+      }));
+      script.dispatchEvent(new TestCustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
+        detail: {
+          requestId: event.detail.requestId,
+          success: true,
+          variableName: 'temp1',
+        },
+      }));
+    });
+
+    inspector.scan();
+
+    await expect(inspector.storeController('modal-controller', 'modal')).resolves.toEqual({
+      requestId: 'uuid-1',
+      success: true,
+      variableName: 'temp1',
+    });
+  });
+
+  it('returns injected script loader failures as controller storage errors', async () => {
+    const controller = createElement('div', {
+      id: 'modal-controller',
+      attributes: { 'data-controller': 'modal' },
+    });
+    const document = createDocument([controller]);
+    const inspector = new ContentInspector({ document, crypto, cssEscape });
+
+    inspector.scan();
+
+    await expect(inspector.storeController('modal-controller', 'modal')).resolves.toEqual({
+      success: false,
+      error: 'Injected page script loader unavailable',
+    });
+  });
+
+  it('uses fallback storage error text and global CustomEvent when needed', async () => {
+    const previousCustomEvent = globalThis.CustomEvent;
+    const controller = createElement('div', {
+      id: 'modal-controller',
+      attributes: { 'data-controller': 'modal' },
+    });
+    const document = createDocument([controller]);
+    const script = new EventTarget();
+    const injectScript = () => Promise.resolve({ script });
+    const inspector = new ContentInspector({ document, crypto, cssEscape, injectScript });
+
+    globalThis.CustomEvent = TestCustomEvent;
+    inspector.sendStoreControllerRequest = async () => {
+      throw new Error();
+    };
+    inspector.scan();
+
+    await expect(inspector.storeController('modal-controller', 'modal')).resolves.toEqual({
+      success: false,
+      error: 'Controller storage failed',
+    });
+
+    inspector.sendStoreControllerRequest = ContentInspector.prototype.sendStoreControllerRequest;
+    script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
+      script.dispatchEvent(new TestCustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
+        detail: {
+          requestId: event.detail.requestId,
+          success: true,
+        },
+      }));
+    });
+
+    await expect(inspector.storeController('modal-controller', 'modal')).resolves.toEqual({
+      requestId: 'uuid-1',
+      success: true,
+    });
+
+    globalThis.CustomEvent = previousCustomEvent;
+  });
+
+  it('reuses the injected script for subsequent controller storage requests', async () => {
+    const controller = createElement('div', {
+      id: 'modal-controller',
+      attributes: { 'data-controller': 'modal' },
+    });
+    const document = createDocument([controller]);
+    document.defaultView = { CustomEvent: TestCustomEvent };
+    const script = new EventTarget();
+    let injectionCount = 0;
+    const injectScript = () => {
+      injectionCount += 1;
+      return Promise.resolve(script);
+    };
+    const inspector = new ContentInspector({ document, crypto, cssEscape, injectScript });
+
+    script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
+      script.dispatchEvent(new TestCustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
+        detail: {
+          requestId: event.detail.requestId,
+          success: true,
+          variableName: `temp${injectionCount}`,
+        },
+      }));
+    });
+
+    inspector.scan();
+
+    await inspector.storeController('modal-controller', 'modal');
+    await inspector.storeController('modal-controller', 'modal');
+
+    expect(injectionCount).toBe(1);
   });
 });

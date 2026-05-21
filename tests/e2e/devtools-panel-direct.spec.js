@@ -1,8 +1,10 @@
 import { test, expect, chromium } from '@playwright/test';
 import {
+  fixturesRoot,
   fixtureUrl,
   ensureDisplay,
   waitForPage,
+  withStaticServer,
 } from './helpers.js';
 import path from 'path';
 
@@ -94,7 +96,9 @@ test.skip('interacts with DevTools panel directly via undock approach', async ({
     const devtoolsPanel = devtools.frameLocator('iframe[src*="panel.html"]');
 
     // Navigate to the fixture page
-    await page.goto(fixtureUrl);
+    await withStaticServer(fixturesRoot, async (origin) => {
+      await page.goto(fixtureUrl(origin));
+    });
 
     // Wait for the panel to render scan results
     await expect(devtoolsPanel.locator('#summary')).toHaveText(/\d+ frames?, \d+ controllers?/, { timeout: 5000 });

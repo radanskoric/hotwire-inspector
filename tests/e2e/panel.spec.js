@@ -5,6 +5,7 @@ import {
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
+  CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
   ID_PREFIX,
 } from '../../lib/constants.js';
 import {
@@ -18,6 +19,7 @@ import {
   expectRefreshRescans,
   expectThemeChanges,
   expectThemeSwitcher,
+  withExpectedBadgeClickStoresController,
   withExpectedClickInspects,
   withExpectedControllerBadges,
   withExpectedDeepTree,
@@ -180,6 +182,16 @@ test.describe('Panel UI', () => {
       { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'nested-frame' },
       { type: CONTENT_INSPECT_MESSAGE_TYPE, id: 'nested-frame' },
     ], ['inspect(document.querySelector("#mock"))']));
+  });
+
+  test('clicking a controller badge stores the page controller as a temp variable', async ({ browserName, page }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedBadgeClickStoresController('modal-controller', 'modal', [
+      { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'modal-controller' },
+      { type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE, id: 'modal-controller', identifier: 'modal' },
+    ]));
   });
 
   test('double-clicking a row toggles node children visibility', async ({ browserName, page }) => {

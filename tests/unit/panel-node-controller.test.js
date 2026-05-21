@@ -20,6 +20,11 @@ describe('PanelNodeController', () => {
   beforeEach(async () => {
     calls = [];
     document.body.innerHTML = `
+      <template id="notice-template">
+        <div class="status-notice" data-controller="status" role="status" aria-live="polite">
+          <span slot="text"></span>
+        </div>
+      </template>
       <button
         data-controller="panel-node"
         data-panel-node-id-value="frame-1"
@@ -34,6 +39,10 @@ describe('PanelNodeController', () => {
       inspectNode(id) {
         calls.push(['inspectNode', id]);
         return Promise.resolve('inspected');
+      },
+      storeControllerNode(id, identifier) {
+        calls.push(['storeControllerNode', id, identifier]);
+        return Promise.resolve({ success: true, name: 'temp1', identifier });
       },
     };
     application = Application.start();
@@ -69,6 +78,78 @@ describe('PanelNodeController', () => {
     await Promise.resolve();
 
     expect(calls).toEqual([['inspectNode', 'ctrl-1']]);
+  });
+
+  it('stores a controller from a badge click without inspecting the row', async () => {
+    button.innerHTML = '<span class="badge" data-controller-identifier="modal" data-action="click->panel-node#storeController">modal</span>';
+    const badge = button.querySelector('.badge');
+    await Promise.resolve();
+
+    badge.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+
+    expect(calls).toEqual([['storeControllerNode', 'frame-1', 'modal']]);
+  });
+
+  it('shows success feedback in status element on successful controller storage', async () => {
+    button.innerHTML = '<span class="badge" data-controller-identifier="modal" data-action="click->panel-node#storeController">modal</span>';
+    const badge = button.querySelector('.badge');
+    await Promise.resolve();
+
+    badge.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+
+    const statusElement = document.querySelector('.status-notice');
+    expect(statusElement).not.toBeNull();
+    expect(statusElement.textContent).toContain('modal controller instance stored as temp1');
+    expect(statusElement.hidden).toBe(false);
+  });
+
+  it('returns storage result without rendering feedback when notice template is unavailable', async () => {
+    document.getElementById('notice-template').remove();
+    button.innerHTML = '<span class="badge" data-controller-identifier="modal" data-action="click->panel-node#storeController">modal</span>';
+    const badge = button.querySelector('.badge');
+    await Promise.resolve();
+
+    badge.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+
+    expect(document.querySelector('.status-notice')).toBeNull();
+    expect(calls).toEqual([['storeControllerNode', 'frame-1', 'modal']]);
+  });
+
+  it('shows error feedback in status element on failed controller storage', async () => {
+    document[PANEL_BRIDGE_PROPERTY].storeControllerNode = (id, identifier) => {
+      calls.push(['storeControllerNode', id, identifier]);
+      return Promise.resolve({ success: false, error: 'Controller not found' });
+    };
+    button.innerHTML = '<span class="badge" data-controller-identifier="modal" data-action="click->panel-node#storeController">modal</span>';
+    const badge = button.querySelector('.badge');
+    await Promise.resolve();
+
+    badge.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+
+    const statusElement = document.querySelector('.status-notice');
+    expect(statusElement).not.toBeNull();
+    expect(statusElement.textContent).toContain('Controller not found');
+  });
+
+  it('shows generic error message when storage fails without specific error', async () => {
+    document[PANEL_BRIDGE_PROPERTY].storeControllerNode = (id, identifier) => {
+      calls.push(['storeControllerNode', id, identifier]);
+      return Promise.resolve({ success: false });
+    };
+    button.innerHTML = '<span class="badge" data-controller-identifier="modal" data-action="click->panel-node#storeController">modal</span>';
+    const badge = button.querySelector('.badge');
+    await Promise.resolve();
+
+    badge.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+
+    const statusElement = document.querySelector('.status-notice');
+    expect(statusElement).not.toBeNull();
+    expect(statusElement.textContent).toContain('Controller storage failed');
   });
 });
 

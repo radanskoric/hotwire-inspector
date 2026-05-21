@@ -1,4 +1,5 @@
-export { deepFixtureUrl, fixtureUrl } from './support/fixtures.js';
+export { deepFixtureUrl, fixtureUrl, fixturesRoot } from './support/fixtures.js';
+export { withStaticServer } from './support/static-server.js';
 export {
   chromiumAdapter,
   ensureDisplay,

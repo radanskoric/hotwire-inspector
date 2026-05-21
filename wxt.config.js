@@ -14,6 +14,10 @@ export default defineConfig({
     name: 'Hotwire Inspector',
     permissions: ['activeTab', 'scripting', 'tabs'],
     devtools_page: 'devtools.html',
+    web_accessible_resources: [{
+      resources: ['inspected-page-inject.js'],
+      matches: ['http://*/*', 'https://*/*'],
+    }],
   },
   webExt: {
     startUrls: ['http://localhost:4173'],

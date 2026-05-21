@@ -22,7 +22,7 @@
   --color-accent-contrast: oklch(var(--lch-accent-contrast));
   --color-selection: oklch(var(--lch-accent) / 0.12);
   --color-positive: oklch(var(--lch-positive));
-  --color-positive-surface: oklch(var(--lch-positive) / 0.14);
+  --color-positive-surface: color-mix(in srgb, var(--color-positive) 14%, white);
   --space-inline: 1ch;
   --space-block: 1rem;
   --radius-sm: 0.25rem;
@@ -126,6 +126,20 @@ select {
   margin: 0.25rem 0 0;
   color: var(--color-ink-muted);
   font-size: 0.75rem;
+}
+
+.status-notice {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--color-positive-surface);
+  color: var(--color-positive);
+  padding: 0.75rem calc(var(--space-inline) * 2);
+  text-align: center;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--color-positive);
 }
 
 .toolbar-actions {
@@ -247,4 +261,5 @@ main {
   background: var(--badge-background, var(--color-positive-surface));
   color: var(--badge-color, var(--color-positive));
   font-size: 0.6875rem;
+  cursor: pointer;
 }

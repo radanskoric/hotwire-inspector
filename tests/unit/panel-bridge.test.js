@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   CONTENT_INSPECT_MESSAGE_TYPE,
+  CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
   RELAY_ERROR_TYPE,
   RELAY_MESSAGE_TYPE,
 } from '../../lib/constants.js';
 import { PanelBridge } from '../../lib/panel-bridge.js';
 
-function createBrowserApi(sendMessageImplementation) {
+function createBrowserApi(sendMessageImplementation, evalResult = { success: true, name: 'temp1' }) {
   const evalCalls = [];
   return {
     runtime: {
@@ -15,8 +16,9 @@ function createBrowserApi(sendMessageImplementation) {
     devtools: {
       inspectedWindow: {
         tabId: 42,
-        eval(code) {
+        eval(code, callback) {
           evalCalls.push(code);
+          callback?.(evalResult);
         },
       },
     },
@@ -115,5 +117,24 @@ describe('PanelBridge', () => {
     await bridge.inspectNode('frame-1');
 
     expect(browserApi.evalCalls).toEqual([]);
+  });
+
+  it('storeControllerNode sends CONTENT_STORE_CONTROLLER_MESSAGE_TYPE to the content script', async () => {
+    const sentMessages = [];
+    const browserApi = createBrowserApi((message) => {
+      sentMessages.push(message);
+      return Promise.resolve({ success: true, name: 'temp3', identifier: 'modal' });
+    });
+    const bridge = new PanelBridge({ browserApi });
+
+    const response = await bridge.storeControllerNode('modal-controller', 'modal');
+
+    expect(sentMessages).toEqual([{
+      type: RELAY_MESSAGE_TYPE,
+      tabId: 42,
+      message: { type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE, id: 'modal-controller', identifier: 'modal' },
+    }]);
+    expect(browserApi.evalCalls).toEqual([]);
+    expect(response).toEqual({ success: true, name: 'temp3', identifier: 'modal' });
   });
 });

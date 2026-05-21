@@ -31,3 +31,7 @@ That matters because the extension should avoid:
 With this decision, element identity is treated as extension-internal state, not as part of the target application DOM. That keeps the extension safer and makes it less likely that running the inspector changes the behavior of the page being inspected.
 
 Reverse lookups must dereference weak references and handle stale entries as missing elements. For real DOM ids, the extension may fall back to `document.getElementById()` when a weak reference has been cleared.
+
+## Explicit User-Triggered Debugging Side Effects
+
+Clicking a Stimulus controller badge in the panel intentionally stores the matching inspected-page controller instance on the inspected page global object as the first available `window.tempN`. This action runs only after a direct user gesture and does not modify inspected page DOM structure or attributes.

@@ -15,6 +15,7 @@ Testing guidance for coding agents working in this folder.
 - Firefox E2E supports shared panel behavior through mocked panel APIs plus a focused smoke test.
 - Do not assume Firefox can use the same extension-loading or DevTools automation path as Chromium.
 - Keep browser mechanics in `e2e/adapters/` and reusable panel fixtures/assertions in `e2e/support/`.
+- Content-script E2E fixture pages must be served over HTTP via `withStaticServer(fixturesRoot, ...)`; do not load them with `file://` URLs because the production content script only matches `http://*/*` and `https://*/*`.
 
 ## Commands
 

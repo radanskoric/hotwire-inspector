@@ -4,11 +4,12 @@ import {
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
+  CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
   ID_PREFIX,
 } from '../../../lib/constants.js';
 
 export async function addMockPanelApis(page, { scanResponse, scanError, scanResponses, persistedTheme } = {}) {
-  await page.addInitScript(({ scanResponse, scanError, scanResponses, persistedTheme, scanMessageType }) => {
+  await page.addInitScript(({ scanResponse, scanError, scanResponses, persistedTheme, scanMessageType, storeControllerMessageType }) => {
     globalThis.browser ??= {};
     globalThis.browser.runtime ??= {};
     globalThis.chrome ??= globalThis.browser;
@@ -22,8 +23,9 @@ export async function addMockPanelApis(page, { scanResponse, scanError, scanResp
     browser.devtools = {
       inspectedWindow: {
         tabId: 1,
-        eval: (code) => {
+        eval: (code, callback) => {
           globalThis.__hotwireInspectorEvalCalls.push(code);
+          callback?.({ success: true, name: 'temp1' });
         },
       },
     };
@@ -49,10 +51,21 @@ export async function addMockPanelApis(page, { scanResponse, scanError, scanResp
         return Promise.resolve(scanResponse);
       }
 
+      if (message.type === storeControllerMessageType) {
+        return Promise.resolve({ success: true, name: 'temp1', identifier: message.identifier });
+      }
+
       return Promise.resolve({ success: true, selector: '#mock' });
     };
     globalThis.chrome = globalThis.browser;
-  }, { scanResponse, scanError, scanResponses, persistedTheme, scanMessageType: CONTENT_SCAN_MESSAGE_TYPE });
+  }, {
+    scanResponse,
+    scanError,
+    scanResponses,
+    persistedTheme,
+    scanMessageType: CONTENT_SCAN_MESSAGE_TYPE,
+    storeControllerMessageType: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+  });
 }
 
 export async function getRecordedMessages(panelPage) {
@@ -226,6 +239,19 @@ export function withExpectedClickInspects(nodeId, expectedMessages, expectedEval
 
     expect(messages).toEqual(expectedMessages);
     expect(evalCalls).toEqual(expectedEvalCall);
+  };
+}
+
+export function withExpectedBadgeClickStoresController(nodeId, controllerIdentifier, expectedMessages) {
+  return async (panelPage) => {
+    const nodeRow = panelPage.locator('.node-row').filter({ hasText: nodeId }).first();
+    const badge = nodeRow.locator('.badge').filter({ hasText: controllerIdentifier }).first();
+
+    await clearRecordedMessages(panelPage);
+    await badge.click();
+
+    const messages = await getRecordedMessages(panelPage);
+    expect(messages).toEqual(expectedMessages);
   };
 }
 
