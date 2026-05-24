@@ -12,6 +12,7 @@
     "build:firefox": "wxt build -b firefox",
     "build:safari": "wxt build -b safari",
     "test": "vitest",
+    "test:all": "node scripts/test-all.js",
     "coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test -c tests/e2e/playwright.config.js --project=chromium",

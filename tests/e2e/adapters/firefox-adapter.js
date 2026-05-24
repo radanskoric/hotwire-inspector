@@ -15,6 +15,7 @@ export const firefoxAdapter = {
   },
   withExtension,
   openPanelPage,
+  withPanelPage,
   sendToContentScript,
 };
 
@@ -34,6 +35,16 @@ export async function openPanelPage(page, options = {}) {
   });
 
   return panelPage;
+}
+
+export async function withPanelPage(page, options = {}, testBody) {
+  await addMockPanelApis(page, options);
+
+  await withStaticServer(firefoxAdapter.extensionOutputPath, async (baseUrl) => {
+    await page.goto(`${baseUrl}/panel.html`);
+    await page.waitForLoadState('networkidle');
+    await testBody(page);
+  });
 }
 
 async function sendToContentScript() {

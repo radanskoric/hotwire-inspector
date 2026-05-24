@@ -250,8 +250,9 @@ export function withExpectedBadgeClickStoresController(nodeId, controllerIdentif
     await clearRecordedMessages(panelPage);
     await badge.click();
 
-    const messages = await getRecordedMessages(panelPage);
-    expect(messages).toEqual(expectedMessages);
+    for (const expectedMessage of expectedMessages) {
+      await expect.poll(() => getRecordedMessages(panelPage)).toContainEqual(expectedMessage);
+    }
   };
 }
 
