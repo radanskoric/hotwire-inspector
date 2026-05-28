@@ -8,14 +8,26 @@ export default defineUnlistedScript(() => {
   }
 
   script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
-    const { selector, identifier, requestId } = event.detail ?? {};
+    const detail = typeof event.detail === 'string' ? JSON.parse(event.detail) : event.detail;
+    const { selector, identifier, requestId } = detail ?? {};
     const response = storeController(selector, identifier);
 
     script.dispatchEvent(new CustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
-      detail: { requestId, ...response },
+      detail: JSON.stringify({ requestId, ...response }),
     }));
   });
 });
+
+function checkApplicationCandidate(candidate) {
+  return candidate && typeof candidate.getControllerForElementAndIdentifier === 'function';
+}
+
+function detectApplication() {
+  if (checkApplicationCandidate(window.Stimulus)) { return window.Stimulus; }
+  if (checkApplicationCandidate(window.stimulusApp)) { return window.stimulusApp; }
+  if (checkApplicationCandidate(window.StimulusApp)) { return window.StimulusApp; }
+  return null;
+}
 
 function storeController(selector, identifier) {
   const element = document.querySelector(selector);
@@ -24,9 +36,8 @@ function storeController(selector, identifier) {
     return { success: false, error: 'Element not found' };
   }
 
-  const application = window.Stimulus;
-
-  if (!application || typeof application.getControllerForElementAndIdentifier !== 'function') {
+  const application = detectApplication();
+  if (!application) {
     return { success: false, error: 'Stimulus application not found' };
   }
 

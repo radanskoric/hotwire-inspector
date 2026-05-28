@@ -98,34 +98,20 @@ class TestCustomEvent extends Event {
 }
 
 describe('ContentInspector', () => {
-  let uuid = 0;
-  let crypto;
   let cssEscape;
 
   beforeEach(() => {
-    uuid = 0;
-    crypto = {
-      randomUUID() {
-        uuid += 1;
-        return `uuid-${uuid}`;
-      },
-    };
     cssEscape = (value) => value.replace(/:/g, '\\:');
   });
 
   it('can use global defaults with CSS escape and element node type', () => {
     const previousDocument = globalThis.document;
-    const previousCrypto = globalThis.crypto;
     const previousCss = globalThis.CSS;
     const previousNode = globalThis.Node;
     const frame = createElement('turbo-frame', { id: 'frame:main' });
     const document = createDocument([frame]);
 
     globalThis.document = document;
-    Object.defineProperty(globalThis, 'crypto', {
-      configurable: true,
-      value: crypto,
-    });
     globalThis.CSS = { escape: (value) => value.replace(/:/g, '\\:') };
     globalThis.Node = { ELEMENT_NODE: 1 };
 
@@ -139,10 +125,6 @@ describe('ContentInspector', () => {
       });
     } finally {
       globalThis.document = previousDocument;
-      Object.defineProperty(globalThis, 'crypto', {
-        configurable: true,
-        value: previousCrypto,
-      });
       globalThis.CSS = previousCss;
       globalThis.Node = previousNode;
     }
@@ -158,7 +140,7 @@ describe('ContentInspector', () => {
     globalThis.Node = undefined;
 
     try {
-      const inspector = new ContentInspector({ document, crypto });
+      const inspector = new ContentInspector({ document });
       inspector.scan();
 
       expect(inspector.inspect('frame:main')).toEqual({
@@ -174,7 +156,7 @@ describe('ContentInspector', () => {
   it('uses real element ids when present during scan', () => {
     const frame = createElement('turbo-frame', { id: 'main-frame' });
     const document = createDocument([frame]);
-    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const inspector = new ContentInspector({ document, cssEscape });
 
     expect(inspector.scan()).toEqual([
       {
@@ -193,7 +175,7 @@ describe('ContentInspector', () => {
       attributes: { 'data-controller': 'sidebar frame-loader' },
     });
     const document = createDocument([frame]);
-    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const inspector = new ContentInspector({ document, cssEscape });
 
     expect(inspector.scan()).toEqual([
       {
@@ -209,19 +191,20 @@ describe('ContentInspector', () => {
   it('generates stable in-memory keys for elements without ids', () => {
     const controller = createElement('div', { attributes: { 'data-controller': 'modal' } });
     const document = createDocument([controller]);
-    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const inspector = new ContentInspector({ document, cssEscape });
 
     const firstScan = inspector.scan();
     const secondScan = inspector.scan();
 
-    expect(firstScan[0].id).toBe(`${ID_PREFIX}-uuid-1`);
-    expect(secondScan[0].id).toBe(`${ID_PREFIX}-uuid-1`);
+    const firstId = firstScan[0].id;
+    expect(firstId).toMatch(new RegExp(`^${ID_PREFIX}-`));
+    expect(secondScan[0].id).toBe(firstId);
   });
 
   it('stores weak references in the reverse element lookup', () => {
     const controller = createElement('div', { attributes: { 'data-controller': 'modal' } });
     const document = createDocument([controller]);
-    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const inspector = new ContentInspector({ document, cssEscape });
     const [{ id }] = inspector.scan();
     const ref = inspector.elementsByKey.get(id);
 
@@ -232,7 +215,7 @@ describe('ContentInspector', () => {
   it('treats stale generated-key weak references as missing elements', () => {
     const controller = createElement('div', { attributes: { 'data-controller': 'modal' } });
     const document = createDocument([controller]);
-    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const inspector = new ContentInspector({ document, cssEscape });
     const [{ id }] = inspector.scan();
 
     inspector.elementsByKey.set(id, { deref: () => undefined });
@@ -243,7 +226,7 @@ describe('ContentInspector', () => {
   it('falls back to document id lookup when a weak reference is stale', () => {
     const frame = createElement('turbo-frame', { id: 'main-frame' });
     const document = createDocument([frame]);
-    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const inspector = new ContentInspector({ document, cssEscape });
 
     inspector.scan();
     inspector.elementsByKey.set('main-frame', { deref: () => undefined });
@@ -259,23 +242,22 @@ describe('ContentInspector', () => {
     const controller = createElement('div', { attributes: { 'data-controller': 'dropdown menu' } });
     frame.appendChild(controller);
     const document = createDocument([frame, controller]);
-    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const inspector = new ContentInspector({ document, cssEscape });
 
-    expect(inspector.scan()).toEqual([
-      {
-        id: 'parent-frame',
-        src: null,
-        parentId: null,
-        tagName: 'turbo-frame',
-        controllers: [],
-      },
-      {
-        id: `${ID_PREFIX}-uuid-1`,
-        parentId: 'parent-frame',
-        tagName: 'div',
-        controllers: ['dropdown', 'menu'],
-      },
-    ]);
+    const items = inspector.scan();
+    expect(items[0]).toEqual({
+      id: 'parent-frame',
+      src: null,
+      parentId: null,
+      tagName: 'turbo-frame',
+      controllers: [],
+    });
+    expect(items[1]).toMatchObject({
+      parentId: 'parent-frame',
+      tagName: 'div',
+      controllers: ['dropdown', 'menu'],
+    });
+    expect(items[1].id).toMatch(new RegExp(`^${ID_PREFIX}-`));
   });
 
   it('highlights and clears highlight with an overlay while preserving target inline styles', () => {
@@ -285,7 +267,7 @@ describe('ContentInspector', () => {
       rect: { top: 10, left: 20, width: 300, height: 40 },
     });
     const document = createDocument([controller]);
-    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const inspector = new ContentInspector({ document, cssEscape });
     const [{ id }] = inspector.scan();
 
     expect(inspector.highlight(id)).toEqual({ success: true });
@@ -316,7 +298,7 @@ describe('ContentInspector', () => {
   it('returns a selector for inspect using escaped ids when available', () => {
     const frame = createElement('turbo-frame', { id: 'frame:main' });
     const document = createDocument([frame]);
-    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const inspector = new ContentInspector({ document, cssEscape });
 
     inspector.scan();
 
@@ -328,7 +310,7 @@ describe('ContentInspector', () => {
 
   it('returns no selector when inspecting a missing element', () => {
     const document = createDocument([]);
-    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const inspector = new ContentInspector({ document, cssEscape });
 
     expect(inspector.inspect('missing')).toEqual({
       success: false,
@@ -349,7 +331,7 @@ describe('ContentInspector', () => {
     wrapper.appendChild(secondController);
 
     const document = createDocument([firstController, secondController]);
-    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const inspector = new ContentInspector({ document, cssEscape });
     const items = inspector.scan();
 
     expect(inspector.inspect(items[1].id)).toEqual({
@@ -365,16 +347,50 @@ describe('ContentInspector', () => {
       observedCalls.push(args);
     };
     const document = createDocument([controller]);
-    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const inspector = new ContentInspector({ document, cssEscape });
 
     inspector.scan();
 
     expect(observedCalls).toEqual([]);
   });
 
+  it('round-trips controller storage via JSON stringified event details (Firefox compartment)', async () => {
+    const controller = createElement('div', {
+      id: 'modal-controller',
+      attributes: { 'data-controller': 'modal' },
+    });
+    const document = createDocument([controller]);
+    document.defaultView = { CustomEvent: TestCustomEvent };
+    const script = new EventTarget();
+    const injectScript = () => Promise.resolve({ script });
+    const inspector = new ContentInspector({ document, cssEscape, injectScript });
+
+    script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
+      const detail = JSON.parse(event.detail);
+
+      script.dispatchEvent(new TestCustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
+        detail: JSON.stringify({
+          requestId: detail.requestId,
+          success: true,
+          name: 'temp1',
+          identifier: 'modal',
+        }),
+      }));
+    });
+
+    inspector.scan();
+
+    await expect(inspector.storeController('modal-controller', 'modal')).resolves.toEqual({
+      requestId: expect.any(String),
+      success: true,
+      name: 'temp1',
+      identifier: 'modal',
+    });
+  });
+
   it('returns an error when storing a controller for a missing element', async () => {
     const document = createDocument([]);
-    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const inspector = new ContentInspector({ document, cssEscape });
 
     await expect(inspector.storeController('missing', 'modal')).resolves.toEqual({
       success: false,
@@ -391,30 +407,34 @@ describe('ContentInspector', () => {
     document.defaultView = { CustomEvent: TestCustomEvent };
     const script = new EventTarget();
     const injectScript = () => Promise.resolve({ script });
-    const inspector = new ContentInspector({ document, crypto, cssEscape, injectScript });
+    const inspector = new ContentInspector({ document, cssEscape, injectScript });
 
     script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
+      const detail = JSON.parse(event.detail);
+
       script.dispatchEvent(new TestCustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
-        detail: {
+        detail: JSON.stringify({
           requestId: 'unrelated-request',
           success: false,
-        },
+        }),
       }));
       script.dispatchEvent(new TestCustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
-        detail: {
-          requestId: event.detail.requestId,
+        detail: JSON.stringify({
+          requestId: detail.requestId,
           success: true,
-          variableName: 'temp1',
-        },
+          name: 'temp1',
+          identifier: 'modal',
+        }),
       }));
     });
 
     inspector.scan();
 
     await expect(inspector.storeController('modal-controller', 'modal')).resolves.toEqual({
-      requestId: 'uuid-1',
+      requestId: expect.any(String),
       success: true,
-      variableName: 'temp1',
+      name: 'temp1',
+      identifier: 'modal',
     });
   });
 
@@ -424,7 +444,7 @@ describe('ContentInspector', () => {
       attributes: { 'data-controller': 'modal' },
     });
     const document = createDocument([controller]);
-    const inspector = new ContentInspector({ document, crypto, cssEscape });
+    const inspector = new ContentInspector({ document, cssEscape });
 
     inspector.scan();
 
@@ -443,7 +463,7 @@ describe('ContentInspector', () => {
     const document = createDocument([controller]);
     const script = new EventTarget();
     const injectScript = () => Promise.resolve({ script });
-    const inspector = new ContentInspector({ document, crypto, cssEscape, injectScript });
+    const inspector = new ContentInspector({ document, cssEscape, injectScript });
 
     globalThis.CustomEvent = TestCustomEvent;
     inspector.sendStoreControllerRequest = async () => {
@@ -458,16 +478,18 @@ describe('ContentInspector', () => {
 
     inspector.sendStoreControllerRequest = ContentInspector.prototype.sendStoreControllerRequest;
     script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
+      const detail = JSON.parse(event.detail);
+
       script.dispatchEvent(new TestCustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
-        detail: {
-          requestId: event.detail.requestId,
+        detail: JSON.stringify({
+          requestId: detail.requestId,
           success: true,
-        },
+        }),
       }));
     });
 
     await expect(inspector.storeController('modal-controller', 'modal')).resolves.toEqual({
-      requestId: 'uuid-1',
+      requestId: expect.any(String),
       success: true,
     });
 
@@ -487,15 +509,18 @@ describe('ContentInspector', () => {
       injectionCount += 1;
       return Promise.resolve(script);
     };
-    const inspector = new ContentInspector({ document, crypto, cssEscape, injectScript });
+    const inspector = new ContentInspector({ document, cssEscape, injectScript });
 
     script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
+      const detail = JSON.parse(event.detail);
+
       script.dispatchEvent(new TestCustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
-        detail: {
-          requestId: event.detail.requestId,
+        detail: JSON.stringify({
+          requestId: detail.requestId,
           success: true,
-          variableName: `temp${injectionCount}`,
-        },
+          name: `temp${injectionCount}`,
+          identifier: 'modal',
+        }),
       }));
     });
 

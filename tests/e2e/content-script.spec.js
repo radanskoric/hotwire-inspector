@@ -10,6 +10,8 @@ import {
   deepFixtureUrl,
   fixturesRoot,
   fixtureUrl,
+  stimulusAppFixtureUrl,
+  StimulusAppFixtureUrl,
   withChromiumExtension,
   getExtensionDevtoolsFrame,
   sendToContentScript,
@@ -256,6 +258,60 @@ test.describe('Content Script', () => {
           'level-6': 'level-5',
           'level-7': 'level-6',
         });
+      });
+    });
+  });
+
+  test('stores a controller when Stimulus is exposed as window.stimulusApp', async ({ browserName }) => {
+    test.skip(browserName !== 'chromium');
+
+    await withStaticServer(fixturesRoot, async (origin) => {
+      await withChromiumExtension(async ({ page, context }) => {
+        await page.goto(stimulusAppFixtureUrl(origin));
+
+        const frame = await getExtensionDevtoolsFrame(context);
+        const scanResult = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
+        const modalController = scanResult.items.find((item) => item.controllers?.includes('modal'));
+        const result = await sendToContentScript(frame, {
+          type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+          id: modalController.id,
+          identifier: 'modal',
+        });
+
+        expect(result).toEqual({
+          requestId: expect.any(String),
+          success: true,
+          name: 'temp1',
+          identifier: 'modal',
+        });
+        await expect.poll(() => page.evaluate(() => window.temp1 === window.modalController)).toBe(true);
+      });
+    });
+  });
+
+  test('stores a controller when Stimulus is exposed as window.StimulusApp', async ({ browserName }) => {
+    test.skip(browserName !== 'chromium');
+
+    await withStaticServer(fixturesRoot, async (origin) => {
+      await withChromiumExtension(async ({ page, context }) => {
+        await page.goto(StimulusAppFixtureUrl(origin));
+
+        const frame = await getExtensionDevtoolsFrame(context);
+        const scanResult = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
+        const modalController = scanResult.items.find((item) => item.controllers?.includes('modal'));
+        const result = await sendToContentScript(frame, {
+          type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+          id: modalController.id,
+          identifier: 'modal',
+        });
+
+        expect(result).toEqual({
+          requestId: expect.any(String),
+          success: true,
+          name: 'temp1',
+          identifier: 'modal',
+        });
+        await expect.poll(() => page.evaluate(() => window.temp1 === window.modalController)).toBe(true);
       });
     });
   });

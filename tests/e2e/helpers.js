@@ -1,4 +1,10 @@
-export { deepFixtureUrl, fixtureUrl, fixturesRoot } from './support/fixtures.js';
+export {
+  deepFixtureUrl,
+  fixtureUrl,
+  fixturesRoot,
+  stimulusAppFixtureUrl,
+  StimulusAppFixtureUrl,
+} from './support/fixtures.js';
 export { withStaticServer } from './support/static-server.js';
 export {
   chromiumAdapter,
