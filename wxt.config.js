@@ -1,9 +1,15 @@
 import { defineConfig } from 'wxt';
 
 const debugBuild = process.env.WXT_DEBUG_BUILD === 'true';
+const devServerPort = Number(process.env.WXT_DEV_SERVER_PORT || 3000);
 
 export default defineConfig({
   outDir: 'output',
+  dev: {
+    server: {
+      port: devServerPort,
+    },
+  },
   vite: () => ({
     build: {
       minify: debugBuild ? false : undefined,
