@@ -63,7 +63,7 @@ npm run test:e2e:firefox
 
 The Firefox smoke test uses `tests/e2e/playwright.firefox.config.js` and `tests/e2e/firefox-smoke.spec.js`.
 
-Firefox does not yet load the extension into Firefox DevTools. Instead, the Firefox adapter serves the built Firefox output from `output/firefox-mv2`, opens the built `panel.html` in Playwright Firefox, injects mocked extension APIs, and verifies that the Firefox-built panel bundle renders expected scan data.
+Firefox does not yet load the extension into Firefox DevTools. Instead, the Firefox adapter serves the built Firefox output from `output/firefox-mv3`, opens the built `panel.html` in Playwright Firefox, injects mocked extension APIs, and verifies that the Firefox-built panel bundle renders expected scan data.
 
 This allows shared panel UI behavior assertions to run in Firefox while keeping content-script messaging explicitly unsupported until a real Firefox extension transport is proven.
 

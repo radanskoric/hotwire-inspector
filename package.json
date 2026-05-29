@@ -6,10 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "wxt",
-    "dev:firefox": "wxt -b firefox",
+    "dev:firefox": "wxt -b firefox --mv3",
     "build": "wxt build",
     "build:debug": "WXT_DEBUG_BUILD=true wxt build",
-    "build:firefox": "wxt build -b firefox",
+    "build:firefox": "wxt build -b firefox --mv3",
     "build:safari": "wxt build -b safari",
     "test": "vitest",
     "test:all": "node scripts/test-all.js",
@@ -20,7 +20,7 @@
     "test:e2e:firefox": "playwright test -c tests/e2e/playwright.firefox.config.js",
     "test:e2e:headed": "playwright test -c tests/e2e/playwright.config.js --headed",
     "zip": "wxt zip",
-    "zip:firefox": "wxt zip -b firefox",
+    "zip:firefox": "wxt zip -b firefox --mv3",
     "postinstall": "wxt prepare"
   },
   "devDependencies": {

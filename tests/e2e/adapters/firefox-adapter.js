@@ -4,7 +4,7 @@ import { withStaticServer } from '../support/static-server.js';
 
 export const firefoxAdapter = {
   browserName: 'firefox',
-  extensionOutputPath: path.resolve('output/firefox-mv2'),
+  extensionOutputPath: path.resolve('output/firefox-mv3'),
   extensionUrlScheme: 'moz-extension://',
   capabilities: {
     loadsExtension: false,
