@@ -40,6 +40,7 @@ function mountPanelDom() {
     <template id="node-template">
       <div class="node">
         <button type="button" class="node-row" role="treeitem" data-controller="panel-node">
+          <span class="node-toggle" data-action="click->node#toggleChildren" aria-hidden="true"></span>
           <img src="/icons/reveal-in-elements.svg" class="icon" />
           <span class="node-main">
             <span class="node-kind"></span>
@@ -189,9 +190,11 @@ describe('PanelApp', () => {
 
     const rootNode = treeElement.children[0];
     const row = rootNode.querySelector('.node-row');
+    const toggle = rootNode.querySelector('.node-toggle');
     const src = rootNode.querySelector('.node-src');
     const badges = rootNode.querySelector('.badges');
     const children = rootNode.querySelector('.node-children');
+    const childNode = children.querySelector(':scope > .node');
 
     expect(summaryElement.textContent).toBe('1 frames, 2 controllers');
     expect(emptyStateElement.hidden).toBe(true);
@@ -207,6 +210,10 @@ describe('PanelApp', () => {
     expect(badges.children[0].dataset.controllerIdentifier).toBe('lazy');
     expect(children.hidden).toBe(false);
     expect(children.children.length).toBe(1);
+    expect(childNode).not.toBeNull();
+    expect(childNode.querySelector(':scope > .node-row .node-toggle')).not.toBeNull();
+    expect(childNode.querySelector(':scope > .node-children > .node')).toBeNull();
+    expect(toggle).not.toBeNull();
     expect(row.dataset.controller).toBe('panel-node');
     expect(row.dataset.panelNodeIdValue).toBe('frame-1');
   });

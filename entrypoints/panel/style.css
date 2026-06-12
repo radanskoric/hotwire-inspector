@@ -99,8 +99,8 @@ select {
 }
 
 .icon {
-  width: 1.2rem;
-  height: 1.2rem;
+  width: 1.1rem;
+  height: 1.1rem;
 }
 
 .icon-btn {
@@ -205,8 +205,8 @@ main {
 
 .node-row {
   display: flex;
-  align-items: left;
-  gap: calc(var(--space-inline) * 1.5);
+  align-items: center;
+  gap: var(--space-inline);
   width: 100%;
   padding: 0.625rem calc(var(--space-inline) * 1.5);
   background: transparent;
@@ -219,6 +219,33 @@ main {
   background: var(--color-selection);
 }
 
+.node-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 0.75rem;
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.node-toggle::before {
+  content: '';
+  border-block: 0.25rem solid transparent;
+  border-inline-start: 0.375rem solid currentColor;
+  transform-origin: center;
+  transition: transform 300ms ease;
+}
+
+.node:has(> .node-children > .node) > .node-row .node-toggle {
+  display: inline-flex;
+}
+
+.node.expanded > .node-row .node-toggle::before {
+  transform: rotate(90deg);
+}
+
 .node-main {
   display: flex;
   align-items: center;
@@ -227,10 +254,14 @@ main {
 }
 
 .node-children {
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 0.375rem;
-  padding: 0 0 0.625rem calc(var(--space-inline) * 2.25);
+  padding: 0 0 0.625rem calc(var(--space-inline) * 1.5);
+}
+
+.node.expanded > .node-children {
+  display: flex;
 }
 
 .node-kind {

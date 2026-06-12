@@ -11,8 +11,10 @@ describe('NodeController', () => {
 
   beforeEach(async () => {
     document.body.innerHTML = `
-      <div data-controller="node">
-        <div class="node-row" data-action="dblclick->node#toggleChildren"></div>
+      <div class="node expanded" data-controller="node">
+        <div class="node-row" data-action="dblclick->node#toggleChildren">
+          <span class="node-toggle" data-action="click->node#toggleChildren"></span>
+        </div>
         <div class="node-children" data-node-target="children"></div>
       </div>
     `;
@@ -29,21 +31,33 @@ describe('NodeController', () => {
     document.body.innerHTML = '';
   });
 
-  it('toggles children visibility on double-click', async () => {
+  it('toggles children state on double-click', async () => {
     const row = node.querySelector('.node-row');
 
-    // Initial state: children are visible (hidden=false by default in HTML)
-    expect(children.hidden).toBe(false);
+    expect(node.classList.contains('expanded')).toBe(true);
 
-    // First double-click: hide children
-    row.dispatchEvent(new Event('dblclick'));
+    row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
     await Promise.resolve();
-    expect(children.hidden).toBe(true);
+    expect(node.classList.contains('expanded')).toBe(false);
 
-    // Second double-click: show children again
-    row.dispatchEvent(new Event('dblclick'));
+    row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
     await Promise.resolve();
-    expect(children.hidden).toBe(false);
+    expect(node.classList.contains('expanded')).toBe(true);
+  });
+
+  it('toggles children visibility and state from the triangle indicator', async () => {
+    const toggle = node.querySelector('.node-toggle');
+
+    expect(node.classList.contains('expanded')).toBe(true);
+
+    const event = new Event('click', { bubbles: true, cancelable: true });
+    toggle.dispatchEvent(event);
+    await Promise.resolve();
+    expect(node.classList.contains('expanded')).toBe(false);
+
+    toggle.dispatchEvent(new Event('click', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+    expect(node.classList.contains('expanded')).toBe(true);
   });
 
   it('no-ops when children target is not present', async () => {

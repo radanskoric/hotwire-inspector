@@ -33,9 +33,10 @@
     </main>
   </div>
   <template id="node-template">
-    <div class="node" data-controller="node">
+    <div class="node expanded" data-controller="node">
       <div class="node-row" role="treeitem" data-controller="panel-node"
         data-action="mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight dblclick->node#toggleChildren">
+        <span class="node-toggle" data-action="click->node#toggleChildren:stop" aria-hidden="true"></span>
         <img src="/icons/reveal-in-elements.svg" class="icon icon-btn" data-action="click->panel-node#inspect" />
         <span class="node-main">
           <span class="node-kind"></span>

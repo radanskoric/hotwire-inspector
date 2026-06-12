@@ -260,15 +260,26 @@ export async function expectDoubleClickTogglesNodeChildren(panelPage) {
   const mainFrameNode = panelPage.locator('.node').filter({ hasText: 'main-frame' }).first();
   const mainFrameRow = mainFrameNode.locator('> .node-row');
   const mainFrameChildren = mainFrameNode.locator('> .node-children');
+  const mainFrameToggle = mainFrameRow.locator('.node-toggle');
+  const sidebarControllerToggle = panelPage.locator('.node-row').filter({ hasText: 'sidebar-controller' }).first().locator('.node-toggle');
 
   // Initial state: children are visible (expanded by default)
   await expect(mainFrameChildren).not.toBeHidden();
+  await expect(mainFrameToggle).toBeVisible();
+  await expect(sidebarControllerToggle).toBeHidden();
+  await expect(mainFrameNode).toHaveClass(/expanded/);
 
   // Double-click to collapse
   await mainFrameRow.dblclick();
   await expect(mainFrameChildren).toBeHidden();
+  await expect(mainFrameNode).not.toHaveClass(/expanded/);
 
   // Double-click again to expand
   await mainFrameRow.dblclick();
   await expect(mainFrameChildren).not.toBeHidden();
+  await expect(mainFrameNode).toHaveClass(/expanded/);
+
+  await mainFrameToggle.click();
+  await expect(mainFrameChildren).toBeHidden();
+  await expect(mainFrameNode).not.toHaveClass(/expanded/);
 }
