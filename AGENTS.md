@@ -65,6 +65,10 @@ When making meaningful changes, use the existing checks as appropriate:
 - `npm run test:e2e`
 - `npm run build`
 
+## Common Gotchas
+
+- `npm run dev:firefox` targets Firefox MV3 and uses WXT's dev server. The default dev server port is `3000`; if another process is already using that port, Firefox may open but the extension can fail to load or run properly. Set `WXT_DEV_SERVER_PORT` to a free port before starting the dev server, e.g. `WXT_DEV_SERVER_PORT=3001 npm run dev:firefox`.
+
 ## E2E Testing
 
 The Chromium E2E tests use Playwright with a real extension loaded into the browser. They are split into two files with different strategies:
