@@ -18,6 +18,14 @@ export default defineConfig({
   }),
   manifest: {
     name: 'Hotwire Inspector',
+    browser_specific_settings: {
+      gecko: {
+        id: 'hotwire-inspector@radan.dev',
+        data_collection_permissions: {
+          required: ["none"],
+        },
+      },
+    },
     permissions: ['activeTab', 'scripting', 'tabs'],
     devtools_page: 'devtools.html',
     web_accessible_resources: [{
