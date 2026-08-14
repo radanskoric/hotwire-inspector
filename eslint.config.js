@@ -1,12 +1,12 @@
-import js from '@eslint/js';
-import globals from 'globals';
-import vitest from '@vitest/eslint-plugin';
-import playwright from 'eslint-plugin-playwright';
-import autoImports from './.wxt/eslint-auto-imports.mjs';
+import js from "@eslint/js";
+import globals from "globals";
+import vitest from "@vitest/eslint-plugin";
+import playwright from "eslint-plugin-playwright";
+import autoImports from "./.wxt/eslint-auto-imports.mjs";
 
 export default [
   {
-    ignores: ['output/', 'coverage/', '.wxt/', 'test-results/'],
+    ignores: ["output/", "coverage/", ".wxt/", "test-results/"],
   },
 
   js.configs.recommended,
@@ -17,7 +17,7 @@ export default [
 
   // Extension code runs in browser/webextension contexts.
   {
-    files: ['entrypoints/**/*.js', 'lib/**/*.js'],
+    files: ["entrypoints/**/*.js", "lib/**/*.js"],
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -28,7 +28,7 @@ export default [
 
   // Node-context files: build configs and scripts.
   {
-    files: ['*.config.js', 'scripts/**/*.js'],
+    files: ["*.config.js", "scripts/**/*.js"],
     languageOptions: {
       globals: {
         ...globals.node,
@@ -39,7 +39,7 @@ export default [
   // Unit tests (Vitest APIs are imported explicitly; no vitest globals needed).
   {
     ...vitest.configs.recommended,
-    files: ['tests/unit/**/*.js'],
+    files: ["tests/unit/**/*.js"],
     languageOptions: {
       globals: {
         ...globals.node,
@@ -51,8 +51,8 @@ export default [
 
   // E2E tests and their harness.
   {
-    ...playwright.configs['flat/recommended'],
-    files: ['tests/e2e/**/*.js'],
+    ...playwright.configs["flat/recommended"],
+    files: ["tests/e2e/**/*.js"],
     languageOptions: {
       globals: {
         ...globals.node,
@@ -70,10 +70,13 @@ export default [
   // - Panel tests assert via helpers passed to withPanel(); the expect-expect rule
   //   cannot see assertions made inside those helpers.
   {
-    files: ['tests/e2e/**/*.js'],
+    files: ["tests/e2e/**/*.js"],
     rules: {
-      'playwright/no-skipped-test': ['warn', { allowConditional: true }],
-      'playwright/expect-expect': ['warn', { assertFunctionNames: ['withPanel'] }],
+      "playwright/no-skipped-test": ["warn", { allowConditional: true }],
+      "playwright/expect-expect": [
+        "warn",
+        { assertFunctionNames: ["withPanel"] },
+      ],
     },
   },
 
@@ -81,10 +84,10 @@ export default [
   // as documentation of an attempted undocking approach; its conditionals are
   // debug scaffolding, not test logic.
   {
-    files: ['tests/e2e/devtools-panel-direct.spec.js'],
+    files: ["tests/e2e/devtools-panel-direct.spec.js"],
     rules: {
-      'playwright/no-skipped-test': 'off',
-      'playwright/no-conditional-in-test': 'off',
+      "playwright/no-skipped-test": "off",
+      "playwright/no-conditional-in-test": "off",
     },
   },
 ];

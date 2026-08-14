@@ -1,13 +1,18 @@
-import { browser } from 'wxt/browser';
-import { RELAY_ERROR_TYPE, RELAY_MESSAGE_TYPE } from '../lib/constants.js';
+import { browser } from "wxt/browser";
+import { RELAY_ERROR_TYPE, RELAY_MESSAGE_TYPE } from "../lib/constants.js";
 
 export default defineBackground(() => {
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (!message || typeof message !== 'object' || message.type !== RELAY_MESSAGE_TYPE) {
+    if (
+      !message ||
+      typeof message !== "object" ||
+      message.type !== RELAY_MESSAGE_TYPE
+    ) {
       return false;
     }
 
-    browser.tabs.sendMessage(message.tabId, message.message)
+    browser.tabs
+      .sendMessage(message.tabId, message.message)
       .then((response) => {
         sendResponse(response);
       })

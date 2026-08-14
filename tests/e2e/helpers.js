@@ -4,8 +4,8 @@ export {
   fixturesRoot,
   stimulusAppFixtureUrl,
   StimulusAppFixtureUrl,
-} from './support/fixtures.js';
-export { withStaticServer } from './support/static-server.js';
+} from "./support/fixtures.js";
+export { withStaticServer } from "./support/static-server.js";
 export {
   chromiumAdapter,
   ensureDisplay,
@@ -15,4 +15,4 @@ export {
   sendToContentScript,
   waitForPage,
   withChromiumExtension,
-} from './adapters/chromium-adapter.js';
+} from "./adapters/chromium-adapter.js";

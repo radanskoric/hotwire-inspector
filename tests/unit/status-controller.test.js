@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 
-import { Application } from '@hotwired/stimulus';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { StatusController } from '../../lib/panel/controllers/status-controller.js';
+import { Application } from "@hotwired/stimulus";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { StatusController } from "../../lib/panel/controllers/status-controller.js";
 
-describe('StatusController', () => {
+describe("StatusController", () => {
   let application;
   let statusElement;
   let statusController;
@@ -16,23 +16,26 @@ describe('StatusController', () => {
       </div>
     `;
     application = Application.start();
-    application.register('status', StatusController);
-    statusElement = document.getElementById('status');
+    application.register("status", StatusController);
+    statusElement = document.getElementById("status");
     await Promise.resolve();
-    statusController = application.getControllerForElementAndIdentifier(statusElement, 'status');
+    statusController = application.getControllerForElementAndIdentifier(
+      statusElement,
+      "status",
+    );
   });
 
   afterEach(() => {
     application.stop();
-    document.body.innerHTML = '';
+    document.body.innerHTML = "";
     vi.useRealTimers();
   });
 
-  it('schedules removal on connect', () => {
+  it("schedules removal on connect", () => {
     expect(statusController.hideTimeout).toBeDefined();
   });
 
-  it('removes the status element after the configured duration', async () => {
+  it("removes the status element after the configured duration", async () => {
     application.stop();
     vi.useFakeTimers();
     document.body.innerHTML = `
@@ -41,16 +44,16 @@ describe('StatusController', () => {
       </div>
     `;
     application = Application.start();
-    application.register('status', StatusController);
-    statusElement = document.getElementById('status');
+    application.register("status", StatusController);
+    statusElement = document.getElementById("status");
     await Promise.resolve();
 
     vi.advanceTimersByTime(100);
 
-    expect(document.getElementById('status')).toBeNull();
+    expect(document.getElementById("status")).toBeNull();
   });
 
-  it('uses custom duration when specified', () => {
+  it("uses custom duration when specified", () => {
     statusController.disconnect();
     statusController.durationValue = 5000;
 
@@ -59,7 +62,7 @@ describe('StatusController', () => {
     expect(statusController.hideTimeout).toBeDefined();
   });
 
-  it('clears an existing timeout before reconnecting', () => {
+  it("clears an existing timeout before reconnecting", () => {
     const timeoutBefore = statusController.hideTimeout;
 
     statusController.connect();
@@ -69,7 +72,7 @@ describe('StatusController', () => {
     expect(statusController.hideTimeout).not.toBe(timeoutBefore);
   });
 
-  it('clears timeout on disconnect', () => {
+  it("clears timeout on disconnect", () => {
     const timeoutBefore = statusController.hideTimeout;
 
     statusController.disconnect();
@@ -78,7 +81,7 @@ describe('StatusController', () => {
     expect(timeoutBefore._destroyed).toBe(true);
   });
 
-  it('ignores disconnect when no timeout is set', () => {
+  it("ignores disconnect when no timeout is set", () => {
     statusController.hideTimeout = null;
 
     statusController.disconnect();

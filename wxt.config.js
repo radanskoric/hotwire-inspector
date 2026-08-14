@@ -1,10 +1,10 @@
-import { defineConfig } from 'wxt';
+import { defineConfig } from "wxt";
 
-const debugBuild = process.env.WXT_DEBUG_BUILD === 'true';
+const debugBuild = process.env.WXT_DEBUG_BUILD === "true";
 const devServerPort = Number(process.env.WXT_DEV_SERVER_PORT || 4173);
 
 export default defineConfig({
-  outDir: 'output',
+  outDir: "output",
   dev: {
     server: {
       port: devServerPort,
@@ -17,23 +17,25 @@ export default defineConfig({
     },
   }),
   manifest: {
-    name: 'Hotwire Inspector',
+    name: "Hotwire Inspector",
     browser_specific_settings: {
       gecko: {
-        id: 'hotwire-inspector@radan.dev',
+        id: "hotwire-inspector@radan.dev",
         data_collection_permissions: {
           required: ["none"],
         },
       },
     },
-    permissions: ['activeTab', 'scripting', 'tabs'],
-    devtools_page: 'devtools.html',
-    web_accessible_resources: [{
-      resources: ['inspected-page-inject.js'],
-      matches: ['http://*/*', 'https://*/*'],
-    }],
+    permissions: ["activeTab", "scripting", "tabs"],
+    devtools_page: "devtools.html",
+    web_accessible_resources: [
+      {
+        resources: ["inspected-page-inject.js"],
+        matches: ["http://*/*", "https://*/*"],
+      },
+    ],
   },
   webExt: {
-    startUrls: ['http://localhost:3000'],
+    startUrls: ["http://localhost:3000"],
   },
 });

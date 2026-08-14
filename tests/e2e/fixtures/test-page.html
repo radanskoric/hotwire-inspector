@@ -1,32 +1,39 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
+  <head>
+    <title>Test Page</title>
+    <script>
+      window.modalController = { name: "modal-controller" };
+      window.Stimulus = {
+        getControllerForElementAndIdentifier(element, identifier) {
+          if (
+            identifier === "modal" &&
+            element.matches('[data-controller~="modal"]')
+          ) {
+            return window.modalController;
+          }
 
-<head>
-  <title>Test Page</title>
-  <script>
-    window.modalController = { name: 'modal-controller' };
-    window.Stimulus = {
-      getControllerForElementAndIdentifier(element, identifier) {
-        if (identifier === 'modal' && element.matches('[data-controller~="modal"]')) {
-          return window.modalController;
-        }
+          return null;
+        },
+      };
+    </script>
+  </head>
 
-        return null;
-      },
-    };
-  </script>
-</head>
-
-<body>
-  <turbo-frame id="main-frame" src="/main" data-controller="sidebar">
-    <turbo-frame id="nested-frame">
-      <div data-controller="modal dropdown">
-        Modal content
-        <button id="modal-close" data-modal-target="closeButton trigger" data-dropdown-target="item">Close</button>
-      </div>
+  <body>
+    <turbo-frame id="main-frame" src="/main" data-controller="sidebar">
+      <turbo-frame id="nested-frame">
+        <div data-controller="modal dropdown">
+          Modal content
+          <button
+            id="modal-close"
+            data-modal-target="closeButton trigger"
+            data-dropdown-target="item"
+          >
+            Close
+          </button>
+        </div>
+      </turbo-frame>
     </turbo-frame>
-  </turbo-frame>
-  <div data-controller="sidebar">Sidebar</div>
-</body>
-
+    <div data-controller="sidebar">Sidebar</div>
+  </body>
 </html>

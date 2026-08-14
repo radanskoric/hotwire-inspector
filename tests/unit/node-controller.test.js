@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 
-import { Application } from '@hotwired/stimulus';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { NodeController } from '../../lib/panel/controllers/node-controller.js';
+import { Application } from "@hotwired/stimulus";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { NodeController } from "../../lib/panel/controllers/node-controller.js";
 
-describe('NodeController', () => {
+describe("NodeController", () => {
   let application;
   let node;
 
@@ -18,7 +18,7 @@ describe('NodeController', () => {
       </div>
     `;
     application = Application.start();
-    application.register('node', NodeController);
+    application.register("node", NodeController);
     node = document.querySelector('[data-controller="node"]');
 
     await Promise.resolve();
@@ -26,39 +26,45 @@ describe('NodeController', () => {
 
   afterEach(() => {
     application.stop();
-    document.body.innerHTML = '';
+    document.body.innerHTML = "";
   });
 
-  it('toggles children state on double-click', async () => {
-    const row = node.querySelector('.node-row');
+  it("toggles children state on double-click", async () => {
+    const row = node.querySelector(".node-row");
 
-    expect(node.classList.contains('expanded')).toBe(true);
+    expect(node.classList.contains("expanded")).toBe(true);
 
-    row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+    row.dispatchEvent(
+      new MouseEvent("dblclick", { bubbles: true, cancelable: true }),
+    );
     await Promise.resolve();
-    expect(node.classList.contains('expanded')).toBe(false);
+    expect(node.classList.contains("expanded")).toBe(false);
 
-    row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+    row.dispatchEvent(
+      new MouseEvent("dblclick", { bubbles: true, cancelable: true }),
+    );
     await Promise.resolve();
-    expect(node.classList.contains('expanded')).toBe(true);
+    expect(node.classList.contains("expanded")).toBe(true);
   });
 
-  it('toggles children visibility and state from the triangle indicator', async () => {
-    const toggle = node.querySelector('.node-toggle');
+  it("toggles children visibility and state from the triangle indicator", async () => {
+    const toggle = node.querySelector(".node-toggle");
 
-    expect(node.classList.contains('expanded')).toBe(true);
+    expect(node.classList.contains("expanded")).toBe(true);
 
-    const event = new Event('click', { bubbles: true, cancelable: true });
+    const event = new Event("click", { bubbles: true, cancelable: true });
     toggle.dispatchEvent(event);
     await Promise.resolve();
-    expect(node.classList.contains('expanded')).toBe(false);
+    expect(node.classList.contains("expanded")).toBe(false);
 
-    toggle.dispatchEvent(new Event('click', { bubbles: true, cancelable: true }));
+    toggle.dispatchEvent(
+      new Event("click", { bubbles: true, cancelable: true }),
+    );
     await Promise.resolve();
-    expect(node.classList.contains('expanded')).toBe(true);
+    expect(node.classList.contains("expanded")).toBe(true);
   });
 
-  it('no-ops when children target is not present', async () => {
+  it("no-ops when children target is not present", async () => {
     application.stop();
     document.body.innerHTML = `
       <div data-controller="node">
@@ -66,14 +72,14 @@ describe('NodeController', () => {
       </div>
     `;
     application = Application.start();
-    application.register('node', NodeController);
+    application.register("node", NodeController);
     node = document.querySelector('[data-controller="node"]');
-    const row = node.querySelector('.node-row');
+    const row = node.querySelector(".node-row");
     await Promise.resolve();
 
     // Should not throw, and the toggle should still apply
-    row.dispatchEvent(new Event('dblclick'));
+    row.dispatchEvent(new Event("dblclick"));
     await Promise.resolve();
-    expect(node.classList.contains('expanded')).toBe(true);
+    expect(node.classList.contains("expanded")).toBe(true);
   });
 });

@@ -13,6 +13,7 @@ Core tooling currently includes:
 - Vitest
 - Playwright
 - ESLint
+- Prettier
 
 ## Important Files and Areas
 
@@ -63,6 +64,7 @@ At minimum, review those files when your work touches:
 When making meaningful changes, use the existing checks as appropriate:
 
 - `npm run lint`
+- `npm run format:check`
 - `npm test -- --run`
 - `npm run test:e2e`
 - `npm run build`

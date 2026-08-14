@@ -1,21 +1,21 @@
-import { browser } from 'wxt/browser';
-import { injectScript } from 'wxt/utils/inject-script';
+import { browser } from "wxt/browser";
+import { injectScript } from "wxt/utils/inject-script";
 import {
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
   CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
-} from '../lib/constants.js';
-import { ContentInspector } from '../lib/content-inspector.js';
+} from "../lib/constants.js";
+import { ContentInspector } from "../lib/content-inspector.js";
 
 export default defineContentScript({
-  matches: ['http://*/*', 'https://*/*'],
+  matches: ["http://*/*", "https://*/*"],
   main() {
     const inspector = new ContentInspector({ injectScript });
 
     browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-      if (!message || typeof message !== 'object') {
+      if (!message || typeof message !== "object") {
         return false;
       }
 
@@ -40,7 +40,9 @@ export default defineContentScript({
       }
 
       if (message.type === CONTENT_STORE_CONTROLLER_MESSAGE_TYPE) {
-        inspector.storeController(message.id, message.identifier).then(sendResponse);
+        inspector
+          .storeController(message.id, message.identifier)
+          .then(sendResponse);
         return true;
       }
 

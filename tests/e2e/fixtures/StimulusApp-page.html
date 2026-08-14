@@ -1,24 +1,25 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
+  <head>
+    <title>Test Page — StimulusApp</title>
+    <script>
+      window.modalController = { name: "modal-controller" };
+      window.StimulusApp = {
+        getControllerForElementAndIdentifier(element, identifier) {
+          if (
+            identifier === "modal" &&
+            element.matches('[data-controller~="modal"]')
+          ) {
+            return window.modalController;
+          }
 
-<head>
-  <title>Test Page — StimulusApp</title>
-  <script>
-    window.modalController = { name: 'modal-controller' };
-    window.StimulusApp = {
-      getControllerForElementAndIdentifier(element, identifier) {
-        if (identifier === 'modal' && element.matches('[data-controller~="modal"]')) {
-          return window.modalController;
-        }
+          return null;
+        },
+      };
+    </script>
+  </head>
 
-        return null;
-      },
-    };
-  </script>
-</head>
-
-<body>
-  <div data-controller="modal">Modal content</div>
-</body>
-
+  <body>
+    <div data-controller="modal">Modal content</div>
+  </body>
 </html>

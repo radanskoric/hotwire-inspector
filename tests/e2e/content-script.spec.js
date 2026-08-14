@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 import {
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
   CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
-} from '../../lib/constants.js';
+} from "../../lib/constants.js";
 import {
   deepFixtureUrl,
   fixturesRoot,
@@ -16,7 +16,7 @@ import {
   getExtensionDevtoolsFrame,
   sendToContentScript,
   withStaticServer,
-} from './helpers.js';
+} from "./helpers.js";
 
 async function gotoFixture(page, origin) {
   await page.goto(fixtureUrl(origin));
@@ -31,148 +31,179 @@ async function withFixturePage(testBody) {
   });
 }
 
-test.describe('Content Script', () => {
-  test('registers the DevTools panel', async ({ browserName }) => {
-    test.skip(browserName !== 'chromium');
+test.describe("Content Script", () => {
+  test("registers the DevTools panel", async ({ browserName }) => {
+    test.skip(browserName !== "chromium");
 
     await withChromiumExtension(async ({ context }) => {
       const frame = await getExtensionDevtoolsFrame(context);
 
-      const hasDevtools = await frame.evaluate(() => typeof chrome?.devtools?.panels?.create === 'function');
+      const hasDevtools = await frame.evaluate(
+        () => typeof chrome?.devtools?.panels?.create === "function",
+      );
       expect(hasDevtools).toBe(true);
     });
   });
 
-  test('scans and displays turbo-frames', async ({ browserName }) => {
-    test.skip(browserName !== 'chromium');
+  test("scans and displays turbo-frames", async ({ browserName }) => {
+    test.skip(browserName !== "chromium");
 
     await withStaticServer(fixturesRoot, async (origin) => {
       await withChromiumExtension(async ({ page, context }) => {
         await gotoFixture(page, origin);
 
         const frame = await getExtensionDevtoolsFrame(context);
-        const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
+        const result = await sendToContentScript(frame, {
+          type: CONTENT_SCAN_MESSAGE_TYPE,
+        });
 
-        const frames = result.items.filter((item) => item.tagName === 'turbo-frame');
+        const frames = result.items.filter(
+          (item) => item.tagName === "turbo-frame",
+        );
         expect(frames).toHaveLength(2);
-        expect(frames.map((f) => f.id)).toEqual(['main-frame', 'nested-frame']);
-        expect(frames[0].src).toBe('/main');
-        expect(frames[0].controllers).toEqual(['sidebar']);
-        expect(frames[1].parentId).toBe('main-frame');
+        expect(frames.map((f) => f.id)).toEqual(["main-frame", "nested-frame"]);
+        expect(frames[0].src).toBe("/main");
+        expect(frames[0].controllers).toEqual(["sidebar"]);
+        expect(frames[1].parentId).toBe("main-frame");
       });
     });
   });
 
-  test('scans and displays Stimulus controllers', async ({ browserName }) => {
-    test.skip(browserName !== 'chromium');
+  test("scans and displays Stimulus controllers", async ({ browserName }) => {
+    test.skip(browserName !== "chromium");
 
     await withFixturePage(async ({ context }) => {
       const frame = await getExtensionDevtoolsFrame(context);
-      const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
+      const result = await sendToContentScript(frame, {
+        type: CONTENT_SCAN_MESSAGE_TYPE,
+      });
 
-      const controllers = result.items.filter((item) => item.tagName === 'div');
+      const controllers = result.items.filter((item) => item.tagName === "div");
       expect(controllers).toHaveLength(2);
 
-      const multi = controllers.find((c) => c.controllers.includes('modal'));
-      expect(multi.controllers).toEqual(['modal', 'dropdown']);
-      expect(multi.parentId).toBe('nested-frame');
+      const multi = controllers.find((c) => c.controllers.includes("modal"));
+      expect(multi.controllers).toEqual(["modal", "dropdown"]);
+      expect(multi.parentId).toBe("nested-frame");
 
-      const sidebar = controllers.find((c) => c.controllers.includes('sidebar'));
+      const sidebar = controllers.find((c) =>
+        c.controllers.includes("sidebar"),
+      );
       expect(sidebar.parentId).toBeNull();
 
-      const target = result.items.find((item) => item.id === 'modal-close');
+      const target = result.items.find((item) => item.id === "modal-close");
       expect(target).toMatchObject({
         parentId: multi.id,
-        tagName: 'button',
+        tagName: "button",
         controllers: [],
         targets: [
-          { controller: 'modal', name: 'closeButton' },
-          { controller: 'modal', name: 'trigger' },
-          { controller: 'dropdown', name: 'item' },
+          { controller: "modal", name: "closeButton" },
+          { controller: "modal", name: "trigger" },
+          { controller: "dropdown", name: "item" },
         ],
       });
     });
   });
 
-  test('highlights element on hover', async ({ browserName }) => {
-    test.skip(browserName !== 'chromium');
+  test("highlights element on hover", async ({ browserName }) => {
+    test.skip(browserName !== "chromium");
 
     await withFixturePage(async ({ page, context }) => {
       const frame = await getExtensionDevtoolsFrame(context);
-      const result = await sendToContentScript(frame, { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'main-frame' });
+      const result = await sendToContentScript(frame, {
+        type: CONTENT_HIGHLIGHT_MESSAGE_TYPE,
+        id: "main-frame",
+      });
 
       expect(result).toEqual({ success: true });
 
-      await expect(page.locator('body > div')).toHaveCount(2);
-      const overlay = page.locator('body > div').last();
-      await expect(overlay).toHaveCSS('position', 'fixed');
-      await expect(overlay).toHaveCSS('pointer-events', 'none');
-      await expect(overlay).toHaveCSS('z-index', '2147483647');
-      await expect(overlay).toHaveCSS('box-sizing', 'border-box');
-      await expect(overlay).toHaveCSS('outline-style', 'dashed');
+      await expect(page.locator("body > div")).toHaveCount(2);
+      const overlay = page.locator("body > div").last();
+      await expect(overlay).toHaveCSS("position", "fixed");
+      await expect(overlay).toHaveCSS("pointer-events", "none");
+      await expect(overlay).toHaveCSS("z-index", "2147483647");
+      await expect(overlay).toHaveCSS("box-sizing", "border-box");
+      await expect(overlay).toHaveCSS("outline-style", "dashed");
 
       const overlayBox = await overlay.boundingBox();
-      const targetBox = await page.locator('#main-frame').boundingBox();
+      const targetBox = await page.locator("#main-frame").boundingBox();
       expect(overlayBox).toEqual(targetBox);
     });
   });
 
-  test('removes highlight on mouse leave', async ({ browserName }) => {
-    test.skip(browserName !== 'chromium');
+  test("removes highlight on mouse leave", async ({ browserName }) => {
+    test.skip(browserName !== "chromium");
 
     await withFixturePage(async ({ page, context }) => {
       const frame = await getExtensionDevtoolsFrame(context);
-      await sendToContentScript(frame, { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'main-frame' });
-      await sendToContentScript(frame, { type: CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE });
+      await sendToContentScript(frame, {
+        type: CONTENT_HIGHLIGHT_MESSAGE_TYPE,
+        id: "main-frame",
+      });
+      await sendToContentScript(frame, {
+        type: CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
+      });
 
-      await expect(page.locator('body > div')).toHaveCount(1);
+      await expect(page.locator("body > div")).toHaveCount(1);
     });
   });
 
-  test('inspect returns a valid selector', async ({ browserName }) => {
-    test.skip(browserName !== 'chromium');
+  test("inspect returns a valid selector", async ({ browserName }) => {
+    test.skip(browserName !== "chromium");
 
     await withFixturePage(async ({ page, context }) => {
       const frame = await getExtensionDevtoolsFrame(context);
-      const result = await sendToContentScript(frame, { type: CONTENT_INSPECT_MESSAGE_TYPE, id: 'main-frame' });
+      const result = await sendToContentScript(frame, {
+        type: CONTENT_INSPECT_MESSAGE_TYPE,
+        id: "main-frame",
+      });
 
       expect(result.success).toBe(true);
-      expect(result.selector).toBe('#main-frame');
+      expect(result.selector).toBe("#main-frame");
 
       const found = page.locator(result.selector);
       await expect(found).toHaveCount(1);
     });
   });
 
-  test('stores a Stimulus controller as a temp variable', async ({ browserName }) => {
-    test.skip(browserName !== 'chromium');
+  test("stores a Stimulus controller as a temp variable", async ({
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium");
 
     await withFixturePage(async ({ page, context }) => {
       const frame = await getExtensionDevtoolsFrame(context);
-      const scanResult = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
-      const modalController = scanResult.items.find((item) => item.controllers?.includes('modal'));
+      const scanResult = await sendToContentScript(frame, {
+        type: CONTENT_SCAN_MESSAGE_TYPE,
+      });
+      const modalController = scanResult.items.find((item) =>
+        item.controllers?.includes("modal"),
+      );
       const result = await sendToContentScript(frame, {
         type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
         id: modalController.id,
-        identifier: 'modal',
+        identifier: "modal",
       });
 
       expect(result).toEqual({
         requestId: expect.any(String),
         success: true,
-        name: 'temp1',
-        identifier: 'modal',
+        name: "temp1",
+        identifier: "modal",
       });
-      await expect(page.locator('body > div')).toHaveCount(1);
-      await expect.poll(() => page.evaluate(() => window.temp1 === window.modalController)).toBe(true);
+      await expect(page.locator("body > div")).toHaveCount(1);
+      await expect
+        .poll(() =>
+          page.evaluate(() => window.temp1 === window.modalController),
+        )
+        .toBe(true);
     });
   });
 
-  test('handles empty page gracefully', async ({ browserName }) => {
-    test.skip(browserName !== 'chromium');
+  test("handles empty page gracefully", async ({ browserName }) => {
+    test.skip(browserName !== "chromium");
 
     await withChromiumExtension(async ({ page, context }) => {
-      await page.goto('about:blank');
+      await page.goto("about:blank");
 
       const frame = await getExtensionDevtoolsFrame(context);
 
@@ -182,148 +213,188 @@ test.describe('Content Script', () => {
     });
   });
 
-  test('builds correct parent-child relationships', async ({ browserName }) => {
-    test.skip(browserName !== 'chromium');
+  test("builds correct parent-child relationships", async ({ browserName }) => {
+    test.skip(browserName !== "chromium");
 
     await withFixturePage(async ({ context }) => {
       const frame = await getExtensionDevtoolsFrame(context);
-      const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
+      const result = await sendToContentScript(frame, {
+        type: CONTENT_SCAN_MESSAGE_TYPE,
+      });
 
-      const mainFrame = result.items.find((i) => i.id === 'main-frame');
-      const nestedFrame = result.items.find((i) => i.id === 'nested-frame');
-      const modalController = result.items.find((i) => i.controllers?.includes('modal'));
-      const sidebarController = result.items.find((i) => i.controllers?.includes('sidebar'));
+      const mainFrame = result.items.find((i) => i.id === "main-frame");
+      const nestedFrame = result.items.find((i) => i.id === "nested-frame");
+      const modalController = result.items.find((i) =>
+        i.controllers?.includes("modal"),
+      );
+      const sidebarController = result.items.find((i) =>
+        i.controllers?.includes("sidebar"),
+      );
 
       expect(mainFrame.parentId).toBeNull();
-      expect(nestedFrame.parentId).toBe('main-frame');
-      expect(modalController.parentId).toBe('nested-frame');
+      expect(nestedFrame.parentId).toBe("main-frame");
+      expect(modalController.parentId).toBe("nested-frame");
       expect(sidebarController.parentId).toBeNull();
     });
   });
 
-  test('rescans after dynamic DOM changes', async ({ browserName }) => {
-    test.skip(browserName !== 'chromium');
+  test("rescans after dynamic DOM changes", async ({ browserName }) => {
+    test.skip(browserName !== "chromium");
 
     await withFixturePage(async ({ page, context }) => {
       const frame = await getExtensionDevtoolsFrame(context);
-      const initialResult = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
+      const initialResult = await sendToContentScript(frame, {
+        type: CONTENT_SCAN_MESSAGE_TYPE,
+      });
 
-      expect(initialResult.items.find((item) => item.id === 'dynamic-frame')).toBeUndefined();
+      expect(
+        initialResult.items.find((item) => item.id === "dynamic-frame"),
+      ).toBeUndefined();
 
-      await page.locator('#nested-frame').evaluate((nestedFrame) => {
-        const frameElement = document.createElement('turbo-frame');
-        frameElement.id = 'dynamic-frame';
+      await page.locator("#nested-frame").evaluate((nestedFrame) => {
+        const frameElement = document.createElement("turbo-frame");
+        frameElement.id = "dynamic-frame";
 
-        const controllerElement = document.createElement('div');
-        controllerElement.id = 'dynamic-controller';
-        controllerElement.setAttribute('data-controller', 'dynamic');
-        controllerElement.textContent = 'Dynamic content';
+        const controllerElement = document.createElement("div");
+        controllerElement.id = "dynamic-controller";
+        controllerElement.setAttribute("data-controller", "dynamic");
+        controllerElement.textContent = "Dynamic content";
 
         frameElement.appendChild(controllerElement);
         nestedFrame.appendChild(frameElement);
       });
 
-      const updatedResult = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
-      const dynamicFrame = updatedResult.items.find((item) => item.id === 'dynamic-frame');
-      const dynamicController = updatedResult.items.find((item) => item.id === 'dynamic-controller');
+      const updatedResult = await sendToContentScript(frame, {
+        type: CONTENT_SCAN_MESSAGE_TYPE,
+      });
+      const dynamicFrame = updatedResult.items.find(
+        (item) => item.id === "dynamic-frame",
+      );
+      const dynamicController = updatedResult.items.find(
+        (item) => item.id === "dynamic-controller",
+      );
 
       expect(dynamicFrame).toMatchObject({
-        id: 'dynamic-frame',
-        parentId: 'nested-frame',
-        tagName: 'turbo-frame',
+        id: "dynamic-frame",
+        parentId: "nested-frame",
+        tagName: "turbo-frame",
       });
       expect(dynamicController).toMatchObject({
-        id: 'dynamic-controller',
-        parentId: 'dynamic-frame',
-        tagName: 'div',
-        controllers: ['dynamic'],
+        id: "dynamic-controller",
+        parentId: "dynamic-frame",
+        tagName: "div",
+        controllers: ["dynamic"],
       });
     });
   });
 
-  test('handles deeply nested elements', async ({ browserName }) => {
-    test.skip(browserName !== 'chromium');
+  test("handles deeply nested elements", async ({ browserName }) => {
+    test.skip(browserName !== "chromium");
 
     await withStaticServer(fixturesRoot, async (origin) => {
       await withChromiumExtension(async ({ page, context }) => {
         await page.goto(deepFixtureUrl(origin));
 
         const frame = await getExtensionDevtoolsFrame(context);
-        const result = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
-        const parentIdsById = Object.fromEntries(result.items.map((item) => [item.id, item.parentId]));
+        const result = await sendToContentScript(frame, {
+          type: CONTENT_SCAN_MESSAGE_TYPE,
+        });
+        const parentIdsById = Object.fromEntries(
+          result.items.map((item) => [item.id, item.parentId]),
+        );
 
         expect(result.items.map((item) => item.id)).toEqual([
-          'level-1',
-          'level-2',
-          'level-3',
-          'level-4',
-          'level-5',
-          'level-6',
-          'level-7',
+          "level-1",
+          "level-2",
+          "level-3",
+          "level-4",
+          "level-5",
+          "level-6",
+          "level-7",
         ]);
         expect(parentIdsById).toMatchObject({
-          'level-1': null,
-          'level-2': 'level-1',
-          'level-3': 'level-2',
-          'level-4': 'level-3',
-          'level-5': 'level-4',
-          'level-6': 'level-5',
-          'level-7': 'level-6',
+          "level-1": null,
+          "level-2": "level-1",
+          "level-3": "level-2",
+          "level-4": "level-3",
+          "level-5": "level-4",
+          "level-6": "level-5",
+          "level-7": "level-6",
         });
       });
     });
   });
 
-  test('stores a controller when Stimulus is exposed as window.stimulusApp', async ({ browserName }) => {
-    test.skip(browserName !== 'chromium');
+  test("stores a controller when Stimulus is exposed as window.stimulusApp", async ({
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium");
 
     await withStaticServer(fixturesRoot, async (origin) => {
       await withChromiumExtension(async ({ page, context }) => {
         await page.goto(stimulusAppFixtureUrl(origin));
 
         const frame = await getExtensionDevtoolsFrame(context);
-        const scanResult = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
-        const modalController = scanResult.items.find((item) => item.controllers?.includes('modal'));
+        const scanResult = await sendToContentScript(frame, {
+          type: CONTENT_SCAN_MESSAGE_TYPE,
+        });
+        const modalController = scanResult.items.find((item) =>
+          item.controllers?.includes("modal"),
+        );
         const result = await sendToContentScript(frame, {
           type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
           id: modalController.id,
-          identifier: 'modal',
+          identifier: "modal",
         });
 
         expect(result).toEqual({
           requestId: expect.any(String),
           success: true,
-          name: 'temp1',
-          identifier: 'modal',
+          name: "temp1",
+          identifier: "modal",
         });
-        await expect.poll(() => page.evaluate(() => window.temp1 === window.modalController)).toBe(true);
+        await expect
+          .poll(() =>
+            page.evaluate(() => window.temp1 === window.modalController),
+          )
+          .toBe(true);
       });
     });
   });
 
-  test('stores a controller when Stimulus is exposed as window.StimulusApp', async ({ browserName }) => {
-    test.skip(browserName !== 'chromium');
+  test("stores a controller when Stimulus is exposed as window.StimulusApp", async ({
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium");
 
     await withStaticServer(fixturesRoot, async (origin) => {
       await withChromiumExtension(async ({ page, context }) => {
         await page.goto(StimulusAppFixtureUrl(origin));
 
         const frame = await getExtensionDevtoolsFrame(context);
-        const scanResult = await sendToContentScript(frame, { type: CONTENT_SCAN_MESSAGE_TYPE });
-        const modalController = scanResult.items.find((item) => item.controllers?.includes('modal'));
+        const scanResult = await sendToContentScript(frame, {
+          type: CONTENT_SCAN_MESSAGE_TYPE,
+        });
+        const modalController = scanResult.items.find((item) =>
+          item.controllers?.includes("modal"),
+        );
         const result = await sendToContentScript(frame, {
           type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
           id: modalController.id,
-          identifier: 'modal',
+          identifier: "modal",
         });
 
         expect(result).toEqual({
           requestId: expect.any(String),
           success: true,
-          name: 'temp1',
-          identifier: 'modal',
+          name: "temp1",
+          identifier: "modal",
         });
-        await expect.poll(() => page.evaluate(() => window.temp1 === window.modalController)).toBe(true);
+        await expect
+          .poll(() =>
+            page.evaluate(() => window.temp1 === window.modalController),
+          )
+          .toBe(true);
       });
     });
   });

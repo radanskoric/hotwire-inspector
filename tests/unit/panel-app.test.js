@@ -1,11 +1,8 @@
 // @vitest-environment happy-dom
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  CONTENT_SCAN_MESSAGE_TYPE,
-  ID_PREFIX,
-} from '../../lib/constants.js';
-import { PanelApp } from '../../lib/panel-app.js';
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { CONTENT_SCAN_MESSAGE_TYPE, ID_PREFIX } from "../../lib/constants.js";
+import { PanelApp } from "../../lib/panel-app.js";
 
 function mountPanelDom() {
   document.body.innerHTML = `
@@ -54,12 +51,12 @@ function mountPanelDom() {
   `;
 
   return {
-    summaryElement: document.getElementById('summary'),
-    treeElement: document.getElementById('tree'),
-    emptyStateElement: document.getElementById('empty-state'),
-    refreshButton: document.getElementById('refresh-button'),
-    nodeTemplate: document.getElementById('node-template'),
-    badgeTemplate: document.getElementById('badge-template'),
+    summaryElement: document.getElementById("summary"),
+    treeElement: document.getElementById("tree"),
+    emptyStateElement: document.getElementById("empty-state"),
+    refreshButton: document.getElementById("refresh-button"),
+    nodeTemplate: document.getElementById("node-template"),
+    badgeTemplate: document.getElementById("badge-template"),
   };
 }
 
@@ -86,7 +83,7 @@ function createBridge(sendToInspectedTabImplementation) {
   };
 }
 
-describe('PanelApp', () => {
+describe("PanelApp", () => {
   let summaryElement;
   let treeElement;
   let emptyStateElement;
@@ -120,10 +117,10 @@ describe('PanelApp', () => {
   });
 
   afterEach(() => {
-    document.body.innerHTML = '';
+    document.body.innerHTML = "";
   });
 
-  it('uses document lookups when elements and templates are not provided', () => {
+  it("uses document lookups when elements and templates are not provided", () => {
     const app = new PanelApp({
       document,
       browserApi: createBrowserApi(() => Promise.resolve({})),
@@ -138,41 +135,43 @@ describe('PanelApp', () => {
     expect(app.badgeTemplate).toBe(badgeTemplate);
   });
 
-  it('counts frames and controllers', () => {
+  it("counts frames and controllers", () => {
     const app = createPanelApp();
 
-    expect(app.countItems([
-      { tagName: 'turbo-frame', controllers: ['lazy'] },
-      { tagName: 'div', controllers: ['modal', 'dropdown'] },
-      { tagName: 'turbo-frame', controllers: [] },
-    ])).toEqual({ frames: 2, controllers: 3 });
+    expect(
+      app.countItems([
+        { tagName: "turbo-frame", controllers: ["lazy"] },
+        { tagName: "div", controllers: ["modal", "dropdown"] },
+        { tagName: "turbo-frame", controllers: [] },
+      ]),
+    ).toEqual({ frames: 2, controllers: 3 });
   });
 
-  it('renders empty state when there are no nodes', () => {
+  it("renders empty state when there are no nodes", () => {
     const app = createPanelApp({ buildTree: () => [] });
 
     app.renderTree([]);
 
-    expect(summaryElement.textContent).toBe('0 frames, 0 controllers');
+    expect(summaryElement.textContent).toBe("0 frames, 0 controllers");
     expect(emptyStateElement.hidden).toBe(false);
     expect(treeElement.hidden).toBe(true);
     expect(treeElement.children.length).toBe(0);
   });
 
-  it('renders nodes and badges from the built tree', () => {
+  it("renders nodes and badges from the built tree", () => {
     const app = createPanelApp({
       buildTree: () => [
         {
-          id: 'frame-1',
-          tagName: 'turbo-frame',
-          src: '/posts',
-          controllers: ['lazy'],
+          id: "frame-1",
+          tagName: "turbo-frame",
+          src: "/posts",
+          controllers: ["lazy"],
           children: [
             {
-              id: 'ctrl-1',
-              tagName: 'div',
-              controllers: ['modal'],
-              targets: [{ controller: 'modal', name: 'content' }],
+              id: "ctrl-1",
+              tagName: "div",
+              controllers: ["modal"],
+              targets: [{ controller: "modal", name: "content" }],
               children: [],
             },
           ],
@@ -181,103 +180,119 @@ describe('PanelApp', () => {
     });
 
     app.renderTree([
-      { tagName: 'turbo-frame', controllers: ['lazy'] },
-      { tagName: 'div', controllers: ['modal'] },
+      { tagName: "turbo-frame", controllers: ["lazy"] },
+      { tagName: "div", controllers: ["modal"] },
     ]);
 
     const rootNode = treeElement.children[0];
-    const row = rootNode.querySelector('.node-row');
-    const toggle = rootNode.querySelector('.node-toggle');
-    const src = rootNode.querySelector('.node-src');
-    const badges = rootNode.querySelector('.badges');
-    const children = rootNode.querySelector('.node-children');
-    const childNode = children.querySelector(':scope > .node');
+    const row = rootNode.querySelector(".node-row");
+    const toggle = rootNode.querySelector(".node-toggle");
+    const src = rootNode.querySelector(".node-src");
+    const badges = rootNode.querySelector(".badges");
+    const children = rootNode.querySelector(".node-children");
+    const childNode = children.querySelector(":scope > .node");
 
-    expect(summaryElement.textContent).toBe('1 frames, 2 controllers');
+    expect(summaryElement.textContent).toBe("1 frames, 2 controllers");
     expect(emptyStateElement.hidden).toBe(true);
     expect(treeElement.hidden).toBe(false);
-    expect(src.textContent).toBe('/posts');
+    expect(src.textContent).toBe("/posts");
     expect(src.hidden).toBe(false);
     expect(badges.hidden).toBe(false);
     expect(badges.children.length).toBe(1);
-    expect(badges.children[0].textContent).toBe('lazy');
-    expect(badges.children[0].dataset.controller).toBe('panel-node');
-    expect(badges.children[0].dataset.panelNodeIdValue).toBe('frame-1');
-    expect(badges.children[0].dataset.action).toBe('click->panel-node#storeController');
-    expect(badges.children[0].dataset.controllerIdentifier).toBe('lazy');
+    expect(badges.children[0].textContent).toBe("lazy");
+    expect(badges.children[0].dataset.controller).toBe("panel-node");
+    expect(badges.children[0].dataset.panelNodeIdValue).toBe("frame-1");
+    expect(badges.children[0].dataset.action).toBe(
+      "click->panel-node#storeController",
+    );
+    expect(badges.children[0].dataset.controllerIdentifier).toBe("lazy");
     expect(children.hidden).toBe(false);
     expect(children.children.length).toBe(1);
     expect(childNode).not.toBeNull();
-    expect(childNode.querySelector(':scope > .node-row .node-toggle')).not.toBeNull();
-    expect(childNode.querySelector(':scope > .node-row .target-badge').textContent).toBe('modal#content');
-    expect(childNode.querySelector(':scope > .node-children > .node')).toBeNull();
+    expect(
+      childNode.querySelector(":scope > .node-row .node-toggle"),
+    ).not.toBeNull();
+    expect(
+      childNode.querySelector(":scope > .node-row .target-badge").textContent,
+    ).toBe("modal#content");
+    expect(
+      childNode.querySelector(":scope > .node-children > .node"),
+    ).toBeNull();
     expect(toggle).not.toBeNull();
-    expect(row.dataset.controller).toBe('panel-node');
-    expect(row.dataset.panelNodeIdValue).toBe('frame-1');
+    expect(row.dataset.controller).toBe("panel-node");
+    expect(row.dataset.panelNodeIdValue).toBe("frame-1");
   });
 
-  it('renders multiple target labels on a single node', () => {
+  it("renders multiple target labels on a single node", () => {
     const app = createPanelApp({
       buildTree: () => [
         {
-          id: 'shared-target',
-          tagName: 'button',
+          id: "shared-target",
+          tagName: "button",
           controllers: [],
           targets: [
-            { controller: 'search', name: 'input' },
-            { controller: 'tabs', name: 'tab' },
+            { controller: "search", name: "input" },
+            { controller: "tabs", name: "tab" },
           ],
           children: [],
         },
       ],
     });
 
-    app.renderTree([{ tagName: 'button', controllers: [], targets: [{ controller: 'search', name: 'input' }] }]);
+    app.renderTree([
+      {
+        tagName: "button",
+        controllers: [],
+        targets: [{ controller: "search", name: "input" }],
+      },
+    ]);
 
-    const targetBadges = treeElement.querySelectorAll('.target-badge');
+    const targetBadges = treeElement.querySelectorAll(".target-badge");
 
     expect(targetBadges).toHaveLength(2);
-    expect(Array.from(targetBadges).map((badge) => badge.textContent)).toEqual(['search#input', 'tabs#tab']);
+    expect(Array.from(targetBadges).map((badge) => badge.textContent)).toEqual([
+      "search#input",
+      "tabs#tab",
+    ]);
   });
 
-  it('does not render internal generated ids in node labels', () => {
+  it("does not render internal generated ids in node labels", () => {
     const app = createPanelApp({
       buildTree: () => [
         {
           id: `${ID_PREFIX}-uuid-1`,
-          tagName: 'div',
-          controllers: ['modal'],
+          tagName: "div",
+          controllers: ["modal"],
           children: [],
         },
         {
-          id: 'user-controller',
-          tagName: 'div',
-          controllers: ['menu'],
+          id: "user-controller",
+          tagName: "div",
+          controllers: ["menu"],
           children: [],
         },
       ],
     });
 
-    app.renderTree([
-      { tagName: 'div' },
-      { tagName: 'div' },
-    ]);
+    app.renderTree([{ tagName: "div" }, { tagName: "div" }]);
 
-    const internalId = treeElement.children[0].querySelector('.node-id');
-    const userId = treeElement.children[1].querySelector('.node-id');
+    const internalId = treeElement.children[0].querySelector(".node-id");
+    const userId = treeElement.children[1].querySelector(".node-id");
 
-    expect(internalId.textContent).toBe('');
+    expect(internalId.textContent).toBe("");
     expect(internalId.hidden).toBe(true);
-    expect(userId.textContent).toBe('user-controller');
+    expect(userId.textContent).toBe("user-controller");
     expect(userId.hidden).toBe(false);
   });
 
-  it('refreshes by requesting a scan and then rendering the result', async () => {
+  it("refreshes by requesting a scan and then rendering the result", async () => {
     const sentMessages = [];
     const app = createPanelApp({
       bridge: createBridge((message) => {
         sentMessages.push(message);
-        return Promise.resolve({ items: [{ id: 'frame-1', tagName: 'turbo-frame' }] });
+        return Promise.resolve({
+          items: [{ id: "frame-1", tagName: "turbo-frame" }],
+        });
       }),
       buildTree: (items) => items.map((item) => ({ ...item, children: [] })),
     });
@@ -285,11 +300,11 @@ describe('PanelApp', () => {
     await app.refreshTree();
 
     expect(sentMessages).toEqual([{ type: CONTENT_SCAN_MESSAGE_TYPE }]);
-    expect(summaryElement.textContent).toBe('1 frames, 0 controllers');
+    expect(summaryElement.textContent).toBe("1 frames, 0 controllers");
     expect(treeElement.children.length).toBe(1);
   });
 
-  it('renders an empty tree when refresh returns no items', async () => {
+  it("renders an empty tree when refresh returns no items", async () => {
     const app = createPanelApp({
       bridge: createBridge(() => Promise.resolve({ items: [] })),
       buildTree: () => [],
@@ -297,12 +312,12 @@ describe('PanelApp', () => {
 
     await app.refreshTree();
 
-    expect(summaryElement.textContent).toBe('0 frames, 0 controllers');
+    expect(summaryElement.textContent).toBe("0 frames, 0 controllers");
     expect(emptyStateElement.hidden).toBe(false);
     expect(treeElement.hidden).toBe(true);
   });
 
-  it('renders an empty tree when refresh returns response without items', async () => {
+  it("renders an empty tree when refresh returns response without items", async () => {
     const app = createPanelApp({
       bridge: createBridge(() => Promise.resolve({})),
       buildTree: () => [],
@@ -310,49 +325,53 @@ describe('PanelApp', () => {
 
     await app.refreshTree();
 
-    expect(summaryElement.textContent).toBe('0 frames, 0 controllers');
+    expect(summaryElement.textContent).toBe("0 frames, 0 controllers");
     expect(emptyStateElement.hidden).toBe(false);
     expect(treeElement.hidden).toBe(true);
   });
 
-  it('shows an error message when refresh fails', async () => {
+  it("shows an error message when refresh fails", async () => {
     const app = createPanelApp({
-      bridge: createBridge(() => Promise.reject(new Error('boom'))),
+      bridge: createBridge(() => Promise.reject(new Error("boom"))),
       buildTree: () => [],
     });
 
     await app.refreshTree();
 
-    expect(summaryElement.textContent).toBe('Unable to read the inspected page');
+    expect(summaryElement.textContent).toBe(
+      "Unable to read the inspected page",
+    );
     expect(emptyStateElement.hidden).toBe(false);
     expect(treeElement.hidden).toBe(true);
   });
 
-  it('shows an error message when the background relay fails', async () => {
+  it("shows an error message when the background relay fails", async () => {
     const app = createPanelApp({
-      bridge: createBridge(() => Promise.reject(new Error('relay failed'))),
+      bridge: createBridge(() => Promise.reject(new Error("relay failed"))),
       buildTree: () => [],
     });
 
     await app.refreshTree();
 
-    expect(summaryElement.textContent).toBe('Unable to read the inspected page');
+    expect(summaryElement.textContent).toBe(
+      "Unable to read the inspected page",
+    );
     expect(emptyStateElement.hidden).toBe(false);
     expect(treeElement.hidden).toBe(true);
   });
 
-  it('start wires the refresh button and triggers an initial refresh', async () => {
+  it("start wires the refresh button and triggers an initial refresh", async () => {
     const refreshCalls = [];
     const app = createPanelApp();
 
     app.refreshTree = async () => {
-      refreshCalls.push('refresh');
+      refreshCalls.push("refresh");
     };
 
     app.start();
-    refreshButton.dispatchEvent(new Event('click'));
+    refreshButton.dispatchEvent(new Event("click"));
     await Promise.resolve();
 
-    expect(refreshCalls).toEqual(['refresh', 'refresh']);
+    expect(refreshCalls).toEqual(["refresh", "refresh"]);
   });
 });

@@ -1,19 +1,19 @@
-import { test } from '@playwright/test';
-import { chromiumAdapter } from './adapters/chromium-adapter.js';
-import { firefoxAdapter } from './adapters/firefox-adapter.js';
+import { test } from "@playwright/test";
+import { chromiumAdapter } from "./adapters/chromium-adapter.js";
+import { firefoxAdapter } from "./adapters/firefox-adapter.js";
 import {
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
   ID_PREFIX,
-} from '../../lib/constants.js';
+} from "../../lib/constants.js";
 import {
   deepScanResponse,
   emptyScanResponse,
   fixtureScanResponse,
   internalIdScanResponse,
-} from './support/panel-fixtures.js';
+} from "./support/panel-fixtures.js";
 import {
   expectDoubleClickTogglesNodeChildren,
   expectRefreshRescans,
@@ -34,7 +34,7 @@ import {
   withExpectedPersistedTheme,
   withExpectedTagNames,
   withExpectedTargetBadges,
-} from './support/panel-assertions.js';
+} from "./support/panel-assertions.js";
 
 const adaptersByBrowserName = {
   chromium: chromiumAdapter,
@@ -43,10 +43,13 @@ const adaptersByBrowserName = {
 
 async function withPanel(adapter, page, options, testBody) {
   if (!adapter.capabilities.supportsDirectPanelPage) {
-    test.skip(true, `${adapter.browserName} does not support direct panel-page tests`);
+    test.skip(
+      true,
+      `${adapter.browserName} does not support direct panel-page tests`,
+    );
   }
 
-  if (adapter.browserName === 'chromium') {
+  if (adapter.browserName === "chromium") {
     await adapter.withExtension(async ({ context }) => {
       const panelPage = await adapter.openPanelPage(context, options);
       await testBody(panelPage);
@@ -58,88 +61,181 @@ async function withPanel(adapter, page, options, testBody) {
   await testBody(panelPage);
 }
 
-test.describe('Panel UI', () => {
-  test('renders heading and summary', async ({ browserName, page }) => {
+test.describe("Panel UI", () => {
+  test("renders heading and summary", async ({ browserName, page }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedHeadingAndSummary('Hotwire Inspector', '2 frames, 4 controllers'));
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      withExpectedHeadingAndSummary(
+        "Hotwire Inspector",
+        "2 frames, 4 controllers",
+      ),
+    );
   });
 
-  test('renders tree nodes with correct IDs', async ({ browserName, page }) => {
+  test("renders tree nodes with correct IDs", async ({ browserName, page }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedNodeIds(['main-frame', 'nested-frame', 'modal-controller', 'modal-close', 'sidebar-controller']));
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      withExpectedNodeIds([
+        "main-frame",
+        "nested-frame",
+        "modal-controller",
+        "modal-close",
+        "sidebar-controller",
+      ]),
+    );
   });
 
-  test('displays tag names for each node', async ({ browserName, page }) => {
+  test("displays tag names for each node", async ({ browserName, page }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedTagNames(['turbo-frame', 'turbo-frame', 'div', 'button', 'div']));
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      withExpectedTagNames([
+        "turbo-frame",
+        "turbo-frame",
+        "div",
+        "button",
+        "div",
+      ]),
+    );
   });
 
-  test('does not render internal generated IDs', async ({ browserName, page }) => {
+  test("does not render internal generated IDs", async ({
+    browserName,
+    page,
+  }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: internalIdScanResponse }, withExpectedInternalIdsHidden(ID_PREFIX, 'user-controller'));
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: internalIdScanResponse },
+      withExpectedInternalIdsHidden(ID_PREFIX, "user-controller"),
+    );
   });
 
-  test('shows frame src attribute', async ({ browserName, page }) => {
+  test("shows frame src attribute", async ({ browserName, page }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedFrameSrc('main-frame', '/main'));
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      withExpectedFrameSrc("main-frame", "/main"),
+    );
   });
 
-  test('displays controller badges', async ({ browserName, page }) => {
+  test("displays controller badges", async ({ browserName, page }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, async (panelPage) => {
-      await withExpectedControllerBadges('main-frame', ['sidebar'])(panelPage);
-      await withExpectedControllerBadges('modal-controller', ['modal', 'dropdown'])(panelPage);
-    });
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        await withExpectedControllerBadges("main-frame", ["sidebar"])(
+          panelPage,
+        );
+        await withExpectedControllerBadges("modal-controller", [
+          "modal",
+          "dropdown",
+        ])(panelPage);
+      },
+    );
   });
 
-  test('displays target badges', async ({ browserName, page }) => {
+  test("displays target badges", async ({ browserName, page }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedTargetBadges('modal-close', ['modal#closeButton', 'modal#trigger', 'dropdown#item']));
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      withExpectedTargetBadges("modal-close", [
+        "modal#closeButton",
+        "modal#trigger",
+        "dropdown#item",
+      ]),
+    );
   });
 
-  test('renders nested tree structure', async ({ browserName, page }) => {
+  test("renders nested tree structure", async ({ browserName, page }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedNestedTree('main-frame', 'nested-frame', 'modal-controller'));
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      withExpectedNestedTree("main-frame", "nested-frame", "modal-controller"),
+    );
   });
 
-  test('renders deeply nested tree structure', async ({ browserName, page }) => {
+  test("renders deeply nested tree structure", async ({
+    browserName,
+    page,
+  }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: deepScanResponse }, withExpectedDeepTree('4 frames, 3 controllers', ['level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6', 'level-7']));
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: deepScanResponse },
+      withExpectedDeepTree("4 frames, 3 controllers", [
+        "level-1",
+        "level-2",
+        "level-3",
+        "level-4",
+        "level-5",
+        "level-6",
+        "level-7",
+      ]),
+    );
   });
 
-  test('shows empty state for no elements', async ({ browserName, page }) => {
+  test("shows empty state for no elements", async ({ browserName, page }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: emptyScanResponse }, withExpectedEmptyState('0 frames, 0 controllers'));
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: emptyScanResponse },
+      withExpectedEmptyState("0 frames, 0 controllers"),
+    );
   });
 
-  test('shows error state when scan fails', async ({ browserName, page }) => {
+  test("shows error state when scan fails", async ({ browserName, page }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanError: 'Connection failed' }, withExpectedErrorState('Unable to read the inspected page'));
+    await withPanel(
+      adapter,
+      page,
+      { scanError: "Connection failed" },
+      withExpectedErrorState("Unable to read the inspected page"),
+    );
   });
 
-  test('refresh button triggers rescan', async ({ browserName, page }) => {
+  test("refresh button triggers rescan", async ({ browserName, page }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
@@ -151,61 +247,125 @@ test.describe('Panel UI', () => {
     );
   });
 
-  test('renders the theme switcher next to refresh', async ({ browserName, page }) => {
+  test("renders the theme switcher next to refresh", async ({
+    browserName,
+    page,
+  }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, expectThemeSwitcher);
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      expectThemeSwitcher,
+    );
   });
 
-  test('updates the panel theme from the switcher', async ({ browserName, page }) => {
+  test("updates the panel theme from the switcher", async ({
+    browserName,
+    page,
+  }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, expectThemeChanges);
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      expectThemeChanges,
+    );
   });
 
-  test('applies a persisted panel theme override', async ({ browserName, page }) => {
+  test("applies a persisted panel theme override", async ({
+    browserName,
+    page,
+  }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse, persistedTheme: 'dark' }, withExpectedPersistedTheme('dark'));
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse, persistedTheme: "dark" },
+      withExpectedPersistedTheme("dark"),
+    );
   });
 
-  test('hovering and leaving a row sends highlight messages', async ({ browserName, page }) => {
+  test("hovering and leaving a row sends highlight messages", async ({
+    browserName,
+    page,
+  }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedHoverMessages('main-frame', [
-      { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'main-frame' },
-      { type: CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE },
-    ]));
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      withExpectedHoverMessages("main-frame", [
+        { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: "main-frame" },
+        { type: CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE },
+      ]),
+    );
   });
 
-  test('clicking a row inspects the selected element', async ({ browserName, page }) => {
+  test("clicking a row inspects the selected element", async ({
+    browserName,
+    page,
+  }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedClickInspects('nested-frame', [
-      { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'nested-frame' },
-      { type: CONTENT_INSPECT_MESSAGE_TYPE, id: 'nested-frame' },
-    ], ['inspect(document.querySelector("#mock"))']));
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      withExpectedClickInspects(
+        "nested-frame",
+        [
+          { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: "nested-frame" },
+          { type: CONTENT_INSPECT_MESSAGE_TYPE, id: "nested-frame" },
+        ],
+        ['inspect(document.querySelector("#mock"))'],
+      ),
+    );
   });
 
-  test('clicking a controller badge stores the page controller as a temp variable', async ({ browserName, page }) => {
+  test("clicking a controller badge stores the page controller as a temp variable", async ({
+    browserName,
+    page,
+  }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedBadgeClickStoresController('modal-controller', 'modal', [
-      { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: 'modal-controller' },
-      { type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE, id: 'modal-controller', identifier: 'modal' },
-    ]));
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      withExpectedBadgeClickStoresController("modal-controller", "modal", [
+        { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: "modal-controller" },
+        {
+          type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+          id: "modal-controller",
+          identifier: "modal",
+        },
+      ]),
+    );
   });
 
-  test('double-clicking a row toggles node children visibility', async ({ browserName, page }) => {
+  test("double-clicking a row toggles node children visibility", async ({
+    browserName,
+    page,
+  }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, expectDoubleClickTogglesNodeChildren);
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      expectDoubleClickTogglesNodeChildren,
+    );
   });
 });

@@ -134,7 +134,9 @@ describe("buildTree", () => {
   });
 
   it("returns single root frame with no children", () => {
-    const input = [{ id: "main", src: "/page", parentId: null, tagName: "turbo-frame" }];
+    const input = [
+      { id: "main", src: "/page", parentId: null, tagName: "turbo-frame" },
+    ];
     const result = buildTree(input);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("main");
