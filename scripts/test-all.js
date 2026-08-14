@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 const checks = [
   ["ESLint", "npm", ["run", "lint"]],
   ["Prettier", "npm", ["run", "format:check"]],
+  ["Stylelint", "npm", ["run", "lint:css"]],
   ["Unit tests", "npm", ["test", "--", "--run"]],
   ["Coverage", "npm", ["run", "coverage"]],
   ["Vitest UI", "npm", ["run", "test:ui", "--", "--run"]],

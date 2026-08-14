@@ -7,6 +7,7 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
+
   --lch-canvas: 98% 0.01 255;
   --lch-surface: 100% 0 0;
   --lch-surface-elevated: 96% 0.015 255;
@@ -22,11 +23,11 @@
   --color-ink: oklch(var(--lch-ink));
   --color-ink-muted: oklch(var(--lch-ink-muted));
   --color-border: oklch(var(--lch-border));
-  --color-border-soft: oklch(var(--lch-border) / 0.7);
+  --color-border-soft: oklch(var(--lch-border) / 70%);
   --color-accent: oklch(var(--lch-accent));
-  --color-accent-hover: oklch(48% 0.2 255);
+  --color-accent-hover: oklch(48% 0.2 255deg);
   --color-accent-contrast: oklch(var(--lch-accent-contrast));
-  --color-selection: oklch(var(--lch-accent) / 0.12);
+  --color-selection: oklch(var(--lch-accent) / 12%);
   --color-positive: oklch(var(--lch-positive));
   --color-positive-surface: color-mix(
     in srgb,
@@ -38,6 +39,7 @@
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
   --radius-pill: 999px;
+
   background: var(--color-canvas);
   color: var(--color-ink);
 }
@@ -58,6 +60,7 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
+
   --lch-canvas: 98% 0.01 255;
   --lch-surface: 100% 0 0;
   --lch-surface-elevated: 96% 0.015 255;
@@ -71,6 +74,7 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+
   --lch-canvas: 18% 0.035 255;
   --lch-surface: 22% 0.04 255;
   --lch-surface-elevated: 26% 0.045 255;
@@ -170,7 +174,7 @@ select {
   min-block-size: 2rem;
   border: 1px solid var(--select-border, var(--color-border));
   border-radius: var(--radius-sm);
-  padding: 0.1rem 0.1rem;
+  padding: 0.1rem;
   background: var(--select-background, var(--color-surface-elevated));
   color: var(--select-color, var(--color-ink));
   cursor: pointer;
@@ -243,7 +247,7 @@ main {
 .node-toggle::before {
   content: "";
   border-block: 0.25rem solid transparent;
-  border-inline-start: 0.375rem solid currentColor;
+  border-inline-start: 0.375rem solid currentcolor;
   transform-origin: center;
   transition: transform 300ms ease;
 }

@@ -23,6 +23,7 @@
     "zip:firefox": "wxt zip -b firefox --mv3",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "lint:css": "stylelint \"**/*.css\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "postinstall": "wxt prepare"
@@ -39,6 +40,8 @@
     "happy-dom": "^20.9.0",
     "playwright": "^1.49.1",
     "prettier": "^3.9.6",
+    "stylelint": "^17.14.1",
+    "stylelint-config-standard": "^40.0.0",
     "vite": "^5.4.14",
     "vitest": "^2.1.8",
     "wxt": "^0.20.27"
