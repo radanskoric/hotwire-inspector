@@ -2,10 +2,10 @@
 <html>
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hotwire Inspector</title>
-  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="./style.css">
 </head>
 
 <body>
@@ -37,13 +37,14 @@
       <div class="node-row" role="treeitem" data-controller="panel-node"
         data-action="mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight dblclick->node#toggleChildren">
         <span class="node-toggle" data-action="click->node#toggleChildren:stop" aria-hidden="true"></span>
-        <img src="/icons/reveal-in-elements.svg" class="icon icon-btn" data-action="click->panel-node#inspect" />
+        <img src="/icons/reveal-in-elements.svg" class="icon icon-btn" data-action="click->panel-node#inspect">
         <span class="node-main">
           <span class="node-kind"></span>
           <span class="node-id"></span>
           <span class="node-src" hidden></span>
         </span>
         <span class="badges" hidden></span>
+        <span class="target-badges" hidden></span>
       </div>
       <div class="node-children" role="group" hidden data-node-target="children"></div>
     </div>

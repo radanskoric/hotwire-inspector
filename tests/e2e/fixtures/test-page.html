@@ -20,7 +20,10 @@
 <body>
   <turbo-frame id="main-frame" src="/main" data-controller="sidebar">
     <turbo-frame id="nested-frame">
-      <div data-controller="modal dropdown">Modal content</div>
+      <div data-controller="modal dropdown">
+        Modal content
+        <button id="modal-close" data-modal-target="closeButton trigger" data-dropdown-target="item">Close</button>
+      </div>
     </turbo-frame>
   </turbo-frame>
   <div data-controller="sidebar">Sidebar</div>

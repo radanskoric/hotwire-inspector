@@ -5,6 +5,17 @@ export const fixtureScanResponse = {
     { id: 'main-frame', src: '/main', parentId: null, tagName: 'turbo-frame', controllers: ['sidebar'] },
     { id: 'nested-frame', src: null, parentId: 'main-frame', tagName: 'turbo-frame', controllers: [] },
     { id: 'modal-controller', parentId: 'nested-frame', tagName: 'div', controllers: ['modal', 'dropdown'] },
+    {
+      id: 'modal-close',
+      parentId: 'modal-controller',
+      tagName: 'button',
+      controllers: [],
+      targets: [
+        { controller: 'modal', name: 'closeButton' },
+        { controller: 'modal', name: 'trigger' },
+        { controller: 'dropdown', name: 'item' },
+      ],
+    },
     { id: 'sidebar-controller', parentId: null, tagName: 'div', controllers: ['sidebar'] },
   ],
 };

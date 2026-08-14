@@ -129,6 +129,15 @@ export function withExpectedControllerBadges(nodeId, expectedBadges) {
   };
 }
 
+export function withExpectedTargetBadges(nodeId, expectedBadges) {
+  return async (panelPage) => {
+    const nodeRow = panelPage.locator('.node-row').filter({ hasText: nodeId }).first();
+    const badges = await nodeRow.locator('.target-badge').allTextContents();
+
+    expect(badges).toEqual(expectedBadges);
+  };
+}
+
 export function withExpectedNestedTree(parentId, childId, grandchildId) {
   return async (panelPage) => {
     const parentChildren = panelPage.locator('.node').filter({ hasText: parentId }).first().locator('> .node-children');
@@ -216,6 +225,7 @@ export function withExpectedHoverMessages(nodeId, expectedMessages) {
   return async (panelPage) => {
     const nodeRow = panelPage.locator('.node-row').filter({ hasText: nodeId }).first();
 
+    await panelPage.locator('h1').hover();
     await clearRecordedMessages(panelPage);
     await nodeRow.hover();
     await panelPage.locator('h1').hover();
@@ -231,7 +241,9 @@ export function withExpectedClickInspects(nodeId, expectedMessages, expectedEval
     const nodeRow = panelPage.locator('.node-row').filter({ hasText: nodeId }).first();
     const inspectIcon = nodeRow.locator('.icon-btn');
 
+    await panelPage.locator('h1').hover();
     await clearRecordedMessages(panelPage);
+    await nodeRow.hover();
     await inspectIcon.click();
 
     const messages = await getRecordedMessages(panelPage);

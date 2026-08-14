@@ -62,4 +62,19 @@ describe('buildTree', () => {
     expect(result[0].tagName).toBe('turbo-frame');
     expect(result[0].controllers).toEqual(['lazy']);
   });
+
+  it('preserves target metadata on nested nodes', () => {
+    const input = [
+      { id: 'ctrl-1', parentId: null, tagName: 'div', controllers: ['search'], targets: [] },
+      {
+        id: 'target-1',
+        parentId: 'ctrl-1',
+        tagName: 'input',
+        controllers: [],
+        targets: [{ controller: 'search', name: 'input' }],
+      },
+    ];
+    const result = buildTree(input);
+    expect(result[0].children[0].targets).toEqual([{ controller: 'search', name: 'input' }]);
+  });
 });

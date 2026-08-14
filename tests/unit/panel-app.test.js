@@ -48,6 +48,7 @@ function mountPanelDom() {
             <span class="node-src" hidden></span>
           </span>
           <span class="badges" hidden></span>
+          <span class="target-badges" hidden></span>
         </button>
         <div class="node-children" role="group" hidden></div>
       </div>
@@ -176,6 +177,7 @@ describe('PanelApp', () => {
               id: 'ctrl-1',
               tagName: 'div',
               controllers: ['modal'],
+              targets: [{ controller: 'modal', name: 'content' }],
               children: [],
             },
           ],
@@ -212,10 +214,35 @@ describe('PanelApp', () => {
     expect(children.children.length).toBe(1);
     expect(childNode).not.toBeNull();
     expect(childNode.querySelector(':scope > .node-row .node-toggle')).not.toBeNull();
+    expect(childNode.querySelector(':scope > .node-row .target-badge').textContent).toBe('modal#content');
     expect(childNode.querySelector(':scope > .node-children > .node')).toBeNull();
     expect(toggle).not.toBeNull();
     expect(row.dataset.controller).toBe('panel-node');
     expect(row.dataset.panelNodeIdValue).toBe('frame-1');
+  });
+
+  it('renders multiple target labels on a single node', () => {
+    const app = createPanelApp({
+      buildTree: () => [
+        {
+          id: 'shared-target',
+          tagName: 'button',
+          controllers: [],
+          targets: [
+            { controller: 'search', name: 'input' },
+            { controller: 'tabs', name: 'tab' },
+          ],
+          children: [],
+        },
+      ],
+    });
+
+    app.renderTree([{ tagName: 'button', controllers: [], targets: [{ controller: 'search', name: 'input' }] }]);
+
+    const targetBadges = treeElement.querySelectorAll('.target-badge');
+
+    expect(targetBadges).toHaveLength(2);
+    expect(Array.from(targetBadges).map((badge) => badge.textContent)).toEqual(['search#input', 'tabs#tab']);
   });
 
   it('does not render internal generated ids in node labels', () => {

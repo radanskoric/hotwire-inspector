@@ -23,6 +23,9 @@ function createElement(
     getAttribute(name) {
       return attributeMap.has(name) ? attributeMap.get(name) : null;
     },
+    attributeNames() {
+      return Array.from(attributeMap.keys());
+    },
     appendChild(child) {
       const previousChild = this.children[this.children.length - 1] ?? null;
       child.parentElement = this;
@@ -54,8 +57,11 @@ function createElement(
       while (current) {
         const matchesTurboFrame = selector.includes('turbo-frame') && current.tagName === 'TURBO-FRAME';
         const matchesController = selector.includes('[data-controller]') && current.getAttribute('data-controller');
+        const matchesTarget = selector.includes('[data-') && current.attributeNames().some((name) => (
+          selector.includes(`[${name}]`) && current.getAttribute(name)
+        ));
 
-        if (matchesTurboFrame || matchesController) {
+        if (matchesTurboFrame || matchesController || matchesTarget) {
           return current;
         }
 
@@ -63,6 +69,30 @@ function createElement(
       }
 
       return null;
+    },
+    querySelectorAll(selector) {
+      const descendants = [];
+      const visit = (node) => {
+        for (const child of node.children) {
+          const matchesTarget = selector.includes('[data-') && child.attributeNames().some((name) => (
+            selector.includes(`[${name}]`)
+          ));
+
+          if (
+            selector === 'turbo-frame, [data-controller]'
+            && (child.tagName === 'TURBO-FRAME' || child.getAttribute('data-controller'))
+          ) {
+            descendants.push(child);
+          } else if (matchesTarget) {
+            descendants.push(child);
+          }
+
+          visit(child);
+        }
+      };
+
+      visit(this);
+      return descendants;
     },
   };
 
@@ -258,6 +288,103 @@ describe('ContentInspector', () => {
       controllers: ['dropdown', 'menu'],
     });
     expect(items[1].id).toMatch(new RegExp(`^${ID_PREFIX}-`));
+  });
+
+  it('includes target elements found inside controller subtrees during scan', () => {
+    const controller = createElement('section', { id: 'search-controller', attributes: { 'data-controller': 'search' } });
+    const inputTarget = createElement('input', { id: 'query-input', attributes: { 'data-search-target': 'input result' } });
+    const document = createDocument([controller, inputTarget]);
+    controller.appendChild(inputTarget);
+    const inspector = new ContentInspector({ document, cssEscape });
+
+    expect(inspector.scan()).toEqual([
+      {
+        id: 'search-controller',
+        parentId: null,
+        tagName: 'section',
+        controllers: ['search'],
+      },
+      {
+        id: 'query-input',
+        parentId: 'search-controller',
+        tagName: 'input',
+        controllers: [],
+        targets: [
+          { controller: 'search', name: 'input' },
+          { controller: 'search', name: 'result' },
+        ],
+      },
+    ]);
+  });
+
+  it('renders one scan item for elements with multiple controller target attributes', () => {
+    const controller = createElement('div', { id: 'controller', attributes: { 'data-controller': 'search tabs' } });
+    const target = createElement('button', {
+      id: 'shared-target',
+      attributes: {
+        'data-search-target': 'input',
+        'data-tabs-target': 'tab selectedTab',
+      },
+    });
+    const document = createDocument([controller, target]);
+    controller.appendChild(target);
+    const inspector = new ContentInspector({ document, cssEscape });
+
+    const items = inspector.scan();
+    const targetItems = items.filter((item) => item.id === 'shared-target');
+
+    expect(targetItems).toHaveLength(1);
+    expect(targetItems[0]).toMatchObject({
+      parentId: 'controller',
+      tagName: 'button',
+      controllers: [],
+      targets: [
+        { controller: 'search', name: 'input' },
+        { controller: 'tabs', name: 'tab' },
+        { controller: 'tabs', name: 'selectedTab' },
+      ],
+    });
+  });
+
+  it('ignores target attributes with empty values during scan', () => {
+    const controller = createElement('div', { id: 'controller', attributes: { 'data-controller': 'search' } });
+    const emptyTarget = createElement('button', { id: 'empty-target', attributes: { 'data-search-target': '' } });
+    const realTarget = createElement('input', { id: 'real-target', attributes: { 'data-search-target': 'input' } });
+    const document = createDocument([controller, emptyTarget, realTarget]);
+    controller.appendChild(emptyTarget);
+    controller.appendChild(realTarget);
+    const inspector = new ContentInspector({ document, cssEscape });
+
+    expect(inspector.scan()).toEqual([
+      {
+        id: 'controller',
+        parentId: null,
+        tagName: 'div',
+        controllers: ['search'],
+      },
+      {
+        id: 'real-target',
+        parentId: 'controller',
+        tagName: 'input',
+        controllers: [],
+        targets: [{ controller: 'search', name: 'input' }],
+      },
+    ]);
+  });
+
+  it('can inspect target-only elements discovered during scan', () => {
+    const controller = createElement('div', { attributes: { 'data-controller': 'modal' } });
+    const target = createElement('button', { id: 'close-button', attributes: { 'data-modal-target': 'closeButton' } });
+    const document = createDocument([controller, target]);
+    controller.appendChild(target);
+    const inspector = new ContentInspector({ document, cssEscape });
+
+    inspector.scan();
+
+    expect(inspector.inspect('close-button')).toEqual({
+      success: true,
+      selector: '#close-button',
+    });
   });
 
   it('highlights and clears highlight with an overlay while preserving target inline styles', () => {

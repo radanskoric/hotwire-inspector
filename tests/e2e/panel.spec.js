@@ -33,6 +33,7 @@ import {
   withExpectedNodeIds,
   withExpectedPersistedTheme,
   withExpectedTagNames,
+  withExpectedTargetBadges,
 } from './support/panel-assertions.js';
 
 const adaptersByBrowserName = {
@@ -69,14 +70,14 @@ test.describe('Panel UI', () => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedNodeIds(['main-frame', 'nested-frame', 'modal-controller', 'sidebar-controller']));
+    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedNodeIds(['main-frame', 'nested-frame', 'modal-controller', 'modal-close', 'sidebar-controller']));
   });
 
   test('displays tag names for each node', async ({ browserName, page }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);
 
-    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedTagNames(['turbo-frame', 'turbo-frame', 'div', 'div']));
+    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedTagNames(['turbo-frame', 'turbo-frame', 'div', 'button', 'div']));
   });
 
   test('does not render internal generated IDs', async ({ browserName, page }) => {
@@ -101,6 +102,13 @@ test.describe('Panel UI', () => {
       await withExpectedControllerBadges('main-frame', ['sidebar'])(panelPage);
       await withExpectedControllerBadges('modal-controller', ['modal', 'dropdown'])(panelPage);
     });
+  });
+
+  test('displays target badges', async ({ browserName, page }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(adapter, page, { scanResponse: fixtureScanResponse }, withExpectedTargetBadges('modal-close', ['modal#closeButton', 'modal#trigger', 'dropdown#item']));
   });
 
   test('renders nested tree structure', async ({ browserName, page }) => {

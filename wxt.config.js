@@ -1,7 +1,7 @@
 import { defineConfig } from 'wxt';
 
 const debugBuild = process.env.WXT_DEBUG_BUILD === 'true';
-const devServerPort = Number(process.env.WXT_DEV_SERVER_PORT || 3000);
+const devServerPort = Number(process.env.WXT_DEV_SERVER_PORT || 4173);
 
 export default defineConfig({
   outDir: 'output',
@@ -34,6 +34,6 @@ export default defineConfig({
     }],
   },
   webExt: {
-    startUrls: ['http://localhost:4173'],
+    startUrls: ['http://localhost:3000'],
   },
 });

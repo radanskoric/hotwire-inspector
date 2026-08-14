@@ -79,6 +79,18 @@ test.describe('Content Script', () => {
 
       const sidebar = controllers.find((c) => c.controllers.includes('sidebar'));
       expect(sidebar.parentId).toBeNull();
+
+      const target = result.items.find((item) => item.id === 'modal-close');
+      expect(target).toMatchObject({
+        parentId: multi.id,
+        tagName: 'button',
+        controllers: [],
+        targets: [
+          { controller: 'modal', name: 'closeButton' },
+          { controller: 'modal', name: 'trigger' },
+          { controller: 'dropdown', name: 'item' },
+        ],
+      });
     });
   });
 
