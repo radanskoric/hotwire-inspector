@@ -1,0 +1,14 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "checkJs": true,
+    "maxNodeModuleJsDepth": 0
+  },
+  "include": [
+    "./.wxt/wxt.d.ts",
+    "lib/**/*.js",
+    "entrypoints/**/*.js",
+    "scripts/**/*.js"
+  ],
+  "exclude": ["node_modules", "output", "coverage", "test-results"]
+}

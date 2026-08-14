@@ -15,6 +15,8 @@ export default defineConfig({
         "node_modules/**",
         "**/vite.config.js",
         "**/wxt.config.js",
+        // JSDoc-only typedef module; never imported at runtime.
+        "lib/types.js",
       ],
       thresholds: {
         statements: 100,

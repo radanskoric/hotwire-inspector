@@ -3,6 +3,15 @@ import {
   STORE_CONTROLLER_RESPONSE_EVENT,
 } from "../lib/constants.js";
 
+/**
+ * The inspected page's window. Hotwire apps may expose their Stimulus
+ * application under one of several global names, and stored controllers are
+ * exposed as `temp<N>` globals, so arbitrary property access is intentional
+ * here.
+ *
+ * @typedef {Window & typeof globalThis & Record<string, any>} PageWindow
+ */
+
 export default defineUnlistedScript(() => {
   const script = document.currentScript;
 
@@ -11,21 +20,36 @@ export default defineUnlistedScript(() => {
   }
 
   script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
+    const customEvent = /** @type {CustomEvent} */ (event);
     const detail =
-      typeof event.detail === "string"
-        ? JSON.parse(event.detail)
-        : event.detail;
+      /** @type {import("../lib/types.js").StoreControllerRequestDetail} */ (
+        typeof customEvent.detail === "string"
+          ? JSON.parse(customEvent.detail)
+          : customEvent.detail
+      );
     const { selector, identifier, requestId } = detail ?? {};
-    const response = storeController(selector, identifier);
+    const response = storeController(
+      /** @type {string} */ (selector),
+      /** @type {string} */ (identifier),
+    );
 
     script.dispatchEvent(
       new CustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
-        detail: JSON.stringify({ requestId, ...response }),
+        detail: JSON.stringify(
+          /** @type {import("../lib/types.js").StoreControllerResponseDetail} */ ({
+            requestId,
+            ...response,
+          }),
+        ),
       }),
     );
   });
 });
 
+/**
+ * @param {any} candidate - potential Stimulus application global
+ * @returns {boolean}
+ */
 function checkApplicationCandidate(candidate) {
   return (
     candidate &&
@@ -34,18 +58,25 @@ function checkApplicationCandidate(candidate) {
 }
 
 function detectApplication() {
-  if (checkApplicationCandidate(window.Stimulus)) {
-    return window.Stimulus;
+  const pageWindow = /** @type {PageWindow} */ (window);
+
+  if (checkApplicationCandidate(pageWindow.Stimulus)) {
+    return pageWindow.Stimulus;
   }
-  if (checkApplicationCandidate(window.stimulusApp)) {
-    return window.stimulusApp;
+  if (checkApplicationCandidate(pageWindow.stimulusApp)) {
+    return pageWindow.stimulusApp;
   }
-  if (checkApplicationCandidate(window.StimulusApp)) {
-    return window.StimulusApp;
+  if (checkApplicationCandidate(pageWindow.StimulusApp)) {
+    return pageWindow.StimulusApp;
   }
   return null;
 }
 
+/**
+ * @param {string} selector
+ * @param {string} identifier
+ * @returns {import("../lib/types.js").StoreControllerResponse}
+ */
 function storeController(selector, identifier) {
   const element = document.querySelector(selector);
 
@@ -71,7 +102,7 @@ function storeController(selector, identifier) {
     const name = `temp${index}`;
 
     if (!(name in window)) {
-      window[name] = controller;
+      /** @type {PageWindow} */ (window)[name] = controller;
       console.info(
         "Hotwire Inspector: " + identifier + " controller stored as " + name,
         controller,

@@ -1,9 +1,11 @@
 import { spawn } from "node:child_process";
 
+/** @type {Array<[name: string, command: string, args: string[]]>} */
 const checks = [
   ["ESLint", "npm", ["run", "lint"]],
   ["Prettier", "npm", ["run", "format:check"]],
   ["Stylelint", "npm", ["run", "lint:css"]],
+  ["Typecheck (checkJs)", "npm", ["run", "typecheck"]],
   ["Unit tests", "npm", ["test", "--", "--run"]],
   ["Coverage", "npm", ["run", "coverage"]],
   ["Vitest UI", "npm", ["run", "test:ui", "--", "--run"]],
@@ -16,10 +18,17 @@ const checks = [
 
 const results = [];
 
+/**
+ * @param {string} command
+ * @param {string[]} args
+ */
 function formatCommand(command, args) {
   return [command, ...args].join(" ");
 }
 
+/**
+ * @param {[name: string, command: string, args: string[]]} check
+ */
 function runCheck([name, command, args]) {
   return new Promise((resolve) => {
     const formattedCommand = formatCommand(command, args);

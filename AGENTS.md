@@ -15,6 +15,7 @@ Core tooling currently includes:
 - ESLint
 - Prettier
 - Stylelint
+- TypeScript (checkJs, JSDoc-only)
 
 ## Important Files and Areas
 
@@ -31,6 +32,8 @@ Core tooling currently includes:
   - DevTools panel UI and interaction logic
 - `lib/tree-builder.js`
   - pure tree-building logic used by the panel
+- `lib/types.js`
+  - shared JSDoc typedefs for the panel ↔ background ↔ content script ↔ inspected page messaging shapes (no runtime exports)
 - `tests/unit/`
   - unit tests
 - `tests/e2e/helpers.js`
@@ -67,6 +70,7 @@ When making meaningful changes, use the existing checks as appropriate:
 - `npm run lint`
 - `npm run lint:css`
 - `npm run format:check`
+- `npm run typecheck`
 - `npm test -- --run`
 - `npm run test:e2e`
 - `npm run build`
@@ -118,6 +122,8 @@ If you change content script message types, the devtools entrypoint, or the pane
 
 - Always use red/green TDD for behavior changes.
 - Keep unit-tested application logic at 100% coverage across statements, branches, functions, and lines; do not reduce coverage for functions in `lib/**/*.js`.
+- Keep JSDoc type annotations accurate when changing `lib/**` or messaging shapes; `npm run typecheck` must stay green.
+- Type checking (`checkJs` via `jsconfig.json`) currently covers `lib/**`, `entrypoints/**`, and `scripts/**`; `tests/**` is intentionally out of scope until its files are annotated (ratchet candidate).
 - Prefer minimal, targeted changes.
 - Avoid introducing side effects in inspected pages.
 - Treat `docs/decisions/` as the authoritative record for architectural choices unless intentionally updating those decisions.
