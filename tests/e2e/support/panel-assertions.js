@@ -1,11 +1,7 @@
 import { expect } from '@playwright/test';
 import {
-  CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
-  CONTENT_HIGHLIGHT_MESSAGE_TYPE,
-  CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
   CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
-  ID_PREFIX,
 } from '../../../lib/constants.js';
 
 export async function addMockPanelApis(page, { scanResponse, scanError, scanResponses, persistedTheme } = {}) {
@@ -97,8 +93,7 @@ export function withExpectedNodeIds(expectedIds) {
 
 export function withExpectedTagNames(expectedTagNames) {
   return async (panelPage) => {
-    const nodeKinds = await panelPage.locator('.node-kind').allTextContents();
-    expect(nodeKinds).toEqual(expectedTagNames);
+    await expect(panelPage.locator('.node-kind')).toHaveText(expectedTagNames);
   };
 }
 
@@ -123,25 +118,23 @@ export function withExpectedFrameSrc(nodeId, expectedSrc) {
 export function withExpectedControllerBadges(nodeId, expectedBadges) {
   return async (panelPage) => {
     const nodeRow = panelPage.locator('.node-row').filter({ hasText: nodeId }).first();
-    const badges = await nodeRow.locator('.badge').allTextContents();
 
-    expect(badges).toEqual(expectedBadges);
+    await expect(nodeRow.locator('.badge')).toHaveText(expectedBadges);
   };
 }
 
 export function withExpectedTargetBadges(nodeId, expectedBadges) {
   return async (panelPage) => {
     const nodeRow = panelPage.locator('.node-row').filter({ hasText: nodeId }).first();
-    const badges = await nodeRow.locator('.target-badge').allTextContents();
 
-    expect(badges).toEqual(expectedBadges);
+    await expect(nodeRow.locator('.target-badge')).toHaveText(expectedBadges);
   };
 }
 
 export function withExpectedNestedTree(parentId, childId, grandchildId) {
   return async (panelPage) => {
     const parentChildren = panelPage.locator('.node').filter({ hasText: parentId }).first().locator('> .node-children');
-    await expect(parentChildren).not.toBeHidden();
+    await expect(parentChildren).toBeVisible();
     await expect(parentChildren.locator('.node-id').first()).toHaveText(childId);
 
     const childChildren = parentChildren.locator('.node').filter({ hasText: childId }).first().locator('> .node-children');
@@ -157,7 +150,7 @@ export function withExpectedDeepTree(summaryText, levelIds) {
     let children = panelPage.locator('.node').filter({ hasText: levelIds[0] }).first().locator('> .node-children');
 
     for (let i = 1; i < levelIds.length; i++) {
-      await expect(children).not.toBeHidden();
+      await expect(children).toBeVisible();
       await expect(children.locator('> .node > .node-row .node-id').first()).toHaveText(levelIds[i]);
       children = children.locator('> .node').first().locator('> .node-children');
     }
@@ -276,7 +269,7 @@ export async function expectDoubleClickTogglesNodeChildren(panelPage) {
   const sidebarControllerToggle = panelPage.locator('.node-row').filter({ hasText: 'sidebar-controller' }).first().locator('.node-toggle');
 
   // Initial state: children are visible (expanded by default)
-  await expect(mainFrameChildren).not.toBeHidden();
+  await expect(mainFrameChildren).toBeVisible();
   await expect(mainFrameToggle).toBeVisible();
   await expect(sidebarControllerToggle).toBeHidden();
   await expect(mainFrameNode).toHaveClass(/expanded/);
@@ -288,7 +281,7 @@ export async function expectDoubleClickTogglesNodeChildren(panelPage) {
 
   // Double-click again to expand
   await mainFrameRow.dblclick();
-  await expect(mainFrameChildren).not.toBeHidden();
+  await expect(mainFrameChildren).toBeVisible();
   await expect(mainFrameNode).toHaveClass(/expanded/);
 
   await mainFrameToggle.click();

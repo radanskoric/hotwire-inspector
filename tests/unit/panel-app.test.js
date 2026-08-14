@@ -2,13 +2,8 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
-  CONTENT_HIGHLIGHT_MESSAGE_TYPE,
-  CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
   ID_PREFIX,
-  RELAY_ERROR_TYPE,
-  RELAY_MESSAGE_TYPE,
 } from '../../lib/constants.js';
 import { PanelApp } from '../../lib/panel-app.js';
 

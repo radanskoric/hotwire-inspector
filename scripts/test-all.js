@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 
 const checks = [
+  ['ESLint', 'npm', ['run', 'lint']],
   ['Unit tests', 'npm', ['test', '--', '--run']],
   ['Coverage', 'npm', ['run', 'coverage']],
   ['Vitest UI', 'npm', ['run', 'test:ui', '--', '--run']],

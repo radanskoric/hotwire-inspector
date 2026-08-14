@@ -7,7 +7,6 @@ import { NodeController } from '../../lib/panel/controllers/node-controller.js';
 describe('NodeController', () => {
   let application;
   let node;
-  let children;
 
   beforeEach(async () => {
     document.body.innerHTML = `
@@ -21,7 +20,6 @@ describe('NodeController', () => {
     application = Application.start();
     application.register('node', NodeController);
     node = document.querySelector('[data-controller="node"]');
-    children = document.querySelector('[data-node-target="children"]');
 
     await Promise.resolve();
   });
@@ -73,8 +71,9 @@ describe('NodeController', () => {
     const row = node.querySelector('.node-row');
     await Promise.resolve();
 
-    // Should not throw
+    // Should not throw, and the toggle should still apply
     row.dispatchEvent(new Event('dblclick'));
     await Promise.resolve();
+    expect(node.classList.contains('expanded')).toBe(true);
   });
 });

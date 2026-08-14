@@ -139,8 +139,8 @@ test.describe('Content Script', () => {
       expect(result.success).toBe(true);
       expect(result.selector).toBe('#main-frame');
 
-      const found = await page.locator(result.selector).count();
-      expect(found).toBe(1);
+      const found = page.locator(result.selector);
+      await expect(found).toHaveCount(1);
     });
   });
 

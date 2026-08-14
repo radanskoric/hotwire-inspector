@@ -21,17 +21,24 @@
     "test:e2e:headed": "playwright test -c tests/e2e/playwright.config.js --headed",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox --mv3",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "postinstall": "wxt prepare"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.49.1",
     "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/eslint-plugin": "^1.6.27",
     "@vitest/ui": "^2.1.8",
+    "eslint": "^10.8.1",
+    "eslint-plugin-playwright": "^2.11.0",
+    "globals": "^17.11.0",
     "happy-dom": "^20.9.0",
     "playwright": "^1.49.1",
     "vite": "^5.4.14",
     "vitest": "^2.1.8",
-    "wxt": "^0.20.0"
+    "wxt": "^0.20.27"
   },
   "dependencies": {
     "@hotwired/stimulus": "^3.2.2"

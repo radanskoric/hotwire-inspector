@@ -29,7 +29,7 @@ export async function withStaticServer(rootDir, testBody) {
       const content = await readFile(filePath);
       response.writeHead(200, { 'content-type': contentTypes[path.extname(filePath)] ?? 'application/octet-stream' });
       response.end(content);
-    } catch (_error) {
+    } catch {
       response.writeHead(404);
       response.end('Not found');
     }

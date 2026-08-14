@@ -83,7 +83,7 @@ export async function withChromiumExtension(testBody) {
     await context.close();
 
     if (xvfb?.pid) {
-      try { process.kill(-xvfb.pid, 'SIGTERM'); } catch { }
+      try { process.kill(-xvfb.pid, 'SIGTERM'); } catch { /* Xvfb already exited; nothing to clean up */ }
       delete process.env.DISPLAY;
     }
   }
@@ -130,6 +130,7 @@ export async function openPanelPage(context, options = {}) {
 
   await addMockPanelApis(panelPage, options);
   await panelPage.goto(panelUrl);
+  // eslint-disable-next-line playwright/no-networkidle -- deliberate: wait for the extension panel page to fully settle before handing it to tests
   await panelPage.waitForLoadState('networkidle');
 
   return panelPage;

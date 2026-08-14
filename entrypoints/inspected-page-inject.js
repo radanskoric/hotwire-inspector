@@ -1,4 +1,4 @@
-import { ID_PREFIX, STORE_CONTROLLER_REQUEST_EVENT, STORE_CONTROLLER_RESPONSE_EVENT } from '../lib/constants.js';
+import { STORE_CONTROLLER_REQUEST_EVENT, STORE_CONTROLLER_RESPONSE_EVENT } from '../lib/constants.js';
 
 export default defineUnlistedScript(() => {
   const script = document.currentScript;

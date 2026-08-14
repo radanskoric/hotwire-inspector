@@ -111,7 +111,7 @@ test.skip('interacts with DevTools panel directly via undock approach', async ({
     await context.close();
 
     if (xvfb?.pid) {
-      try { process.kill(-xvfb.pid, 'SIGTERM'); } catch { }
+      try { process.kill(-xvfb.pid, 'SIGTERM'); } catch { /* Xvfb already exited; nothing to clean up */ }
       delete process.env.DISPLAY;
     }
   }

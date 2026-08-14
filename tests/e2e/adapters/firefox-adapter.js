@@ -31,6 +31,7 @@ export async function openPanelPage(page, options = {}) {
   await withStaticServer(firefoxAdapter.extensionOutputPath, async (baseUrl) => {
     panelPage = page;
     await panelPage.goto(`${baseUrl}/panel.html`);
+    // eslint-disable-next-line playwright/no-networkidle -- deliberate: wait for the panel page to fully settle before handing it to tests
     await panelPage.waitForLoadState('networkidle');
   });
 
@@ -42,6 +43,7 @@ export async function withPanelPage(page, options = {}, testBody) {
 
   await withStaticServer(firefoxAdapter.extensionOutputPath, async (baseUrl) => {
     await page.goto(`${baseUrl}/panel.html`);
+    // eslint-disable-next-line playwright/no-networkidle -- deliberate: wait for the panel page to fully settle before handing it to tests
     await page.waitForLoadState('networkidle');
     await testBody(page);
   });
