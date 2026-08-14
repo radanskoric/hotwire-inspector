@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+// @vitest-environment happy-dom
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ContentInspector } from '../../lib/content-inspector.js';
 import {
   ID_PREFIX,
@@ -6,144 +8,23 @@ import {
   STORE_CONTROLLER_RESPONSE_EVENT,
 } from '../../lib/constants.js';
 
-function createElement(
-  tagName,
-  { id = '', attributes = {}, style = {}, nodeType = 1, rect = { top: 0, left: 0, width: 0, height: 0 } } = {},
-) {
-  const attributeMap = new Map(Object.entries(attributes));
-
-  const element = {
-    id,
-    tagName: tagName.toUpperCase(),
-    nodeType,
-    style: { ...style },
-    parentElement: null,
-    previousElementSibling: null,
-    children: [],
-    getAttribute(name) {
-      return attributeMap.has(name) ? attributeMap.get(name) : null;
-    },
-    attributeNames() {
-      return Array.from(attributeMap.keys());
-    },
-    appendChild(child) {
-      const previousChild = this.children[this.children.length - 1] ?? null;
-      child.parentElement = this;
-      child.previousElementSibling = previousChild;
-      this.children.push(child);
-      return child;
-    },
-    remove() {
-      if (!this.parentElement) {
-        return;
-      }
-
-      const siblings = this.parentElement.children;
-      const index = siblings.indexOf(this);
-
-      if (index !== -1) {
-        siblings.splice(index, 1);
-      }
-
-      this.parentElement = null;
-      this.previousElementSibling = null;
-    },
-    getBoundingClientRect() {
-      return rect;
-    },
-    closest(selector) {
-      let current = this;
-
-      while (current) {
-        const matchesTurboFrame = selector.includes('turbo-frame') && current.tagName === 'TURBO-FRAME';
-        const matchesController = selector.includes('[data-controller]') && current.getAttribute('data-controller');
-        const matchesTarget = selector.includes('[data-') && current.attributeNames().some((name) => (
-          selector.includes(`[${name}]`) && current.getAttribute(name)
-        ));
-
-        if (matchesTurboFrame || matchesController || matchesTarget) {
-          return current;
-        }
-
-        current = current.parentElement;
-      }
-
-      return null;
-    },
-    querySelectorAll(selector) {
-      const descendants = [];
-      const visit = (node) => {
-        for (const child of node.children) {
-          const matchesTarget = selector.includes('[data-') && child.attributeNames().some((name) => (
-            selector.includes(`[${name}]`)
-          ));
-
-          if (
-            selector === 'turbo-frame, [data-controller]'
-            && (child.tagName === 'TURBO-FRAME' || child.getAttribute('data-controller'))
-          ) {
-            descendants.push(child);
-          } else if (matchesTarget) {
-            descendants.push(child);
-          }
-
-          visit(child);
-        }
-      };
-
-      visit(this);
-      return descendants;
-    },
-  };
-
-  return element;
-}
-
-function createDocument(elements) {
-  const body = createElement('body');
-
-  return {
-    body,
-    querySelectorAll(selector) {
-      if (selector !== 'turbo-frame, [data-controller]') {
-        return [];
-      }
-
-      return elements.filter((element) => element.tagName === 'TURBO-FRAME' || element.getAttribute('data-controller'));
-    },
-    getElementById(id) {
-      return elements.find((element) => element.id === id) ?? null;
-    },
-    createElement(tagName) {
-      return createElement(tagName);
-    },
-  };
-}
-
-class TestCustomEvent extends Event {
-  constructor(type, options = {}) {
-    super(type);
-    this.detail = options.detail;
-  }
-}
-
 describe('ContentInspector', () => {
   let cssEscape;
 
   beforeEach(() => {
+    document.body.innerHTML = '';
     cssEscape = (value) => value.replace(/:/g, '\\:');
   });
 
-  it('can use global defaults with CSS escape and element node type', () => {
-    const previousDocument = globalThis.document;
-    const previousCss = globalThis.CSS;
-    const previousNode = globalThis.Node;
-    const frame = createElement('turbo-frame', { id: 'frame:main' });
-    const document = createDocument([frame]);
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-    globalThis.document = document;
+  it('can use global defaults with CSS escape and element node type', () => {
+    const previousCss = globalThis.CSS;
+    document.body.innerHTML = '<turbo-frame id="frame:main"></turbo-frame>';
+
     globalThis.CSS = { escape: (value) => value.replace(/:/g, '\\:') };
-    globalThis.Node = { ELEMENT_NODE: 1 };
 
     try {
       const inspector = new ContentInspector();
@@ -154,17 +35,14 @@ describe('ContentInspector', () => {
         selector: '#frame\\:main',
       });
     } finally {
-      globalThis.document = previousDocument;
       globalThis.CSS = previousCss;
-      globalThis.Node = previousNode;
     }
   });
 
   it('falls back when CSS escape and Node globals are unavailable', () => {
     const previousCss = globalThis.CSS;
     const previousNode = globalThis.Node;
-    const frame = createElement('turbo-frame', { id: 'frame:main' });
-    const document = createDocument([frame]);
+    document.body.innerHTML = '<turbo-frame id="frame:main"></turbo-frame>';
 
     globalThis.CSS = undefined;
     globalThis.Node = undefined;
@@ -184,8 +62,7 @@ describe('ContentInspector', () => {
   });
 
   it('uses real element ids when present during scan', () => {
-    const frame = createElement('turbo-frame', { id: 'main-frame' });
-    const document = createDocument([frame]);
+    document.body.innerHTML = '<turbo-frame id="main-frame"></turbo-frame>';
     const inspector = new ContentInspector({ document, cssEscape });
 
     expect(inspector.scan()).toEqual([
@@ -200,11 +77,7 @@ describe('ContentInspector', () => {
   });
 
   it('includes controllers attached directly to frames during scan', () => {
-    const frame = createElement('turbo-frame', {
-      id: 'main-frame',
-      attributes: { 'data-controller': 'sidebar frame-loader' },
-    });
-    const document = createDocument([frame]);
+    document.body.innerHTML = '<turbo-frame id="main-frame" data-controller="sidebar frame-loader"></turbo-frame>';
     const inspector = new ContentInspector({ document, cssEscape });
 
     expect(inspector.scan()).toEqual([
@@ -219,8 +92,7 @@ describe('ContentInspector', () => {
   });
 
   it('generates stable in-memory keys for elements without ids', () => {
-    const controller = createElement('div', { attributes: { 'data-controller': 'modal' } });
-    const document = createDocument([controller]);
+    document.body.innerHTML = '<div data-controller="modal"></div>';
     const inspector = new ContentInspector({ document, cssEscape });
 
     const firstScan = inspector.scan();
@@ -232,8 +104,8 @@ describe('ContentInspector', () => {
   });
 
   it('stores weak references in the reverse element lookup', () => {
-    const controller = createElement('div', { attributes: { 'data-controller': 'modal' } });
-    const document = createDocument([controller]);
+    document.body.innerHTML = '<div data-controller="modal"></div>';
+    const controller = document.querySelector('[data-controller="modal"]');
     const inspector = new ContentInspector({ document, cssEscape });
     const [{ id }] = inspector.scan();
     const ref = inspector.elementsByKey.get(id);
@@ -243,8 +115,7 @@ describe('ContentInspector', () => {
   });
 
   it('treats stale generated-key weak references as missing elements', () => {
-    const controller = createElement('div', { attributes: { 'data-controller': 'modal' } });
-    const document = createDocument([controller]);
+    document.body.innerHTML = '<div data-controller="modal"></div>';
     const inspector = new ContentInspector({ document, cssEscape });
     const [{ id }] = inspector.scan();
 
@@ -254,8 +125,7 @@ describe('ContentInspector', () => {
   });
 
   it('falls back to document id lookup when a weak reference is stale', () => {
-    const frame = createElement('turbo-frame', { id: 'main-frame' });
-    const document = createDocument([frame]);
+    document.body.innerHTML = '<turbo-frame id="main-frame"></turbo-frame>';
     const inspector = new ContentInspector({ document, cssEscape });
 
     inspector.scan();
@@ -268,10 +138,11 @@ describe('ContentInspector', () => {
   });
 
   it('builds parent-child relationships during scan', () => {
-    const frame = createElement('turbo-frame', { id: 'parent-frame' });
-    const controller = createElement('div', { attributes: { 'data-controller': 'dropdown menu' } });
-    frame.appendChild(controller);
-    const document = createDocument([frame, controller]);
+    document.body.innerHTML = `
+      <turbo-frame id="parent-frame">
+        <div data-controller="dropdown menu"></div>
+      </turbo-frame>
+    `;
     const inspector = new ContentInspector({ document, cssEscape });
 
     const items = inspector.scan();
@@ -291,10 +162,11 @@ describe('ContentInspector', () => {
   });
 
   it('includes target elements found inside controller subtrees during scan', () => {
-    const controller = createElement('section', { id: 'search-controller', attributes: { 'data-controller': 'search' } });
-    const inputTarget = createElement('input', { id: 'query-input', attributes: { 'data-search-target': 'input result' } });
-    const document = createDocument([controller, inputTarget]);
-    controller.appendChild(inputTarget);
+    document.body.innerHTML = `
+      <section id="search-controller" data-controller="search">
+        <input id="query-input" data-search-target="input result">
+      </section>
+    `;
     const inspector = new ContentInspector({ document, cssEscape });
 
     expect(inspector.scan()).toEqual([
@@ -318,16 +190,11 @@ describe('ContentInspector', () => {
   });
 
   it('renders one scan item for elements with multiple controller target attributes', () => {
-    const controller = createElement('div', { id: 'controller', attributes: { 'data-controller': 'search tabs' } });
-    const target = createElement('button', {
-      id: 'shared-target',
-      attributes: {
-        'data-search-target': 'input',
-        'data-tabs-target': 'tab selectedTab',
-      },
-    });
-    const document = createDocument([controller, target]);
-    controller.appendChild(target);
+    document.body.innerHTML = `
+      <div id="controller" data-controller="search tabs">
+        <button id="shared-target" data-search-target="input" data-tabs-target="tab selectedTab"></button>
+      </div>
+    `;
     const inspector = new ContentInspector({ document, cssEscape });
 
     const items = inspector.scan();
@@ -347,12 +214,12 @@ describe('ContentInspector', () => {
   });
 
   it('ignores target attributes with empty values during scan', () => {
-    const controller = createElement('div', { id: 'controller', attributes: { 'data-controller': 'search' } });
-    const emptyTarget = createElement('button', { id: 'empty-target', attributes: { 'data-search-target': '' } });
-    const realTarget = createElement('input', { id: 'real-target', attributes: { 'data-search-target': 'input' } });
-    const document = createDocument([controller, emptyTarget, realTarget]);
-    controller.appendChild(emptyTarget);
-    controller.appendChild(realTarget);
+    document.body.innerHTML = `
+      <div id="controller" data-controller="search">
+        <button id="empty-target" data-search-target=""></button>
+        <input id="real-target" data-search-target="input">
+      </div>
+    `;
     const inspector = new ContentInspector({ document, cssEscape });
 
     expect(inspector.scan()).toEqual([
@@ -373,10 +240,11 @@ describe('ContentInspector', () => {
   });
 
   it('can inspect target-only elements discovered during scan', () => {
-    const controller = createElement('div', { attributes: { 'data-controller': 'modal' } });
-    const target = createElement('button', { id: 'close-button', attributes: { 'data-modal-target': 'closeButton' } });
-    const document = createDocument([controller, target]);
-    controller.appendChild(target);
+    document.body.innerHTML = `
+      <div data-controller="modal">
+        <button id="close-button" data-modal-target="closeButton"></button>
+      </div>
+    `;
     const inspector = new ContentInspector({ document, cssEscape });
 
     inspector.scan();
@@ -388,26 +256,25 @@ describe('ContentInspector', () => {
   });
 
   it('highlights and clears highlight with an overlay while preserving target inline styles', () => {
-    const controller = createElement('div', {
-      attributes: { 'data-controller': 'modal' },
-      style: { outline: '1px dashed red', outlineOffset: '1px' },
-      rect: { top: 10, left: 20, width: 300, height: 40 },
-    });
-    const document = createDocument([controller]);
+    document.body.innerHTML = `
+      <div data-controller="modal" style="outline: 1px dashed red; outline-offset: 1px;"></div>
+    `;
+    const controller = document.querySelector('[data-controller="modal"]');
+    controller.getBoundingClientRect = () => ({ top: 10, left: 20, width: 300, height: 40 });
     const inspector = new ContentInspector({ document, cssEscape });
     const [{ id }] = inspector.scan();
 
     expect(inspector.highlight(id)).toEqual({ success: true });
-    expect(controller.style.outline).toBe('1px dashed red');
+    expect(controller.style.outline).toBe('red dashed 1px');
     expect(controller.style.outlineOffset).toBe('1px');
 
-    const overlay = document.body.children[0];
+    const overlay = document.body.lastElementChild;
     expect(overlay.style).toMatchObject({
       position: 'fixed',
       pointerEvents: 'none',
       zIndex: '2147483647',
       boxSizing: 'border-box',
-      outline: '3px dashed rgb(37, 99, 235)',
+      outline: 'rgb(37, 99, 235) dashed 3px',
       background: 'rgba(37, 99, 235, 0.12)',
       borderRadius: '2px',
       top: '10px',
@@ -417,14 +284,13 @@ describe('ContentInspector', () => {
     });
 
     expect(inspector.clearHighlight()).toEqual({ success: true });
-    expect(document.body.children).toHaveLength(0);
-    expect(controller.style.outline).toBe('1px dashed red');
+    expect(document.body.children).toHaveLength(1);
+    expect(controller.style.outline).toBe('red dashed 1px');
     expect(controller.style.outlineOffset).toBe('1px');
   });
 
   it('returns a selector for inspect using escaped ids when available', () => {
-    const frame = createElement('turbo-frame', { id: 'frame:main' });
-    const document = createDocument([frame]);
+    document.body.innerHTML = '<turbo-frame id="frame:main"></turbo-frame>';
     const inspector = new ContentInspector({ document, cssEscape });
 
     inspector.scan();
@@ -436,7 +302,6 @@ describe('ContentInspector', () => {
   });
 
   it('returns no selector when inspecting a missing element', () => {
-    const document = createDocument([]);
     const inspector = new ContentInspector({ document, cssEscape });
 
     expect(inspector.inspect('missing')).toEqual({
@@ -446,18 +311,12 @@ describe('ContentInspector', () => {
   });
 
   it('builds a structural selector for elements without ids', () => {
-    const html = createElement('html');
-    const body = createElement('body');
-    const wrapper = createElement('div');
-    const firstController = createElement('div', { attributes: { 'data-controller': 'first' } });
-    const secondController = createElement('div', { attributes: { 'data-controller': 'second' } });
-
-    html.appendChild(body);
-    body.appendChild(wrapper);
-    wrapper.appendChild(firstController);
-    wrapper.appendChild(secondController);
-
-    const document = createDocument([firstController, secondController]);
+    document.body.innerHTML = `
+      <div>
+        <div data-controller="first"></div>
+        <div data-controller="second"></div>
+      </div>
+    `;
     const inspector = new ContentInspector({ document, cssEscape });
     const items = inspector.scan();
 
@@ -468,26 +327,18 @@ describe('ContentInspector', () => {
   });
 
   it('does not mutate target DOM attributes while scanning', () => {
-    const observedCalls = [];
-    const controller = createElement('div', { attributes: { 'data-controller': 'modal' } });
-    controller.setAttribute = (...args) => {
-      observedCalls.push(args);
-    };
-    const document = createDocument([controller]);
+    document.body.innerHTML = '<div data-controller="modal"></div>';
+    const controller = document.querySelector('[data-controller="modal"]');
+    const setAttributeSpy = vi.spyOn(controller, 'setAttribute');
     const inspector = new ContentInspector({ document, cssEscape });
 
     inspector.scan();
 
-    expect(observedCalls).toEqual([]);
+    expect(setAttributeSpy).not.toHaveBeenCalled();
   });
 
   it('round-trips controller storage via JSON stringified event details (Firefox compartment)', async () => {
-    const controller = createElement('div', {
-      id: 'modal-controller',
-      attributes: { 'data-controller': 'modal' },
-    });
-    const document = createDocument([controller]);
-    document.defaultView = { CustomEvent: TestCustomEvent };
+    document.body.innerHTML = '<div id="modal-controller" data-controller="modal"></div>';
     const script = new EventTarget();
     const injectScript = () => Promise.resolve({ script });
     const inspector = new ContentInspector({ document, cssEscape, injectScript });
@@ -495,7 +346,7 @@ describe('ContentInspector', () => {
     script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
       const detail = JSON.parse(event.detail);
 
-      script.dispatchEvent(new TestCustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
+      script.dispatchEvent(new CustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
         detail: JSON.stringify({
           requestId: detail.requestId,
           success: true,
@@ -516,7 +367,6 @@ describe('ContentInspector', () => {
   });
 
   it('returns an error when storing a controller for a missing element', async () => {
-    const document = createDocument([]);
     const inspector = new ContentInspector({ document, cssEscape });
 
     await expect(inspector.storeController('missing', 'modal')).resolves.toEqual({
@@ -526,12 +376,7 @@ describe('ContentInspector', () => {
   });
 
   it('stores a controller through the injected page script', async () => {
-    const controller = createElement('div', {
-      id: 'modal-controller',
-      attributes: { 'data-controller': 'modal' },
-    });
-    const document = createDocument([controller]);
-    document.defaultView = { CustomEvent: TestCustomEvent };
+    document.body.innerHTML = '<div id="modal-controller" data-controller="modal"></div>';
     const script = new EventTarget();
     const injectScript = () => Promise.resolve({ script });
     const inspector = new ContentInspector({ document, cssEscape, injectScript });
@@ -539,13 +384,13 @@ describe('ContentInspector', () => {
     script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
       const detail = JSON.parse(event.detail);
 
-      script.dispatchEvent(new TestCustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
+      script.dispatchEvent(new CustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
         detail: JSON.stringify({
           requestId: 'unrelated-request',
           success: false,
         }),
       }));
-      script.dispatchEvent(new TestCustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
+      script.dispatchEvent(new CustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
         detail: JSON.stringify({
           requestId: detail.requestId,
           success: true,
@@ -566,11 +411,7 @@ describe('ContentInspector', () => {
   });
 
   it('returns injected script loader failures as controller storage errors', async () => {
-    const controller = createElement('div', {
-      id: 'modal-controller',
-      attributes: { 'data-controller': 'modal' },
-    });
-    const document = createDocument([controller]);
+    document.body.innerHTML = '<div id="modal-controller" data-controller="modal"></div>';
     const inspector = new ContentInspector({ document, cssEscape });
 
     inspector.scan();
@@ -582,17 +423,12 @@ describe('ContentInspector', () => {
   });
 
   it('uses fallback storage error text and global CustomEvent when needed', async () => {
-    const previousCustomEvent = globalThis.CustomEvent;
-    const controller = createElement('div', {
-      id: 'modal-controller',
-      attributes: { 'data-controller': 'modal' },
-    });
-    const document = createDocument([controller]);
+    document.body.innerHTML = '<div id="modal-controller" data-controller="modal"></div>';
     const script = new EventTarget();
     const injectScript = () => Promise.resolve({ script });
     const inspector = new ContentInspector({ document, cssEscape, injectScript });
 
-    globalThis.CustomEvent = TestCustomEvent;
+    vi.spyOn(document, 'defaultView', 'get').mockReturnValue(null);
     inspector.sendStoreControllerRequest = async () => {
       throw new Error();
     };
@@ -607,7 +443,7 @@ describe('ContentInspector', () => {
     script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
       const detail = JSON.parse(event.detail);
 
-      script.dispatchEvent(new TestCustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
+      script.dispatchEvent(new CustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
         detail: JSON.stringify({
           requestId: detail.requestId,
           success: true,
@@ -619,17 +455,10 @@ describe('ContentInspector', () => {
       requestId: expect.any(String),
       success: true,
     });
-
-    globalThis.CustomEvent = previousCustomEvent;
   });
 
   it('reuses the injected script for subsequent controller storage requests', async () => {
-    const controller = createElement('div', {
-      id: 'modal-controller',
-      attributes: { 'data-controller': 'modal' },
-    });
-    const document = createDocument([controller]);
-    document.defaultView = { CustomEvent: TestCustomEvent };
+    document.body.innerHTML = '<div id="modal-controller" data-controller="modal"></div>';
     const script = new EventTarget();
     let injectionCount = 0;
     const injectScript = () => {
@@ -641,7 +470,7 @@ describe('ContentInspector', () => {
     script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
       const detail = JSON.parse(event.detail);
 
-      script.dispatchEvent(new TestCustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
+      script.dispatchEvent(new CustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
         detail: JSON.stringify({
           requestId: detail.requestId,
           success: true,
