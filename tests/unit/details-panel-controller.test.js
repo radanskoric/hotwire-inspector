@@ -35,7 +35,20 @@ describe("DetailsPanelController", () => {
           </button>
           <button type="button" class="details-panel-close" data-action="click->details-panel#close" aria-label="Close details">×</button>
         </header>
-        <div class="details-panel-body">TODO</div>
+        <div class="details-panel-body">
+          <details class="details-panel-section" open>
+            <summary>Values</summary>
+            <div class="details-panel-section-content">TODO</div>
+          </details>
+          <details class="details-panel-section" open>
+            <summary>Targets</summary>
+            <div class="details-panel-section-content">TODO</div>
+          </details>
+          <details class="details-panel-section" open>
+            <summary>Outlets</summary>
+            <div class="details-panel-section-content">TODO</div>
+          </details>
+        </div>
       </aside>
     `;
     document[PANEL_BRIDGE_PROPERTY] = {

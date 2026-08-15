@@ -410,3 +410,45 @@ main {
   padding: var(--space-block) calc(var(--space-inline) * 2);
   color: var(--color-ink-muted);
 }
+
+.details-panel-section {
+  border-block-end: 1px solid var(--color-border-soft);
+}
+
+.details-panel-section:last-child {
+  border-block-end: 0;
+}
+
+.details-panel-section > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5ch;
+  list-style: none;
+  padding: 0.5rem 0;
+  color: var(--color-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.details-panel-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.details-panel-section > summary::before {
+  content: "";
+  border-block: 0.25rem solid transparent;
+  border-inline-start: 0.375rem solid var(--color-ink-muted);
+  transform-origin: center;
+  transition: transform 200ms ease;
+}
+
+.details-panel-section[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.details-panel-section-content {
+  padding-block-end: 0.75rem;
+  padding-inline-start: calc(0.375rem + 0.5ch);
+  font-size: 0.875rem;
+}

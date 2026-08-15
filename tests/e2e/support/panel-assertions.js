@@ -423,6 +423,48 @@ export function withExpectedDetailsPanelRefresh(
   };
 }
 
+export function withExpectedDetailsPanelSections(
+  nodeId,
+  controllerIdentifier,
+  expectedSections,
+) {
+  return async (panelPage) => {
+    const detailsPanel = panelPage.locator("#details-panel");
+    const badge = panelPage
+      .locator(".node-row")
+      .filter({ hasText: nodeId })
+      .first()
+      .locator(".badge")
+      .filter({ hasText: controllerIdentifier })
+      .first();
+
+    await badge.click();
+    await expect(detailsPanel).toBeVisible();
+
+    const sections = detailsPanel.locator(".details-panel-section");
+    await expect(sections.locator("> summary")).toHaveText(expectedSections);
+
+    for (const section of await sections.all()) {
+      await expect(
+        section.locator(".details-panel-section-content"),
+      ).toHaveText("TODO");
+    }
+
+    // Sections collapse and expand natively via their summary.
+    const firstSection = sections.first();
+    const firstContent = firstSection.locator(".details-panel-section-content");
+    await expect(firstSection).toHaveAttribute("open", "");
+
+    await firstSection.locator("> summary").click();
+    expect(await firstSection.getAttribute("open")).toBeNull();
+    await expect(firstContent).toBeHidden();
+
+    await firstSection.locator("> summary").click();
+    await expect(firstSection).toHaveAttribute("open", "");
+    await expect(firstContent).toBeVisible();
+  };
+}
+
 export function withExpectedDetailsPanelPinnedOnScroll(
   nodeId,
   controllerIdentifier,

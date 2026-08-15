@@ -26,6 +26,7 @@ import {
   withExpectedDeepTree,
   withExpectedDetailsPanelPinnedOnScroll,
   withExpectedDetailsPanelRefresh,
+  withExpectedDetailsPanelSections,
   withExpectedEmptyState,
   withExpectedErrorState,
   withExpectedFrameSrc,
@@ -396,6 +397,25 @@ test.describe("Panel UI", () => {
       page,
       { scanResponse: tallScanResponse },
       withExpectedDetailsPanelPinnedOnScroll("frame-0", "modal"),
+    );
+  });
+
+  test("details panel renders collapsible sections", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      withExpectedDetailsPanelSections("modal-controller", "modal", [
+        "Values",
+        "Targets",
+        "Outlets",
+      ]),
     );
   });
 
