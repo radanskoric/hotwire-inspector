@@ -111,3 +111,24 @@ export const internalIdScanResponse = {
 };
 
 export const emptyScanResponse = { items: [] };
+
+// Enough root nodes to make the tree taller than any test viewport, so the
+// tree area becomes scrollable.
+export const tallScanResponse = {
+  items: Array.from({ length: 80 }, (_, index) => ({
+    id: `frame-${index}`,
+    parentId: null,
+    tagName: "turbo-frame",
+    controllers: index === 0 ? ["modal"] : [],
+  })),
+};
+
+// Same tree as `fixtureScanResponse`, but the modal controller was removed
+// from the element that declared it.
+export const controllerRemovedScanResponse = {
+  items: fixtureScanResponse.items.map((item) =>
+    item.id === "modal-controller"
+      ? { ...item, controllers: ["dropdown"] }
+      : item,
+  ),
+};

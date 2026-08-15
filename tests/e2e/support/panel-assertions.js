@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import {
+  CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
   CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
 } from "../../../lib/constants.js";
@@ -326,12 +327,12 @@ export function withExpectedClickInspects(
   };
 }
 
-export function withExpectedBadgeClickStoresController(
+export function withExpectedBadgeClickOpensDetailsPanel(
   nodeId,
   controllerIdentifier,
-  expectedMessages,
 ) {
   return async (panelPage) => {
+    const detailsPanel = panelPage.locator("#details-panel");
     const nodeRow = panelPage
       .locator(".node-row")
       .filter({ hasText: nodeId })
@@ -341,14 +342,106 @@ export function withExpectedBadgeClickStoresController(
       .filter({ hasText: controllerIdentifier })
       .first();
 
+    await expect(detailsPanel).toBeHidden();
     await clearRecordedMessages(panelPage);
     await badge.click();
 
-    for (const expectedMessage of expectedMessages) {
-      await expect
-        .poll(() => getRecordedMessages(panelPage))
-        .toContainEqual(expectedMessage);
+    await expect(detailsPanel).toBeVisible();
+    await expect(detailsPanel.locator(".details-panel-title")).toHaveText(
+      controllerIdentifier,
+    );
+
+    // Clicking the badge alone only highlights the row (via hover); storing
+    // now happens from the panel link.
+    expect(await getRecordedMessages(panelPage)).toEqual([
+      { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: nodeId },
+    ]);
+
+    await detailsPanel.locator(".details-panel-store").click();
+
+    await expect
+      .poll(() => getRecordedMessages(panelPage))
+      .toContainEqual({
+        type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+        id: nodeId,
+        identifier: controllerIdentifier,
+      });
+
+    await detailsPanel.locator(".details-panel-close").click();
+    await expect(detailsPanel).toBeHidden();
+  };
+}
+
+export function withExpectedDetailsPanelRefresh(
+  nodeId,
+  controllerIdentifier,
+  { expectOpen },
+) {
+  return async (panelPage) => {
+    const detailsPanel = panelPage.locator("#details-panel");
+    const badge = panelPage
+      .locator(".node-row")
+      .filter({ hasText: nodeId })
+      .first()
+      .locator(".badge")
+      .filter({ hasText: controllerIdentifier })
+      .first();
+
+    await badge.click();
+    await expect(detailsPanel).toBeVisible();
+
+    await panelPage.locator("#refresh-button").click();
+    await expect
+      .poll(async () =>
+        (await getRecordedMessages(panelPage)).filter(
+          (message) => message.type === CONTENT_SCAN_MESSAGE_TYPE,
+        ),
+      )
+      .toHaveLength(2);
+
+    if (expectOpen) {
+      await expect(detailsPanel).toBeVisible();
+      await expect(detailsPanel.locator(".details-panel-title")).toHaveText(
+        controllerIdentifier,
+      );
+    } else {
+      await expect(detailsPanel).toBeHidden();
     }
+  };
+}
+
+export function withExpectedDetailsPanelPinnedOnScroll(
+  nodeId,
+  controllerIdentifier,
+) {
+  return async (panelPage) => {
+    const detailsPanel = panelPage.locator("#details-panel");
+    const badge = panelPage
+      .locator(".node-row")
+      .filter({ hasText: nodeId })
+      .first()
+      .locator(".badge")
+      .filter({ hasText: controllerIdentifier })
+      .first();
+
+    await badge.click();
+    await expect(detailsPanel).toBeVisible();
+
+    const beforeScroll = await detailsPanel.boundingBox();
+
+    const treeArea = panelPage.locator("main");
+    await treeArea.evaluate((element) =>
+      element.scrollTo(0, element.scrollHeight),
+    );
+
+    // Sanity check: the tree area actually scrolled.
+    expect(
+      await treeArea.evaluate((element) => element.scrollTop),
+    ).toBeGreaterThan(0);
+
+    const afterScroll = await detailsPanel.boundingBox();
+    expect(afterScroll.y).toBe(beforeScroll.y);
+    await expect(detailsPanel).toBeVisible();
   };
 }
 

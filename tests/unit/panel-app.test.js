@@ -1,7 +1,11 @@
 // @vitest-environment happy-dom
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CONTENT_SCAN_MESSAGE_TYPE, ID_PREFIX } from "../../lib/constants.js";
+import {
+  CONTENT_SCAN_MESSAGE_TYPE,
+  ID_PREFIX,
+  SCAN_REFRESHED_EVENT,
+} from "../../lib/constants.js";
 import { PanelApp } from "../../lib/panel-app.js";
 
 function mountPanelDom() {
@@ -203,7 +207,7 @@ describe("PanelApp", () => {
     expect(badges.children[0].dataset.controller).toBe("panel-node");
     expect(badges.children[0].dataset.panelNodeIdValue).toBe("frame-1");
     expect(badges.children[0].dataset.action).toBe(
-      "click->panel-node#storeController",
+      "click->panel-node#showDetails",
     );
     expect(badges.children[0].dataset.controllerIdentifier).toBe("lazy");
     expect(children.hidden).toBe(false);
@@ -358,6 +362,42 @@ describe("PanelApp", () => {
     );
     expect(emptyStateElement.hidden).toBe(false);
     expect(treeElement.hidden).toBe(true);
+  });
+
+  it("dispatches a scan-refreshed event with the refreshed items", async () => {
+    const items = [{ id: "frame-1", tagName: "turbo-frame", controllers: [] }];
+    const app = createPanelApp({
+      bridge: createBridge(() => Promise.resolve({ items })),
+      buildTree: (scanned) =>
+        scanned.map((item) => ({ ...item, children: [] })),
+    });
+    const events = [];
+    window.addEventListener(
+      SCAN_REFRESHED_EVENT,
+      (event) => events.push(event.detail),
+      { once: true },
+    );
+
+    await app.refreshTree();
+
+    expect(events).toEqual([{ items }]);
+  });
+
+  it("dispatches a scan-refreshed event with no items when refresh fails", async () => {
+    const app = createPanelApp({
+      bridge: createBridge(() => Promise.reject(new Error("boom"))),
+      buildTree: () => [],
+    });
+    const events = [];
+    window.addEventListener(
+      SCAN_REFRESHED_EVENT,
+      (event) => events.push(event.detail),
+      { once: true },
+    );
+
+    await app.refreshTree();
+
+    expect(events).toEqual([{ items: [] }]);
   });
 
   it("start wires the refresh button and triggers an initial refresh", async () => {

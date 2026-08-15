@@ -107,7 +107,7 @@ select {
 }
 
 .app {
-  min-height: 100vh;
+  block-size: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -193,7 +193,16 @@ select {
   background: var(--btn-hover-background, var(--color-accent-hover));
 }
 
+.workspace {
+  position: relative;
+  flex: 1;
+  min-block-size: 0;
+  overflow-x: clip;
+}
+
 main {
+  block-size: 100%;
+  overflow-y: auto;
   padding: 0.75rem;
 }
 
@@ -330,4 +339,79 @@ main {
   width: 0.75rem;
   height: 0.75rem;
   flex-shrink: 0;
+}
+
+.details-panel {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  inline-size: var(--details-panel-width, 18rem);
+  background: var(--details-panel-background, var(--color-surface));
+  border-inline-start: 1px solid var(--color-border);
+  box-shadow: var(
+    --details-panel-shadow,
+    -4px 0 12px oklch(var(--lch-ink) / 10%)
+  );
+  transform: translateX(100%);
+  visibility: hidden;
+  transition:
+    transform 200ms ease-out,
+    visibility 0s linear 200ms;
+}
+
+.details-panel.open {
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform 200ms ease-out;
+}
+
+.details-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-inline);
+  padding: var(--space-block) calc(var(--space-inline) * 2);
+  border-block-end: 1px solid var(--color-border-soft);
+}
+
+.details-panel-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.details-panel-close {
+  border: 0;
+  background: none;
+  padding: 0.25rem 0.5rem;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.details-panel-close:hover {
+  color: var(--color-ink);
+}
+
+.details-panel-body {
+  flex: 1;
+  min-block-size: 0;
+  overflow-y: auto;
+  padding: var(--space-block) calc(var(--space-inline) * 2);
+}
+
+.details-panel-store {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-accent);
+  font-size: 0.875rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.details-panel-store:hover {
+  color: var(--color-accent-hover);
 }

@@ -31,12 +31,45 @@
           <button id="refresh-button" class="btn" type="button">Refresh</button>
         </div>
       </header>
-      <main>
-        <div id="empty-state" class="empty-state" hidden>
-          No turbo frames or Stimulus controllers found.
-        </div>
-        <div id="tree" class="tree" role="tree"></div>
-      </main>
+      <div class="workspace">
+        <main>
+          <div id="empty-state" class="empty-state" hidden>
+            No turbo frames or Stimulus controllers found.
+          </div>
+          <div id="tree" class="tree" role="tree"></div>
+        </main>
+        <aside
+          id="details-panel"
+          class="details-panel"
+          data-controller="details-panel"
+          data-action="hotwire-inspector:show-controller-details@window->details-panel#show hotwire-inspector:scan-refreshed@window->details-panel#refresh keydown.esc@window->details-panel#close"
+          aria-label="Controller details"
+        >
+          <header class="details-panel-header">
+            <h2
+              class="details-panel-title"
+              data-details-panel-target="identifier"
+            ></h2>
+            <button
+              type="button"
+              class="details-panel-close"
+              data-action="click->details-panel#close"
+              aria-label="Close details"
+            >
+              ×
+            </button>
+          </header>
+          <div class="details-panel-body">
+            <button
+              type="button"
+              class="details-panel-store"
+              data-action="click->details-panel#storeInConsole"
+            >
+              Store in console
+            </button>
+          </div>
+        </aside>
+      </div>
     </div>
     <template id="node-template">
       <div class="node expanded" data-controller="node">
@@ -79,7 +112,6 @@
       <div
         class="status-notice"
         data-controller="status"
-        data-action="click->panel-node#storeController"
         role="status"
         aria-live="polite"
       >

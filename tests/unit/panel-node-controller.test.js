@@ -2,6 +2,7 @@
 
 import { Application } from "@hotwired/stimulus";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { DetailsPanelController } from "../../lib/panel/controllers/details-panel-controller.js";
 import { NodeController } from "../../lib/panel/controllers/node-controller.js";
 import { PanelNodeController } from "../../lib/panel/controllers/panel-node-controller.js";
 import { registerPanelControllers } from "../../lib/panel/controllers/index.js";
@@ -10,21 +11,27 @@ import {
   PANEL_BRIDGE_PROPERTY,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
+  SHOW_CONTROLLER_DETAILS_EVENT,
 } from "../../lib/constants.js";
 
 describe("PanelNodeController", () => {
   let application;
   let calls;
   let button;
+  let showDetailsEvents;
+  let recordShowDetailsEvent;
 
   beforeEach(async () => {
     calls = [];
+    showDetailsEvents = [];
+    recordShowDetailsEvent = (event) => {
+      showDetailsEvents.push(event.detail);
+    };
+    window.addEventListener(
+      SHOW_CONTROLLER_DETAILS_EVENT,
+      recordShowDetailsEvent,
+    );
     document.body.innerHTML = `
-      <template id="notice-template">
-        <div class="status-notice" data-controller="status" role="status" aria-live="polite">
-          <span slot="text"></span>
-        </div>
-      </template>
       <button
         data-controller="panel-node"
         data-panel-node-id-value="frame-1"
@@ -54,6 +61,10 @@ describe("PanelNodeController", () => {
 
   afterEach(() => {
     application.stop();
+    window.removeEventListener(
+      SHOW_CONTROLLER_DETAILS_EVENT,
+      recordShowDetailsEvent,
+    );
     document.body.innerHTML = "";
     delete document[PANEL_BRIDGE_PROPERTY];
   });
@@ -87,83 +98,19 @@ describe("PanelNodeController", () => {
     expect(calls).toEqual([["inspectNode", "ctrl-1"]]);
   });
 
-  it("stores a controller from a badge click without inspecting the row", async () => {
+  it("opens the details panel from a badge click without inspecting the row or storing the controller", async () => {
     button.innerHTML =
-      '<span class="badge" data-controller-identifier="modal" data-action="click->panel-node#storeController">modal</span>';
+      '<span class="badge" data-controller-identifier="modal" data-action="click->panel-node#showDetails">modal</span>';
     const badge = button.querySelector(".badge");
     await Promise.resolve();
 
     badge.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await Promise.resolve();
 
-    expect(calls).toEqual([["storeControllerNode", "frame-1", "modal"]]);
-  });
-
-  it("shows success feedback in status element on successful controller storage", async () => {
-    button.innerHTML =
-      '<span class="badge" data-controller-identifier="modal" data-action="click->panel-node#storeController">modal</span>';
-    const badge = button.querySelector(".badge");
-    await Promise.resolve();
-
-    badge.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await Promise.resolve();
-
-    const statusElement = document.querySelector(".status-notice");
-    expect(statusElement).not.toBeNull();
-    expect(statusElement.textContent).toContain(
-      "modal controller instance stored as temp1",
-    );
-    expect(statusElement.hidden).toBe(false);
-  });
-
-  it("returns storage result without rendering feedback when notice template is unavailable", async () => {
-    document.getElementById("notice-template").remove();
-    button.innerHTML =
-      '<span class="badge" data-controller-identifier="modal" data-action="click->panel-node#storeController">modal</span>';
-    const badge = button.querySelector(".badge");
-    await Promise.resolve();
-
-    badge.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await Promise.resolve();
-
-    expect(document.querySelector(".status-notice")).toBeNull();
-    expect(calls).toEqual([["storeControllerNode", "frame-1", "modal"]]);
-  });
-
-  it("shows error feedback in status element on failed controller storage", async () => {
-    document[PANEL_BRIDGE_PROPERTY].storeControllerNode = (id, identifier) => {
-      calls.push(["storeControllerNode", id, identifier]);
-      return Promise.resolve({ success: false, error: "Controller not found" });
-    };
-    button.innerHTML =
-      '<span class="badge" data-controller-identifier="modal" data-action="click->panel-node#storeController">modal</span>';
-    const badge = button.querySelector(".badge");
-    await Promise.resolve();
-
-    badge.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await Promise.resolve();
-
-    const statusElement = document.querySelector(".status-notice");
-    expect(statusElement).not.toBeNull();
-    expect(statusElement.textContent).toContain("Controller not found");
-  });
-
-  it("shows generic error message when storage fails without specific error", async () => {
-    document[PANEL_BRIDGE_PROPERTY].storeControllerNode = (id, identifier) => {
-      calls.push(["storeControllerNode", id, identifier]);
-      return Promise.resolve({ success: false });
-    };
-    button.innerHTML =
-      '<span class="badge" data-controller-identifier="modal" data-action="click->panel-node#storeController">modal</span>';
-    const badge = button.querySelector(".badge");
-    await Promise.resolve();
-
-    badge.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await Promise.resolve();
-
-    const statusElement = document.querySelector(".status-notice");
-    expect(statusElement).not.toBeNull();
-    expect(statusElement.textContent).toContain("Controller storage failed");
+    expect(showDetailsEvents).toEqual([
+      { nodeId: "frame-1", identifier: "modal" },
+    ]);
+    expect(calls).toEqual([]);
   });
 });
 
@@ -181,6 +128,10 @@ describe("registerPanelControllers", () => {
     registerPanelControllers(application, panelBridge, document);
 
     expect(document[PANEL_BRIDGE_PROPERTY]).toBe(panelBridge);
+    expect(registrations).toContainEqual([
+      "details-panel",
+      DetailsPanelController,
+    ]);
     expect(registrations).toContainEqual(["node", NodeController]);
     expect(registrations).toContainEqual(["panel-node", PanelNodeController]);
     expect(registrations).toContainEqual(["theme", ThemeController]);

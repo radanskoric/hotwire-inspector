@@ -5,24 +5,27 @@ import {
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
-  CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
   ID_PREFIX,
 } from "../../lib/constants.js";
 import {
+  controllerRemovedScanResponse,
   deepScanResponse,
   emptyScanResponse,
   fixtureScanResponse,
   internalIdScanResponse,
+  tallScanResponse,
 } from "./support/panel-fixtures.js";
 import {
   expectDoubleClickTogglesNodeChildren,
   expectRefreshRescans,
   expectThemeChanges,
   expectThemeSwitcher,
-  withExpectedBadgeClickStoresController,
+  withExpectedBadgeClickOpensDetailsPanel,
   withExpectedClickInspects,
   withExpectedControllerBadges,
   withExpectedDeepTree,
+  withExpectedDetailsPanelPinnedOnScroll,
+  withExpectedDetailsPanelRefresh,
   withExpectedEmptyState,
   withExpectedErrorState,
   withExpectedFrameSrc,
@@ -332,7 +335,7 @@ test.describe("Panel UI", () => {
     );
   });
 
-  test("clicking a controller badge stores the page controller as a temp variable", async ({
+  test("clicking a controller badge opens the details panel", async ({
     browserName,
     page,
   }) => {
@@ -343,14 +346,56 @@ test.describe("Panel UI", () => {
       adapter,
       page,
       { scanResponse: fixtureScanResponse },
-      withExpectedBadgeClickStoresController("modal-controller", "modal", [
-        { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: "modal-controller" },
-        {
-          type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
-          id: "modal-controller",
-          identifier: "modal",
-        },
-      ]),
+      withExpectedBadgeClickOpensDetailsPanel("modal-controller", "modal"),
+    );
+  });
+
+  test("details panel stays open across refresh while the controller exists", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      withExpectedDetailsPanelRefresh("modal-controller", "modal", {
+        expectOpen: true,
+      }),
+    );
+  });
+
+  test("details panel closes on refresh when the controller is gone", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponses: [fixtureScanResponse, controllerRemovedScanResponse] },
+      withExpectedDetailsPanelRefresh("modal-controller", "modal", {
+        expectOpen: false,
+      }),
+    );
+  });
+
+  test("details panel stays pinned when the tree view scrolls", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: tallScanResponse },
+      withExpectedDetailsPanelPinnedOnScroll("frame-0", "modal"),
     );
   });
 
