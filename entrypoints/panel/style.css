@@ -371,7 +371,6 @@ main {
 .details-panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-inline);
   padding: var(--space-block) calc(var(--space-inline) * 2);
   border-block-end: 1px solid var(--color-border-soft);
@@ -383,15 +382,24 @@ main {
   font-weight: 600;
 }
 
-.details-panel-close {
+.details-panel-close,
+.details-panel-store {
+  display: inline-flex;
+  align-items: center;
   border: 0;
   background: none;
-  padding: 0.25rem 0.5rem;
+  padding: 0.25rem;
   color: var(--color-ink-muted);
   cursor: pointer;
 }
 
-.details-panel-close:hover {
+.details-panel-close {
+  margin-inline-start: auto;
+  padding: 0.25rem 0.5rem;
+}
+
+.details-panel-close:hover,
+.details-panel-store:hover {
   color: var(--color-ink);
 }
 
@@ -400,18 +408,5 @@ main {
   min-block-size: 0;
   overflow-y: auto;
   padding: var(--space-block) calc(var(--space-inline) * 2);
-}
-
-.details-panel-store {
-  border: 0;
-  background: none;
-  padding: 0;
-  color: var(--color-accent);
-  font-size: 0.875rem;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.details-panel-store:hover {
-  color: var(--color-accent-hover);
+  color: var(--color-ink-muted);
 }

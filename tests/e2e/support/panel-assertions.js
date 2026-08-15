@@ -351,6 +351,19 @@ export function withExpectedBadgeClickOpensDetailsPanel(
       controllerIdentifier,
     );
 
+    const storeButton = detailsPanel.locator(
+      ".details-panel-title + .details-panel-store",
+    );
+    await expect(storeButton).toBeVisible();
+    await expect(storeButton).toHaveAttribute(
+      "title",
+      "Store as global variable",
+    );
+    await expect(storeButton.locator(".icon")).toHaveAttribute(
+      "src",
+      "/icons/command-line.svg",
+    );
+
     // Clicking the badge alone only highlights the row (via hover); storing
     // now happens from the panel link.
     expect(await getRecordedMessages(panelPage)).toEqual([

@@ -28,9 +28,14 @@ describe("DetailsPanelController", () => {
         data-action="${SHOW_CONTROLLER_DETAILS_EVENT}@window->details-panel#show ${SCAN_REFRESHED_EVENT}@window->details-panel#refresh keydown.esc@window->details-panel#close"
         aria-label="Controller details"
       >
-        <h2 data-details-panel-target="identifier"></h2>
-        <button type="button" class="details-panel-close" data-action="click->details-panel#close">Close</button>
-        <button type="button" class="details-panel-store" data-action="click->details-panel#storeInConsole">Store in console</button>
+        <header class="details-panel-header">
+          <h2 class="details-panel-title" data-details-panel-target="identifier"></h2>
+          <button type="button" class="details-panel-store" data-action="click->details-panel#storeInConsole" title="Store as global variable" aria-label="Store as global variable">
+            <img src="/icons/command-line.svg" class="icon" alt="" aria-hidden="true" />
+          </button>
+          <button type="button" class="details-panel-close" data-action="click->details-panel#close" aria-label="Close details">×</button>
+        </header>
+        <div class="details-panel-body">TODO</div>
       </aside>
     `;
     document[PANEL_BRIDGE_PROPERTY] = {
