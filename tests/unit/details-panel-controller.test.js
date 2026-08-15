@@ -25,7 +25,7 @@ describe("DetailsPanelController", () => {
       <aside
         id="details-panel"
         data-controller="details-panel"
-        data-action="${SHOW_CONTROLLER_DETAILS_EVENT}@window->details-panel#show ${SCAN_REFRESHED_EVENT}@window->details-panel#refresh keydown.esc@window->details-panel#close"
+        data-action="${SHOW_CONTROLLER_DETAILS_EVENT}@document->details-panel#show ${SCAN_REFRESHED_EVENT}@document->details-panel#refresh keydown.esc@window->details-panel#close"
         aria-label="Controller details"
       >
         <header class="details-panel-header">
@@ -52,14 +52,6 @@ describe("DetailsPanelController", () => {
       </aside>
     `;
     document[PANEL_BRIDGE_PROPERTY] = {
-      sendToInspectedTab(message) {
-        calls.push(["sendToInspectedTab", message]);
-        return Promise.resolve("sent");
-      },
-      inspectNode(id) {
-        calls.push(["inspectNode", id]);
-        return Promise.resolve("inspected");
-      },
       storeControllerNode(id, identifier) {
         calls.push(["storeControllerNode", id, identifier]);
         return Promise.resolve({ success: true, name: "temp1", identifier });
@@ -79,13 +71,13 @@ describe("DetailsPanelController", () => {
   });
 
   function showDetails(detail = { nodeId: "frame-1", identifier: "modal" }) {
-    window.dispatchEvent(
+    document.dispatchEvent(
       new CustomEvent(SHOW_CONTROLLER_DETAILS_EVENT, { detail }),
     );
   }
 
   function scanRefreshed(items) {
-    window.dispatchEvent(
+    document.dispatchEvent(
       new CustomEvent(SCAN_REFRESHED_EVENT, { detail: { items } }),
     );
   }

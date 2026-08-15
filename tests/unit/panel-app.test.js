@@ -372,7 +372,7 @@ describe("PanelApp", () => {
         scanned.map((item) => ({ ...item, children: [] })),
     });
     const events = [];
-    window.addEventListener(
+    document.addEventListener(
       SCAN_REFRESHED_EVENT,
       (event) => events.push(event.detail),
       { once: true },
@@ -389,7 +389,7 @@ describe("PanelApp", () => {
       buildTree: () => [],
     });
     const events = [];
-    window.addEventListener(
+    document.addEventListener(
       SCAN_REFRESHED_EVENT,
       (event) => events.push(event.detail),
       { once: true },

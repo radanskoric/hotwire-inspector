@@ -27,7 +27,7 @@ describe("PanelNodeController", () => {
     recordShowDetailsEvent = (event) => {
       showDetailsEvents.push(event.detail);
     };
-    window.addEventListener(
+    document.addEventListener(
       SHOW_CONTROLLER_DETAILS_EVENT,
       recordShowDetailsEvent,
     );
@@ -61,7 +61,7 @@ describe("PanelNodeController", () => {
 
   afterEach(() => {
     application.stop();
-    window.removeEventListener(
+    document.removeEventListener(
       SHOW_CONTROLLER_DETAILS_EVENT,
       recordShowDetailsEvent,
     );

@@ -395,7 +395,6 @@ main {
 
 .details-panel-close {
   margin-inline-start: auto;
-  padding: 0.25rem 0.5rem;
 }
 
 .details-panel-close:hover,
@@ -423,16 +422,11 @@ main {
   display: flex;
   align-items: center;
   gap: 0.5ch;
-  list-style: none;
   padding: 0.5rem 0;
   color: var(--color-ink);
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
-}
-
-.details-panel-section > summary::-webkit-details-marker {
-  display: none;
 }
 
 .details-panel-section > summary::before {

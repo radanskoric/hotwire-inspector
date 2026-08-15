@@ -327,26 +327,33 @@ export function withExpectedClickInspects(
   };
 }
 
+async function openDetailsPanel(panelPage, nodeId, controllerIdentifier) {
+  const detailsPanel = panelPage.locator("#details-panel");
+  const badge = panelPage
+    .locator(".node-row")
+    .filter({ hasText: nodeId })
+    .first()
+    .locator(".badge")
+    .filter({ hasText: controllerIdentifier })
+    .first();
+
+  await badge.click();
+  await expect(detailsPanel).toBeVisible();
+
+  return detailsPanel;
+}
+
 export function withExpectedBadgeClickOpensDetailsPanel(
   nodeId,
   controllerIdentifier,
 ) {
   return async (panelPage) => {
     const detailsPanel = panelPage.locator("#details-panel");
-    const nodeRow = panelPage
-      .locator(".node-row")
-      .filter({ hasText: nodeId })
-      .first();
-    const badge = nodeRow
-      .locator(".badge")
-      .filter({ hasText: controllerIdentifier })
-      .first();
 
     await expect(detailsPanel).toBeHidden();
     await clearRecordedMessages(panelPage);
-    await badge.click();
+    await openDetailsPanel(panelPage, nodeId, controllerIdentifier);
 
-    await expect(detailsPanel).toBeVisible();
     await expect(detailsPanel.locator(".details-panel-title")).toHaveText(
       controllerIdentifier,
     );
@@ -391,17 +398,11 @@ export function withExpectedDetailsPanelRefresh(
   { expectOpen },
 ) {
   return async (panelPage) => {
-    const detailsPanel = panelPage.locator("#details-panel");
-    const badge = panelPage
-      .locator(".node-row")
-      .filter({ hasText: nodeId })
-      .first()
-      .locator(".badge")
-      .filter({ hasText: controllerIdentifier })
-      .first();
-
-    await badge.click();
-    await expect(detailsPanel).toBeVisible();
+    const detailsPanel = await openDetailsPanel(
+      panelPage,
+      nodeId,
+      controllerIdentifier,
+    );
 
     await panelPage.locator("#refresh-button").click();
     await expect
@@ -429,17 +430,11 @@ export function withExpectedDetailsPanelSections(
   expectedSections,
 ) {
   return async (panelPage) => {
-    const detailsPanel = panelPage.locator("#details-panel");
-    const badge = panelPage
-      .locator(".node-row")
-      .filter({ hasText: nodeId })
-      .first()
-      .locator(".badge")
-      .filter({ hasText: controllerIdentifier })
-      .first();
-
-    await badge.click();
-    await expect(detailsPanel).toBeVisible();
+    const detailsPanel = await openDetailsPanel(
+      panelPage,
+      nodeId,
+      controllerIdentifier,
+    );
 
     const sections = detailsPanel.locator(".details-panel-section");
     await expect(sections.locator("> summary")).toHaveText(expectedSections);
@@ -470,17 +465,11 @@ export function withExpectedDetailsPanelPinnedOnScroll(
   controllerIdentifier,
 ) {
   return async (panelPage) => {
-    const detailsPanel = panelPage.locator("#details-panel");
-    const badge = panelPage
-      .locator(".node-row")
-      .filter({ hasText: nodeId })
-      .first()
-      .locator(".badge")
-      .filter({ hasText: controllerIdentifier })
-      .first();
-
-    await badge.click();
-    await expect(detailsPanel).toBeVisible();
+    const detailsPanel = await openDetailsPanel(
+      panelPage,
+      nodeId,
+      controllerIdentifier,
+    );
 
     const beforeScroll = await detailsPanel.boundingBox();
 
