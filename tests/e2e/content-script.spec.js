@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import {
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
+  CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
@@ -196,6 +197,72 @@ test.describe("Content Script", () => {
           page.evaluate(() => window.temp1 === window.modalController),
         )
         .toBe(true);
+    });
+  });
+
+  test("reports Stimulus controller values", async ({ browserName }) => {
+    test.skip(browserName !== "chromium");
+
+    await withFixturePage(async ({ context }) => {
+      const frame = await getExtensionDevtoolsFrame(context);
+      const scanResult = await sendToContentScript(frame, {
+        type: CONTENT_SCAN_MESSAGE_TYPE,
+      });
+      const modalController = scanResult.items.find((item) =>
+        item.controllers?.includes("modal"),
+      );
+      const result = await sendToContentScript(frame, {
+        type: CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
+        id: modalController.id,
+        identifier: "modal",
+      });
+
+      expect(result).toEqual({
+        success: true,
+        values: [
+          {
+            name: "title",
+            type: "string",
+            value: "Greeting",
+            defaultValue: "",
+            hasValue: true,
+          },
+          {
+            name: "count",
+            type: "number",
+            value: "42",
+            defaultValue: 0,
+            hasValue: true,
+          },
+          {
+            name: "enabled",
+            type: "boolean",
+            value: null,
+            defaultValue: false,
+            hasValue: false,
+          },
+        ],
+      });
+    });
+  });
+
+  test("reports an error when reading values for an unknown element", async ({
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium");
+
+    await withFixturePage(async ({ context }) => {
+      const frame = await getExtensionDevtoolsFrame(context);
+      const result = await sendToContentScript(frame, {
+        type: CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
+        id: "missing",
+        identifier: "modal",
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: "Element not found",
+      });
     });
   });
 

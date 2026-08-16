@@ -27,6 +27,8 @@ import {
   withExpectedDetailsPanelPinnedOnScroll,
   withExpectedDetailsPanelRefresh,
   withExpectedDetailsPanelSections,
+  withExpectedDetailsPanelValues,
+  withExpectedDetailsPanelValuesNote,
   withExpectedEmptyState,
   withExpectedErrorState,
   withExpectedFrameSrc,
@@ -416,6 +418,65 @@ test.describe("Panel UI", () => {
         "Targets",
         "Outlets",
       ]),
+    );
+  });
+
+  test("details panel shows the controller's Stimulus values", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      withExpectedDetailsPanelValues("modal-controller", "modal"),
+    );
+  });
+
+  test("details panel shows a note when the controller declares no values", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      {
+        scanResponse: fixtureScanResponse,
+        valuesResponse: { success: true, values: [] },
+      },
+      withExpectedDetailsPanelValuesNote(
+        "modal-controller",
+        "modal",
+        "No values declared.",
+      ),
+    );
+  });
+
+  test("details panel shows an error when values cannot be read", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      {
+        scanResponse: fixtureScanResponse,
+        valuesResponse: { success: false, error: "Controller not found" },
+      },
+      withExpectedDetailsPanelValuesNote(
+        "modal-controller",
+        "modal",
+        "Controller not found",
+      ),
     );
   });
 

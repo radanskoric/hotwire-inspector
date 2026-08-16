@@ -1,7 +1,10 @@
 import {
+  CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
+  CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT,
   STORE_CONTROLLER_REQUEST_EVENT,
   STORE_CONTROLLER_RESPONSE_EVENT,
 } from "../lib/constants.js";
+import { extractControllerValueDefinitions } from "../lib/controller-values.js";
 
 /**
  * The inspected page's window. Hotwire apps may expose their Stimulus
@@ -19,32 +22,48 @@ export default defineUnlistedScript(() => {
     return;
   }
 
-  script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
+  onRequest(
+    script,
+    STORE_CONTROLLER_REQUEST_EVENT,
+    STORE_CONTROLLER_RESPONSE_EVENT,
+    storeController,
+  );
+  onRequest(
+    script,
+    CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
+    CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT,
+    getValueDefinitions,
+  );
+});
+
+/**
+ * Wires a request/response CustomEvent pair on the injected script element:
+ * parses the request detail, runs the handler, and answers with the result
+ * correlated by requestId.
+ *
+ * @param {Element} script - the injected script element
+ * @param {string} requestEvent
+ * @param {string} responseEvent
+ * @param {(selector: string, identifier: string) => object} handler
+ */
+function onRequest(script, requestEvent, responseEvent, handler) {
+  script.addEventListener(requestEvent, (event) => {
     const customEvent = /** @type {CustomEvent} */ (event);
     const detail =
-      /** @type {import("../lib/types.js").StoreControllerRequestDetail} */ (
+      /** @type {{ selector: string, identifier: string, requestId: string }} */ (
         typeof customEvent.detail === "string"
           ? JSON.parse(customEvent.detail)
           : customEvent.detail
       );
     const { selector, identifier, requestId } = detail ?? {};
-    const response = storeController(
-      /** @type {string} */ (selector),
-      /** @type {string} */ (identifier),
-    );
 
     script.dispatchEvent(
-      new CustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
-        detail: JSON.stringify(
-          /** @type {import("../lib/types.js").StoreControllerResponseDetail} */ ({
-            requestId,
-            ...response,
-          }),
-        ),
+      new CustomEvent(responseEvent, {
+        detail: JSON.stringify({ requestId, ...handler(selector, identifier) }),
       }),
     );
   });
-});
+}
 
 /**
  * @param {any} candidate - potential Stimulus application global
@@ -73,11 +92,14 @@ function detectApplication() {
 }
 
 /**
+ * Finds the Stimulus controller instance for the given selector and
+ * identifier, or answers with an error response.
+ *
  * @param {string} selector
  * @param {string} identifier
- * @returns {import("../lib/types.js").StoreControllerResponse}
+ * @returns {{ controller: any } | { success: false, error: string }}
  */
-function storeController(selector, identifier) {
+function findController(selector, identifier) {
   const element = document.querySelector(selector);
 
   if (!element) {
@@ -98,16 +120,49 @@ function storeController(selector, identifier) {
     return { success: false, error: "Controller not found" };
   }
 
+  return { controller };
+}
+
+/**
+ * @param {string} selector
+ * @param {string} identifier
+ * @returns {import("../lib/types.js").StoreControllerResponse}
+ */
+function storeController(selector, identifier) {
+  const result = findController(selector, identifier);
+
+  if ("success" in result) {
+    return result;
+  }
+
   for (let index = 1; ; index += 1) {
     const name = `temp${index}`;
 
     if (!(name in window)) {
-      /** @type {PageWindow} */ (window)[name] = controller;
+      /** @type {PageWindow} */ (window)[name] = result.controller;
       console.info(
         "Hotwire Inspector: " + identifier + " controller stored as " + name,
-        controller,
+        result.controller,
       );
       return { success: true, name, identifier };
     }
   }
+}
+
+/**
+ * @param {string} selector
+ * @param {string} identifier
+ * @returns {import("../lib/types.js").ControllerValueDefinitionsResponse}
+ */
+function getValueDefinitions(selector, identifier) {
+  const result = findController(selector, identifier);
+
+  if ("success" in result) {
+    return result;
+  }
+
+  return {
+    success: true,
+    definitions: extractControllerValueDefinitions(result.controller),
+  };
 }

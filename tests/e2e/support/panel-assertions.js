@@ -1,13 +1,21 @@
 import { expect } from "@playwright/test";
 import {
+  CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
   CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
 } from "../../../lib/constants.js";
+import { fixtureValuesResponse } from "./panel-fixtures.js";
 
 export async function addMockPanelApis(
   page,
-  { scanResponse, scanError, scanResponses, persistedTheme } = {},
+  {
+    scanResponse,
+    scanError,
+    scanResponses,
+    persistedTheme,
+    valuesResponse,
+  } = {},
 ) {
   await page.addInitScript(
     ({
@@ -15,8 +23,10 @@ export async function addMockPanelApis(
       scanError,
       scanResponses,
       persistedTheme,
+      valuesResponse,
       scanMessageType,
       storeControllerMessageType,
+      controllerValuesMessageType,
     }) => {
       globalThis.browser ??= {};
       globalThis.browser.runtime ??= {};
@@ -69,6 +79,10 @@ export async function addMockPanelApis(
           });
         }
 
+        if (message.type === controllerValuesMessageType) {
+          return Promise.resolve(valuesResponse);
+        }
+
         return Promise.resolve({ success: true, selector: "#mock" });
       };
       globalThis.chrome = globalThis.browser;
@@ -78,8 +92,10 @@ export async function addMockPanelApis(
       scanError,
       scanResponses,
       persistedTheme,
+      valuesResponse: valuesResponse ?? fixtureValuesResponse,
       scanMessageType: CONTENT_SCAN_MESSAGE_TYPE,
       storeControllerMessageType: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+      controllerValuesMessageType: CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
     },
   );
 }
@@ -371,10 +387,16 @@ export function withExpectedBadgeClickOpensDetailsPanel(
       "/icons/command-line.svg",
     );
 
-    // Clicking the badge alone only highlights the row (via hover); storing
-    // now happens from the panel link.
+    // Clicking the badge highlights the row (via hover) and opening the
+    // panel fetches the controller's values; storing happens from the panel
+    // button.
     expect(await getRecordedMessages(panelPage)).toEqual([
       { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: nodeId },
+      {
+        type: CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
+        id: nodeId,
+        identifier: controllerIdentifier,
+      },
     ]);
 
     await detailsPanel.locator(".details-panel-store").click();
@@ -439,7 +461,20 @@ export function withExpectedDetailsPanelSections(
     const sections = detailsPanel.locator(".details-panel-section");
     await expect(sections.locator("> summary")).toHaveText(expectedSections);
 
+    // The Values section renders the controller's Stimulus values (default
+    // mock response); Targets and Outlets are still placeholders.
+    const valuesContent = sections
+      .first()
+      .locator(".details-panel-section-content");
+    await expect(valuesContent.locator(".value-row")).toHaveCount(3);
+
     for (const section of await sections.all()) {
+      const summary = await section.locator("> summary").textContent();
+
+      if (summary === "Values") {
+        continue;
+      }
+
       await expect(
         section.locator(".details-panel-section-content"),
       ).toHaveText("TODO");
@@ -457,6 +492,61 @@ export function withExpectedDetailsPanelSections(
     await firstSection.locator("> summary").click();
     await expect(firstSection).toHaveAttribute("open", "");
     await expect(firstContent).toBeVisible();
+  };
+}
+
+export function withExpectedDetailsPanelValues(nodeId, controllerIdentifier) {
+  return async (panelPage) => {
+    const detailsPanel = await openDetailsPanel(
+      panelPage,
+      nodeId,
+      controllerIdentifier,
+    );
+    const valuesContent = detailsPanel
+      .locator(".details-panel-section-content")
+      .first();
+    const rows = valuesContent.locator(".value-row");
+
+    await expect(rows).toHaveCount(3);
+    await expect(rows.nth(0).locator(".value-name")).toHaveText("title");
+    await expect(rows.nth(0).locator(".value-type")).toHaveText("string");
+    await expect(rows.nth(0).locator(".value-data")).toHaveText("Hello");
+    await expect(rows.nth(0)).not.toHaveClass(/value-row-unset/);
+    await expect(rows.nth(1).locator(".value-name")).toHaveText("count");
+    await expect(rows.nth(1).locator(".value-data")).toHaveText("42");
+
+    // Declared values without a backing attribute are marked as unset.
+    await expect(rows.nth(2).locator(".value-name")).toHaveText("enabled");
+    await expect(rows.nth(2).locator(".value-type")).toHaveText("boolean");
+    await expect(rows.nth(2).locator(".value-data")).toHaveText("false");
+    await expect(rows.nth(2)).toHaveClass(/value-row-unset/);
+
+    const messages = await getRecordedMessages(panelPage);
+    expect(messages).toContainEqual({
+      type: CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
+      id: nodeId,
+      identifier: controllerIdentifier,
+    });
+  };
+}
+
+export function withExpectedDetailsPanelValuesNote(
+  nodeId,
+  controllerIdentifier,
+  expectedNote,
+) {
+  return async (panelPage) => {
+    const detailsPanel = await openDetailsPanel(
+      panelPage,
+      nodeId,
+      controllerIdentifier,
+    );
+    const valuesContent = detailsPanel
+      .locator(".details-panel-section-content")
+      .first();
+
+    await expect(valuesContent).toHaveText(expectedNote);
+    await expect(valuesContent.locator(".value-row")).toHaveCount(0);
   };
 }
 

@@ -32,6 +32,8 @@ Core tooling currently includes:
   - DevTools panel UI and interaction logic
 - `lib/tree-builder.js`
   - pure tree-building logic used by the panel
+- `lib/controller-values.js`
+  - pure Stimulus value logic; used by the injected page script (definition extraction), the content script (attribute resolution), and the panel (formatting)
 - `lib/types.js`
   - shared JSDoc typedefs for the panel ↔ background ↔ content script ↔ inspected page messaging shapes (no runtime exports)
 - `tests/unit/`

@@ -348,7 +348,7 @@ main {
   z-index: 900;
   display: flex;
   flex-direction: column;
-  inline-size: var(--details-panel-width, 18rem);
+  inline-size: var(--details-panel-width, 24rem);
   background: var(--details-panel-background, var(--color-surface));
   border-inline-start: 1px solid var(--color-border);
   box-shadow: var(
@@ -445,4 +445,35 @@ main {
   padding-block-end: 0.75rem;
   padding-inline-start: calc(0.375rem + 0.5ch);
   font-size: 0.875rem;
+}
+
+.values-note {
+  font-style: italic;
+}
+
+.value-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-inline);
+  padding-block: 0.125rem;
+}
+
+.value-row-unset {
+  opacity: 0.6;
+}
+
+.value-name {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+.value-type {
+  color: var(--color-ink-muted);
+  font-size: 0.75rem;
+}
+
+.value-data {
+  font-family:
+    ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
   RELAY_ERROR_TYPE,
@@ -170,6 +171,53 @@ describe("PanelBridge", () => {
       success: true,
       name: "temp3",
       identifier: "modal",
+    });
+  });
+
+  it("controllerValues sends CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE to the content script", async () => {
+    const sentMessages = [];
+    const browserApi = createBrowserApi((message) => {
+      sentMessages.push(message);
+      return Promise.resolve({
+        success: true,
+        values: [
+          {
+            name: "title",
+            type: "string",
+            value: "Hello",
+            defaultValue: "",
+            hasValue: true,
+          },
+        ],
+      });
+    });
+    const bridge = new PanelBridge({ browserApi });
+
+    const response = await bridge.controllerValues("modal-controller", "modal");
+
+    expect(sentMessages).toEqual([
+      {
+        type: RELAY_MESSAGE_TYPE,
+        tabId: 42,
+        message: {
+          type: CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
+          id: "modal-controller",
+          identifier: "modal",
+        },
+      },
+    ]);
+    expect(browserApi.evalCalls).toEqual([]);
+    expect(response).toEqual({
+      success: true,
+      values: [
+        {
+          name: "title",
+          type: "string",
+          value: "Hello",
+          defaultValue: "",
+          hasValue: true,
+        },
+      ],
     });
   });
 });

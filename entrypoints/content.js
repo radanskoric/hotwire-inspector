@@ -2,6 +2,7 @@ import { browser } from "wxt/browser";
 import { injectScript } from "wxt/utils/inject-script";
 import {
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
+  CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
@@ -42,6 +43,13 @@ export default defineContentScript({
       if (message.type === CONTENT_STORE_CONTROLLER_MESSAGE_TYPE) {
         inspector
           .storeController(message.id, message.identifier)
+          .then(sendResponse);
+        return true;
+      }
+
+      if (message.type === CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE) {
+        inspector
+          .controllerValues(message.id, message.identifier)
           .then(sendResponse);
         return true;
       }

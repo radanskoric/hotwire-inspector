@@ -112,6 +112,35 @@ export const internalIdScanResponse = {
 
 export const emptyScanResponse = { items: [] };
 
+// Default answer for controller-values messages in panel tests: two set
+// values and one declared value without a backing attribute.
+export const fixtureValuesResponse = {
+  success: true,
+  values: [
+    {
+      name: "title",
+      type: "string",
+      value: "Hello",
+      defaultValue: "",
+      hasValue: true,
+    },
+    {
+      name: "count",
+      type: "number",
+      value: "42",
+      defaultValue: 0,
+      hasValue: true,
+    },
+    {
+      name: "enabled",
+      type: "boolean",
+      value: null,
+      defaultValue: false,
+      hasValue: false,
+    },
+  ],
+};
+
 // Enough root nodes to make the tree taller than any test viewport, so the
 // tree area becomes scrollable.
 export const tallScanResponse = {
