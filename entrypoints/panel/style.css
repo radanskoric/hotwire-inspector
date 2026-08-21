@@ -181,6 +181,9 @@ select {
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--btn-border-color, transparent);
   border-radius: var(--btn-border-radius, var(--radius-sm));
   padding: var(--btn-padding, 0.5rem 0.5rem);

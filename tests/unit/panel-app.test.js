@@ -25,7 +25,9 @@ function mountPanelDom() {
               <option value="dark">Dark</option>
             </select>
           </label>
-          <button id="refresh-button" class="btn" type="button">Refresh</button>
+          <button id="refresh-button" class="btn" type="button" title="Refresh" aria-label="Refresh">
+            <img src="/icons/refresh.svg" class="icon" />
+          </button>
         </div>
       </header>
       <main>
