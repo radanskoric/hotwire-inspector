@@ -36,6 +36,8 @@ Core tooling currently includes:
   - pure Stimulus value logic; used by the injected page script (definition extraction), the content script (attribute resolution), and the panel (formatting)
 - `lib/value-watcher.js`
   - MutationObserver-based Stimulus value watcher; used by the content script for live value streaming
+- `lib/port-reconnect.js`
+  - port reconnection helper with exponential backoff; used by the content script for the events port
 - `lib/types.js`
   - shared JSDoc typedefs for the panel ↔ background ↔ content script ↔ inspected page messaging shapes (no runtime exports)
 - `tests/unit/`

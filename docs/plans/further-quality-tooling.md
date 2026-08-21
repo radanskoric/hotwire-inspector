@@ -3,7 +3,7 @@
 **This is not an execution plan.** It summarizes the remaining proposals from the 2026-08 quality-tooling review that were not implemented immediately in that pass:
 
 - ESLint
-- Prettier 
+- Prettier
 - Stylelint
 - JSDoc typesafety (using Typescripts checker)
 
@@ -16,6 +16,7 @@ What the project already had at review time beyond the improvements (mentioned a
 ## Suggested sequencing and dependencies
 
 Suggested sequence for remaining un-implemented suggestions:
+
 1. **Git hooks** (needs lint + format to exist to be useful)
 2. **CI** (needs the checks above to exist to be useful)
 3. **Dependabot / security scanning** (after CI exists, so update PRs get validated)

@@ -2,6 +2,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ContentInspector } from "../../lib/content-inspector.js";
+import { createReconnectingPort } from "../../lib/port-reconnect.js";
 import {
   CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
   CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT,
@@ -755,6 +756,33 @@ describe("ContentInspector", () => {
       };
     }
 
+    function createFakeTimeout() {
+      /** @type {Array<{ fn: () => void, delay: number, cleared: boolean }>} */
+      const pending = [];
+
+      /** @type {typeof setTimeout} */
+      const fakeSetTimeout = (fn, delay) => {
+        const entry = { fn, delay, cleared: false };
+        pending.push(entry);
+        return /** @type {ReturnType<typeof setTimeout>} */ (entry);
+      };
+
+      const fakeClearTimeout = (id) => {
+        const entry = /** @type {{ cleared: boolean } | null} */ (id);
+        if (entry) entry.cleared = true;
+      };
+
+      return {
+        fakeSetTimeout,
+        fakeClearTimeout,
+        pending,
+        flush() {
+          const entries = pending.splice(0).filter((e) => !e.cleared);
+          for (const entry of entries) entry.fn();
+        },
+      };
+    }
+
     function createFakeObserverClass() {
       let lastInstance;
       const FakeObserver = vi.fn(function (callback) {
@@ -924,7 +952,7 @@ describe("ContentInspector", () => {
       const result = await inspector.watchValues("modal-controller", "modal");
 
       expect(result).toEqual({ success: true });
-      expect(inspector.eventsPort).toBeNull();
+      expect(inspector.reconnectingPort).toBeNull();
     });
 
     it("replaces existing watch when called again", async () => {
@@ -1023,7 +1051,7 @@ describe("ContentInspector", () => {
       expect(fakePort.postMessage).toHaveBeenCalledTimes(postMessageCallCount);
     });
 
-    it("unwatchValues stops watcher and disconnects port", async () => {
+    it("unwatchValues stops watcher but keeps port alive", async () => {
       document.body.innerHTML =
         '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
       const script = new EventTarget();
@@ -1047,9 +1075,9 @@ describe("ContentInspector", () => {
 
       expect(result).toEqual({ success: true });
       expect(observerInstance.disconnect).toHaveBeenCalled();
-      expect(fakePort.disconnect).toHaveBeenCalled();
+      expect(fakePort.disconnect).not.toHaveBeenCalled();
       expect(inspector.activeWatcher).toBeNull();
-      expect(inspector.eventsPort).toBeNull();
+      expect(inspector.reconnectingPort).not.toBeNull();
       expect(inspector.activeWatchTarget).toBeNull();
     });
 
@@ -1061,7 +1089,32 @@ describe("ContentInspector", () => {
       expect(result).toEqual({ success: true });
     });
 
-    it("port onDisconnect reconnects and re-pushes when watch is active", async () => {
+    it("disconnect() tears down the events port", async () => {
+      document.body.innerHTML =
+        '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
+      const script = new EventTarget();
+      makeDefinitionsScript(script);
+      const injectScript = () => Promise.resolve({ script });
+      const fakePort = createFakePort();
+      const FakeObserver = createFakeObserverClass();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript,
+        connectPort: () => fakePort,
+        observerClass: FakeObserver,
+      });
+
+      inspector.scan();
+      await inspector.watchValues("modal-controller", "modal");
+
+      inspector.disconnect();
+
+      expect(fakePort.disconnect).toHaveBeenCalled();
+      expect(inspector.reconnectingPort).toBeNull();
+    });
+
+    it("port reconnects with backoff and re-pushes when watch is active", async () => {
       document.body.innerHTML =
         '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
       const script = new EventTarget();
@@ -1070,6 +1123,7 @@ describe("ContentInspector", () => {
       const firstPort = createFakePort();
       const secondPort = createFakePort();
       const FakeObserver = createFakeObserverClass();
+      const timeout = createFakeTimeout();
       let connectPortCallCount = 0;
       const inspector = new ContentInspector({
         document,
@@ -1078,14 +1132,20 @@ describe("ContentInspector", () => {
         connectPort: () =>
           connectPortCallCount++ === 0 ? firstPort : secondPort,
         observerClass: FakeObserver,
+        createReconnectingPort: (opts) =>
+          createReconnectingPort({
+            ...opts,
+            setTimeoutImpl: timeout.fakeSetTimeout,
+            clearTimeoutImpl: timeout.fakeClearTimeout,
+          }),
       });
 
       inspector.scan();
       await inspector.watchValues("modal-controller", "modal");
 
       firstPort._listeners.disconnect[0]();
+      timeout.flush();
 
-      expect(inspector.eventsPort).toBe(secondPort);
       expect(secondPort.postMessage).toHaveBeenCalledWith({
         type: VALUES_CHANGED_PUSH_TYPE,
         id: "modal-controller",
