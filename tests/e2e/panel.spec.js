@@ -8,6 +8,7 @@ import {
   CONTENT_UNWATCH_VALUES_MESSAGE_TYPE,
   CONTENT_WATCH_VALUES_MESSAGE_TYPE,
   ID_PREFIX,
+  TREE_CHANGED_PUSH_TYPE,
   VALUES_CHANGED_PUSH_TYPE,
 } from "../../lib/constants.js";
 import {
@@ -26,6 +27,7 @@ import {
   expectThemeSwitcher,
   getRecordedMessages,
   openDetailsPanel,
+  simulateTreeChanged,
   simulateValuesChanged,
   withExpectedBadgeClickOpensDetailsPanel,
   withExpectedClickInspects,
@@ -602,6 +604,35 @@ test.describe("Panel UI", () => {
         expect(messages).toContainEqual({
           type: CONTENT_UNWATCH_VALUES_MESSAGE_TYPE,
         });
+      },
+    );
+  });
+
+  test("refreshes the tree when a tree-changed push arrives", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponses: [emptyScanResponse, fixtureScanResponse] },
+      async (panelPage) => {
+        await expect(panelPage.locator("#summary")).toHaveText(
+          "0 frames, 0 controllers",
+        );
+        await expect(panelPage.locator("#empty-state")).toBeVisible();
+
+        await simulateTreeChanged(panelPage, {
+          type: TREE_CHANGED_PUSH_TYPE,
+        });
+
+        await expect(panelPage.locator("#summary")).toHaveText(
+          "2 frames, 4 controllers",
+        );
+        await expect(panelPage.locator("#empty-state")).toBeHidden();
       },
     );
   });

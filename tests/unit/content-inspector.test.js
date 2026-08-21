@@ -3,12 +3,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ContentInspector } from "../../lib/content-inspector.js";
 import { createReconnectingPort } from "../../lib/port-reconnect.js";
+import { TreeWatcher } from "../../lib/tree-watcher.js";
 import {
   CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
   CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT,
   ID_PREFIX,
   STORE_CONTROLLER_REQUEST_EVENT,
   STORE_CONTROLLER_RESPONSE_EVENT,
+  TREE_CHANGED_PUSH_TYPE,
   VALUES_CHANGED_PUSH_TYPE,
 } from "../../lib/constants.js";
 
@@ -23,6 +25,29 @@ describe("ContentInspector", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
+
+  function createFakePort() {
+    const listeners = { message: [], disconnect: [] };
+    return {
+      postMessage: vi.fn(),
+      onMessage: { addListener: (cb) => listeners.message.push(cb) },
+      onDisconnect: { addListener: (cb) => listeners.disconnect.push(cb) },
+      disconnect: vi.fn(),
+      _listeners: listeners,
+    };
+  }
+
+  function createFakeObserverClass() {
+    let lastInstance;
+    const FakeObserver = vi.fn(function (callback) {
+      this.observe = vi.fn();
+      this.disconnect = vi.fn();
+      this._callback = callback;
+      lastInstance = this;
+    });
+    FakeObserver._lastInstance = () => lastInstance;
+    return FakeObserver;
+  }
 
   it("can use global defaults with CSS escape and element node type", () => {
     const previousCss = globalThis.CSS;
@@ -744,18 +769,70 @@ describe("ContentInspector", () => {
     });
   });
 
-  describe("watchValues", () => {
-    function createFakePort() {
-      const listeners = { message: [], disconnect: [] };
-      return {
-        postMessage: vi.fn(),
-        onMessage: { addListener: (cb) => listeners.message.push(cb) },
-        onDisconnect: { addListener: (cb) => listeners.disconnect.push(cb) },
-        disconnect: vi.fn(),
-        _listeners: listeners,
-      };
-    }
+  describe("treeWatcher", () => {
+    it("postTreeChanged sends the correct port message", () => {
+      const fakePort = createFakePort();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        connectPort: () => fakePort,
+      });
 
+      inspector.postTreeChanged();
+
+      expect(fakePort.postMessage).toHaveBeenCalledWith({
+        type: TREE_CHANGED_PUSH_TYPE,
+      });
+    });
+
+    it("startTreeWatcher initializes the TreeWatcher", () => {
+      const fakePort = createFakePort();
+      const FakeObserver = createFakeObserverClass();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        connectPort: () => fakePort,
+        observerClass: FakeObserver,
+      });
+
+      inspector.startTreeWatcher();
+
+      expect(inspector.treeWatcher).toBeInstanceOf(TreeWatcher);
+      expect(FakeObserver).toHaveBeenCalledTimes(1);
+    });
+
+    it("startTreeWatcher pushes a tree-changed message when the DOM changes", () => {
+      vi.useFakeTimers();
+
+      try {
+        const fakePort = createFakePort();
+        const FakeObserver = createFakeObserverClass();
+        document.body.innerHTML = "<div></div>";
+        const inspector = new ContentInspector({
+          document,
+          cssEscape,
+          connectPort: () => fakePort,
+          observerClass: FakeObserver,
+        });
+
+        inspector.startTreeWatcher();
+        const observerInstance = FakeObserver._lastInstance();
+
+        document.body.innerHTML =
+          '<div data-controller="modal"><div data-modal-target="button"></div></div>';
+        observerInstance._callback([{ type: "childList" }]);
+        vi.advanceTimersByTime(100);
+
+        expect(fakePort.postMessage).toHaveBeenCalledWith({
+          type: TREE_CHANGED_PUSH_TYPE,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("watchValues", () => {
     function createFakeTimeout() {
       /** @type {Array<{ fn: () => void, delay: number, cleared: boolean }>} */
       const pending = [];
@@ -781,18 +858,6 @@ describe("ContentInspector", () => {
           for (const entry of entries) entry.fn();
         },
       };
-    }
-
-    function createFakeObserverClass() {
-      let lastInstance;
-      const FakeObserver = vi.fn(function (callback) {
-        this.observe = vi.fn();
-        this.disconnect = vi.fn();
-        this._callback = callback;
-        lastInstance = this;
-      });
-      FakeObserver._lastInstance = () => lastInstance;
-      return FakeObserver;
     }
 
     function makeDefinitionsScript(script) {
@@ -1087,6 +1152,31 @@ describe("ContentInspector", () => {
       const result = inspector.unwatchValues();
 
       expect(result).toEqual({ success: true });
+    });
+
+    it("disconnect() is safe when the tree watcher was never started", () => {
+      const inspector = new ContentInspector({ document, cssEscape });
+
+      expect(() => inspector.disconnect()).not.toThrow();
+      expect(inspector.treeWatcher).toBeNull();
+    });
+
+    it("disconnect() tears down the tree watcher when it is active", () => {
+      const fakePort = createFakePort();
+      const FakeObserver = createFakeObserverClass();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        connectPort: () => fakePort,
+        observerClass: FakeObserver,
+      });
+
+      inspector.startTreeWatcher();
+      const observerInstance = FakeObserver._lastInstance();
+      inspector.disconnect();
+
+      expect(observerInstance.disconnect).toHaveBeenCalled();
+      expect(inspector.treeWatcher).toBeNull();
     });
 
     it("disconnect() tears down the events port", async () => {

@@ -8,6 +8,7 @@ import {
   PANEL_EVENTS_PORT_NAME_PREFIX,
   RELAY_ERROR_TYPE,
   RELAY_MESSAGE_TYPE,
+  TREE_CHANGED_PUSH_TYPE,
   VALUES_CHANGED_PUSH_TYPE,
 } from "../../lib/constants.js";
 import { PanelBridge } from "../../lib/panel-bridge.js";
@@ -331,11 +332,12 @@ describe("PanelBridge", () => {
       id: "ctrl-1",
       values: [{ name: "count", type: "number", value: 5 }],
     };
+    const receivedMessage = JSON.parse(JSON.stringify(pushMessage));
     for (const cb of fakePort._listeners.message) {
-      cb(pushMessage);
+      cb(receivedMessage);
     }
 
-    expect(callback).toHaveBeenCalledWith(pushMessage);
+    expect(callback).toHaveBeenCalledWith(receivedMessage);
   });
 
   it("onValuesChanged callback ignores non-values-changed messages", async () => {
@@ -350,6 +352,51 @@ describe("PanelBridge", () => {
     const callback = vi.fn();
     await bridge.watchControllerValues("ctrl-1", "counter");
     bridge.onValuesChanged(callback);
+
+    const otherMessage = { type: "some-other-type", data: "irrelevant" };
+    for (const cb of fakePort._listeners.message) {
+      cb(otherMessage);
+    }
+
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("onTreeChanged callback receives tree-changed port messages", async () => {
+    const fakePort = createFakePort();
+    const browserApi = createBrowserApi(
+      () => Promise.resolve({ success: true }),
+      { success: true, name: "temp1" },
+      () => fakePort,
+    );
+    const bridge = new PanelBridge({ browserApi });
+
+    const callback = vi.fn();
+    bridge.onTreeChanged(callback);
+
+    expect(browserApi.connectCalls).toEqual([
+      { name: PANEL_EVENTS_PORT_NAME_PREFIX + 42 },
+    ]);
+
+    const pushMessage = { type: TREE_CHANGED_PUSH_TYPE };
+    const receivedMessage = JSON.parse(JSON.stringify(pushMessage));
+    for (const cb of fakePort._listeners.message) {
+      cb(receivedMessage);
+    }
+
+    expect(callback).toHaveBeenCalledWith(receivedMessage);
+  });
+
+  it("onTreeChanged callback ignores non-tree-changed messages", async () => {
+    const fakePort = createFakePort();
+    const browserApi = createBrowserApi(
+      () => Promise.resolve({ success: true }),
+      { success: true, name: "temp1" },
+      () => fakePort,
+    );
+    const bridge = new PanelBridge({ browserApi });
+
+    const callback = vi.fn();
+    bridge.onTreeChanged(callback);
 
     const otherMessage = { type: "some-other-type", data: "irrelevant" };
     for (const cb of fakePort._listeners.message) {

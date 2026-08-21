@@ -1,12 +1,13 @@
 // @vitest-environment happy-dom
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CONTENT_SCAN_MESSAGE_TYPE,
   ID_PREFIX,
   SCAN_REFRESHED_EVENT,
 } from "../../lib/constants.js";
 import { PanelApp } from "../../lib/panel-app.js";
+import { buildTree } from "../../lib/tree-builder.js";
 
 function mountPanelDom() {
   document.body.innerHTML = `
@@ -36,10 +37,10 @@ function mountPanelDom() {
       </main>
     </div>
     <template id="node-template">
-      <div class="node">
-        <button type="button" class="node-row" role="treeitem" data-controller="panel-node">
-          <span class="node-toggle" data-action="click->node#toggleChildren" aria-hidden="true"></span>
-          <img src="/icons/reveal-in-elements.svg" class="icon" />
+      <div class="node expanded" data-controller="node">
+        <button type="button" class="node-row" role="treeitem" data-controller="panel-node" data-action="mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight dblclick->node#toggleChildren">
+          <span class="node-toggle" data-action="click->node#toggleChildren:stop" aria-hidden="true"></span>
+          <img src="/icons/reveal-in-elements.svg" class="icon icon-btn" data-action="click->panel-node#inspect" />
           <span class="node-main">
             <span class="node-kind"></span>
             <span class="node-id"></span>
@@ -48,7 +49,7 @@ function mountPanelDom() {
           <span class="badges" hidden></span>
           <span class="target-badges" hidden></span>
         </button>
-        <div class="node-children" role="group" hidden></div>
+        <div class="node-children" role="group" hidden data-node-target="children"></div>
       </div>
     </template>
     <template id="badge-template">
@@ -86,6 +87,7 @@ function createBrowserApi(sendMessageImplementation) {
 function createBridge(sendToInspectedTabImplementation) {
   return {
     sendToInspectedTab: sendToInspectedTabImplementation,
+    onTreeChanged: () => {},
   };
 }
 
@@ -109,6 +111,51 @@ describe("PanelApp", () => {
       badgeTemplate,
       ...options,
     });
+  }
+
+  function createFrameApp(options = {}) {
+    return createPanelApp({ buildTree, ...options });
+  }
+
+  function frameItems() {
+    return [
+      {
+        id: "frame-1",
+        tagName: "turbo-frame",
+        controllers: [],
+        parentId: null,
+      },
+      {
+        id: "ctrl-1",
+        tagName: "div",
+        controllers: ["modal"],
+        parentId: "frame-1",
+      },
+    ];
+  }
+
+  function singleFrameItems() {
+    return [
+      {
+        id: "frame-1",
+        tagName: "turbo-frame",
+        controllers: [],
+        parentId: null,
+      },
+    ];
+  }
+
+  function frameNode() {
+    return /** @type {HTMLElement} */ (
+      treeElement.querySelector('.node[data-node-id="frame-1"]')
+    );
+  }
+
+  function appendMalformedNode() {
+    const node = document.createElement("div");
+    node.className = "node";
+    node.dataset.nodeId = "";
+    treeElement.appendChild(node);
   }
 
   beforeEach(() => {
@@ -415,5 +462,91 @@ describe("PanelApp", () => {
     await Promise.resolve();
 
     expect(refreshCalls).toEqual(["refresh", "refresh"]);
+  });
+
+  it("throttles auto-refresh calls to refreshTree", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const refreshCalls = [];
+      const app = createPanelApp();
+
+      app.refreshTree = async () => {
+        refreshCalls.push("refresh");
+      };
+
+      app.throttledRefreshTree();
+      app.throttledRefreshTree();
+      app.throttledRefreshTree();
+
+      expect(refreshCalls).toEqual(["refresh"]);
+
+      vi.advanceTimersByTime(50);
+      app.throttledRefreshTree();
+
+      expect(refreshCalls).toEqual(["refresh", "refresh"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("preserves collapsed node state across renders", () => {
+    const app = createFrameApp();
+
+    app.renderTree(frameItems());
+    frameNode().classList.remove("expanded");
+
+    app.renderTree(frameItems());
+
+    expect(frameNode().classList.contains("expanded")).toBe(false);
+  });
+
+  it("preserves expanded state when a row is expanded again after refresh", async () => {
+    const items = frameItems();
+    const app = createFrameApp({
+      bridge: createBridge(() => Promise.resolve({ items })),
+    });
+
+    await app.refreshTree();
+    frameNode().classList.remove("expanded");
+    expect(frameNode().classList.contains("expanded")).toBe(false);
+
+    await app.refreshTree();
+    expect(frameNode().classList.contains("expanded")).toBe(false);
+
+    frameNode().classList.add("expanded");
+
+    await app.refreshTree();
+    expect(frameNode().classList.contains("expanded")).toBe(true);
+  });
+
+  it("captureTreeState skips nodes without an id", () => {
+    const app = createFrameApp();
+    app.renderTree(singleFrameItems());
+    appendMalformedNode();
+
+    expect(() => app.captureTreeState()).not.toThrow();
+  });
+
+  it("restoreTreeState skips nodes without an id", () => {
+    const app = createFrameApp();
+    app.renderTree(singleFrameItems());
+    appendMalformedNode();
+
+    expect(() => app.restoreTreeState()).not.toThrow();
+  });
+
+  it("removes stale collapsed node ids after rendering", () => {
+    const app = createFrameApp();
+    app.renderTree(singleFrameItems());
+
+    frameNode().classList.remove("expanded");
+    app.collapsedNodeIds.add("frame-1");
+    app.collapsedNodeIds.add("removed-node");
+
+    app.renderTree(singleFrameItems());
+
+    expect(app.collapsedNodeIds.has("frame-1")).toBe(true);
+    expect(app.collapsedNodeIds.has("removed-node")).toBe(false);
   });
 });

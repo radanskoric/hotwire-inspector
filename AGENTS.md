@@ -63,7 +63,7 @@ Core tooling currently includes:
 The extension uses two messaging channels between the panel and the content script:
 
 1. **One-shot relay** (panel → background → content script): the panel sends a `scan`, `highlight`, `unhighlight`, `inspect`, `watchValues`, or `unwatchValues` request via `browser.tabs.sendMessage` through the background relay. The content script responds via `browser.runtime.sendMessage`.
-2. **Port-based event channel** (content script → background → panel): for live value updates, the content script opens a `ContentEventsPort` via `browser.runtime.connect` and pushes `ValuesChangedPush` messages. The background script routes these to the panel's `PanelEventsPort`. Ports provide `onDisconnect` lifecycle awareness for clean teardown.
+2. **Port-based event channel** (content script → background → panel): for live value updates and tree-change notifications, the content script opens a `ContentEventsPort` via `browser.runtime.connect` and pushes `ValuesChangedPush` or `TreeChangedPush` messages. `ValuesChangedPush` carries the current values of a watched controller; `TreeChangedPush` is a lightweight signal that the inspected DOM may have changed and the panel should request a fresh scan. The background script routes these to the panel's `PanelEventsPort`. Ports provide `onDisconnect` lifecycle awareness for clean teardown.
 
 ## Technical Decisions
 

@@ -22,6 +22,8 @@ export default defineContentScript({
         browser.runtime.connect({ name: CONTENT_EVENTS_PORT_NAME }),
     });
 
+    inspector.startTreeWatcher();
+
     browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (!message || typeof message !== "object") {
         return false;

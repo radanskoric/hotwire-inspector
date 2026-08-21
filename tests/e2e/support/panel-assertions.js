@@ -633,6 +633,15 @@ export async function simulateValuesChanged(panelPage, payload) {
   }, payload);
 }
 
+export async function simulateTreeChanged(panelPage, payload) {
+  await panelPage.evaluate((payload) => {
+    const port = globalThis.__hotwireInspectorEventsPort;
+    if (port) {
+      port._messageListeners.forEach((cb) => cb(payload));
+    }
+  }, payload);
+}
+
 export async function simulateEventsPortDisconnect(panelPage) {
   await panelPage.evaluate(() => {
     const port = globalThis.__hotwireInspectorEventsPort;
