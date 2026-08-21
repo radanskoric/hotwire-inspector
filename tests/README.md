@@ -73,6 +73,10 @@ This allows shared panel UI behavior assertions to run in Firefox while keeping 
 - **Support helpers**: `tests/e2e/support/` owns reusable fixtures, static serving, mocked panel APIs, and shared assertions.
 - **Specs**: behavior specs call adapter APIs and capability-gate unsupported browser mechanics.
 
+### Events-port mock seam
+
+`addMockPanelApis` in `tests/e2e/support/panel-assertions.js` mocks `browser.runtime.connect` to return a fake events port. This allows `panel.spec.js` to test live value updates without a real content-script or background script. The mock port exposes `postMessage`, `disconnect`, and `onDisconnect.addListener`. Helper functions `simulateValuesChanged()` and `simulateEventsPortDisconnect()` drive the mock port's listeners for assertion.
+
 ## Practical difference
 
 - **Chromium**: broader coverage, real extension loading, DevTools frame messaging, content-script checks, and adapter-backed panel UI checks.

@@ -1,11 +1,14 @@
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { chromiumAdapter } from "./adapters/chromium-adapter.js";
 import { firefoxAdapter } from "./adapters/firefox-adapter.js";
 import {
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
+  CONTENT_UNWATCH_VALUES_MESSAGE_TYPE,
+  CONTENT_WATCH_VALUES_MESSAGE_TYPE,
   ID_PREFIX,
+  VALUES_CHANGED_PUSH_TYPE,
 } from "../../lib/constants.js";
 import {
   controllerRemovedScanResponse,
@@ -16,10 +19,14 @@ import {
   tallScanResponse,
 } from "./support/panel-fixtures.js";
 import {
+  clearRecordedMessages,
   expectDoubleClickTogglesNodeChildren,
   expectRefreshRescans,
   expectThemeChanges,
   expectThemeSwitcher,
+  getRecordedMessages,
+  openDetailsPanel,
+  simulateValuesChanged,
   withExpectedBadgeClickOpensDetailsPanel,
   withExpectedClickInspects,
   withExpectedControllerBadges,
@@ -492,6 +499,110 @@ test.describe("Panel UI", () => {
       page,
       { scanResponse: fixtureScanResponse },
       expectDoubleClickTogglesNodeChildren,
+    );
+  });
+
+  test("live-updates values when a values-changed push arrives", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        const detailsPanel = await openDetailsPanel(
+          panelPage,
+          "modal-controller",
+          "modal",
+        );
+
+        const valuesContent = detailsPanel
+          .locator(".details-panel-section-content")
+          .first();
+        const rows = valuesContent.locator(".value-row");
+        await expect(rows).toHaveCount(3);
+        await expect(rows.nth(0).locator(".value-data")).toHaveText("Hello");
+
+        const messages = await getRecordedMessages(panelPage);
+        expect(messages).toContainEqual({
+          type: CONTENT_WATCH_VALUES_MESSAGE_TYPE,
+          id: "modal-controller",
+          identifier: "modal",
+        });
+
+        await simulateValuesChanged(panelPage, {
+          type: VALUES_CHANGED_PUSH_TYPE,
+          id: "modal-controller",
+          identifier: "modal",
+          values: [
+            {
+              name: "title",
+              type: "string",
+              value: "Updated",
+              defaultValue: "",
+              hasValue: true,
+            },
+            {
+              name: "count",
+              type: "number",
+              value: "99",
+              defaultValue: 0,
+              hasValue: true,
+            },
+            {
+              name: "enabled",
+              type: "boolean",
+              value: null,
+              defaultValue: false,
+              hasValue: false,
+            },
+          ],
+        });
+
+        await expect(rows).toHaveCount(3);
+        await expect(rows.nth(0).locator(".value-data")).toHaveText("Updated");
+        await expect(rows.nth(1).locator(".value-data")).toHaveText("99");
+      },
+    );
+  });
+
+  test("unwatches when the details panel closes", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        const detailsPanel = panelPage.locator("#details-panel");
+        const badge = panelPage
+          .locator(".node-row")
+          .filter({ hasText: "modal-controller" })
+          .first()
+          .locator(".badge")
+          .filter({ hasText: "modal" })
+          .first();
+        await badge.click();
+        await expect(detailsPanel).toBeVisible();
+
+        await clearRecordedMessages(panelPage);
+
+        await detailsPanel.locator(".details-panel-close").click();
+        await expect(detailsPanel).toBeHidden();
+
+        const messages = await getRecordedMessages(panelPage);
+        expect(messages).toContainEqual({
+          type: CONTENT_UNWATCH_VALUES_MESSAGE_TYPE,
+        });
+      },
     );
   });
 });

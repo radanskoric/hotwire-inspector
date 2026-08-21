@@ -3,17 +3,24 @@ import { injectScript } from "wxt/utils/inject-script";
 import {
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
+  CONTENT_EVENTS_PORT_NAME,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
   CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+  CONTENT_UNWATCH_VALUES_MESSAGE_TYPE,
+  CONTENT_WATCH_VALUES_MESSAGE_TYPE,
 } from "../lib/constants.js";
 import { ContentInspector } from "../lib/content-inspector.js";
 
 export default defineContentScript({
   matches: ["http://*/*", "https://*/*"],
   main() {
-    const inspector = new ContentInspector({ injectScript });
+    const inspector = new ContentInspector({
+      injectScript,
+      connectPort: () =>
+        browser.runtime.connect({ name: CONTENT_EVENTS_PORT_NAME }),
+    });
 
     browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (!message || typeof message !== "object") {
@@ -51,6 +58,18 @@ export default defineContentScript({
         inspector
           .controllerValues(message.id, message.identifier)
           .then(sendResponse);
+        return true;
+      }
+
+      if (message.type === CONTENT_WATCH_VALUES_MESSAGE_TYPE) {
+        inspector
+          .watchValues(message.id, message.identifier)
+          .then(sendResponse);
+        return true;
+      }
+
+      if (message.type === CONTENT_UNWATCH_VALUES_MESSAGE_TYPE) {
+        sendResponse(inspector.unwatchValues());
         return true;
       }
 

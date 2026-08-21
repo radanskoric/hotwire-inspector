@@ -7,15 +7,18 @@ import {
   PANEL_BRIDGE_PROPERTY,
   SHOW_CONTROLLER_DETAILS_EVENT,
   SCAN_REFRESHED_EVENT,
+  VALUES_CHANGED_PUSH_TYPE,
 } from "../../lib/constants.js";
 
 describe("DetailsPanelController", () => {
   let application;
   let calls;
   let panel;
+  let onValuesChangedCallback;
 
   beforeEach(async () => {
     calls = [];
+    onValuesChangedCallback = null;
     document.body.innerHTML = `
       <template id="notice-template">
         <div class="status-notice" data-controller="status" role="status" aria-live="polite">
@@ -60,6 +63,17 @@ describe("DetailsPanelController", () => {
         calls.push(["controllerValues", id, identifier]);
         return Promise.resolve({ success: true, values: [] });
       },
+      watchControllerValues(id, identifier) {
+        calls.push(["watchControllerValues", id, identifier]);
+        return Promise.resolve({ success: true });
+      },
+      unwatchControllerValues() {
+        calls.push(["unwatchControllerValues"]);
+        return Promise.resolve({ success: true });
+      },
+      onValuesChanged(callback) {
+        onValuesChangedCallback = callback;
+      },
     };
     application = Application.start();
     application.register("details-panel", DetailsPanelController);
@@ -100,16 +114,21 @@ describe("DetailsPanelController", () => {
   it("opens the panel with the controller details when a show event is dispatched", async () => {
     showDetails();
     await Promise.resolve();
+    await Promise.resolve();
 
     expect(panel.classList.contains("open")).toBe(true);
     expect(identifierText()).toBe("modal");
     expect(panel.dataset.detailsPanelNodeIdValue).toBe("frame-1");
     expect(panel.dataset.detailsPanelIdentifierValue).toBe("modal");
-    expect(calls).toEqual([["controllerValues", "frame-1", "modal"]]);
+    expect(calls).toEqual([
+      ["controllerValues", "frame-1", "modal"],
+      ["watchControllerValues", "frame-1", "modal"],
+    ]);
   });
 
   it("closes the panel when the close button is clicked", async () => {
     showDetails();
+    await Promise.resolve();
     await Promise.resolve();
 
     panel
@@ -123,6 +142,7 @@ describe("DetailsPanelController", () => {
   it("closes the panel when Escape is pressed", async () => {
     showDetails();
     await Promise.resolve();
+    await Promise.resolve();
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     await Promise.resolve();
@@ -133,12 +153,14 @@ describe("DetailsPanelController", () => {
   it("stores the shown controller instance when the store button is clicked", async () => {
     showDetails();
     await Promise.resolve();
+    await Promise.resolve();
 
     clickStoreButton();
     await Promise.resolve();
 
     expect(calls).toEqual([
       ["controllerValues", "frame-1", "modal"],
+      ["watchControllerValues", "frame-1", "modal"],
       ["storeControllerNode", "frame-1", "modal"],
     ]);
 
@@ -153,6 +175,7 @@ describe("DetailsPanelController", () => {
     document.getElementById("notice-template").remove();
     showDetails();
     await Promise.resolve();
+    await Promise.resolve();
 
     clickStoreButton();
     await Promise.resolve();
@@ -160,6 +183,7 @@ describe("DetailsPanelController", () => {
     expect(document.querySelector(".status-notice")).toBeNull();
     expect(calls).toEqual([
       ["controllerValues", "frame-1", "modal"],
+      ["watchControllerValues", "frame-1", "modal"],
       ["storeControllerNode", "frame-1", "modal"],
     ]);
   });
@@ -170,6 +194,7 @@ describe("DetailsPanelController", () => {
       return Promise.resolve({ success: false, error: "Controller not found" });
     };
     showDetails();
+    await Promise.resolve();
     await Promise.resolve();
 
     clickStoreButton();
@@ -187,6 +212,7 @@ describe("DetailsPanelController", () => {
     };
     showDetails();
     await Promise.resolve();
+    await Promise.resolve();
 
     clickStoreButton();
     await Promise.resolve();
@@ -199,10 +225,12 @@ describe("DetailsPanelController", () => {
   it("keeps the panel open when a scan refresh still finds the controller", async () => {
     showDetails();
     await Promise.resolve();
+    await Promise.resolve();
 
     scanRefreshed([
       { id: "frame-1", tagName: "div", controllers: ["modal", "dropdown"] },
     ]);
+    await Promise.resolve();
     await Promise.resolve();
 
     expect(panel.classList.contains("open")).toBe(true);
@@ -211,6 +239,7 @@ describe("DetailsPanelController", () => {
 
   it("closes the panel when a scan refresh no longer contains the element", async () => {
     showDetails();
+    await Promise.resolve();
     await Promise.resolve();
 
     scanRefreshed([]);
@@ -221,6 +250,7 @@ describe("DetailsPanelController", () => {
 
   it("closes the panel when a scan refresh finds the element without the controller", async () => {
     showDetails();
+    await Promise.resolve();
     await Promise.resolve();
 
     scanRefreshed([
@@ -233,6 +263,7 @@ describe("DetailsPanelController", () => {
 
   it("closes the panel when a scan refresh finds the element without controllers", async () => {
     showDetails();
+    await Promise.resolve();
     await Promise.resolve();
 
     scanRefreshed([{ id: "frame-1", tagName: "div" }]);
@@ -248,6 +279,18 @@ describe("DetailsPanelController", () => {
     expect(panel.classList.contains("open")).toBe(false);
     expect(identifierText()).toBe("");
     expect(calls).toEqual([]);
+  });
+
+  it("application disconnect calls unwatchControllerValues", async () => {
+    showDetails();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    calls.length = 0;
+    panel.remove();
+    await Promise.resolve();
+
+    expect(calls).toContainEqual(["unwatchControllerValues"]);
   });
 
   describe("values section", () => {
@@ -315,6 +358,7 @@ describe("DetailsPanelController", () => {
 
       showDetails();
       await Promise.resolve();
+      await Promise.resolve();
 
       const rows = valuesContent().querySelectorAll(".value-row");
       expect(rows).toHaveLength(4);
@@ -343,6 +387,7 @@ describe("DetailsPanelController", () => {
 
       showDetails();
       await Promise.resolve();
+      await Promise.resolve();
 
       expect(valuesContent().querySelector(".value-data").textContent).toBe(
         '{"theme":"dark"}',
@@ -354,6 +399,7 @@ describe("DetailsPanelController", () => {
 
       showDetails();
       await Promise.resolve();
+      await Promise.resolve();
 
       const rows = valuesContent().querySelectorAll(".value-row");
       expect(rows[2].classList.contains("value-row-unset")).toBe(true);
@@ -362,6 +408,7 @@ describe("DetailsPanelController", () => {
 
     it("shows a note when the controller declares no values", async () => {
       showDetails();
+      await Promise.resolve();
       await Promise.resolve();
 
       expect(valuesContent().textContent).toBe("No values declared.");
@@ -373,6 +420,7 @@ describe("DetailsPanelController", () => {
 
       showDetails();
       await Promise.resolve();
+      await Promise.resolve();
 
       expect(valuesContent().textContent).toBe("Controller not found");
     });
@@ -381,6 +429,7 @@ describe("DetailsPanelController", () => {
       mockValuesResponse({ success: false });
 
       showDetails();
+      await Promise.resolve();
       await Promise.resolve();
 
       expect(valuesContent().textContent).toBe("Controller values failed");
@@ -392,6 +441,7 @@ describe("DetailsPanelController", () => {
 
       showDetails();
       await Promise.resolve();
+      await Promise.resolve();
 
       expect(valuesContent().textContent).toBe("Controller values failed");
     });
@@ -402,6 +452,7 @@ describe("DetailsPanelController", () => {
 
       showDetails();
       await Promise.resolve();
+      await Promise.resolve();
 
       expect(valuesContent().textContent).toBe(
         "Could not establish connection",
@@ -411,10 +462,12 @@ describe("DetailsPanelController", () => {
     it("replaces the note styling when values render after a previous note", async () => {
       showDetails();
       await Promise.resolve();
+      await Promise.resolve();
       expect(valuesContent().classList.contains("values-note")).toBe(true);
 
       mockValuesResponse({ success: true, values: sampleValues });
       showDetails({ nodeId: "frame-1", identifier: "modal" });
+      await Promise.resolve();
       await Promise.resolve();
 
       expect(valuesContent().classList.contains("values-note")).toBe(false);
@@ -471,17 +524,159 @@ describe("DetailsPanelController", () => {
 
       showDetails();
       await Promise.resolve();
+      await Promise.resolve();
 
       scanRefreshed([
         { id: "frame-1", tagName: "div", controllers: ["modal", "dropdown"] },
       ]);
       await Promise.resolve();
+      await Promise.resolve();
 
       expect(calls).toEqual([
         ["controllerValues", "frame-1", "modal"],
+        ["watchControllerValues", "frame-1", "modal"],
         ["controllerValues", "frame-1", "modal"],
+        ["watchControllerValues", "frame-1", "modal"],
       ]);
       expect(valuesContent().querySelectorAll(".value-row")).toHaveLength(4);
+    });
+
+    it("show calls watchControllerValues after loadValues completes", async () => {
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(calls).toEqual([
+        ["controllerValues", "frame-1", "modal"],
+        ["watchControllerValues", "frame-1", "modal"],
+      ]);
+    });
+
+    it("renders updated values when a values-changed push arrives with matching id/identifier", async () => {
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      onValuesChangedCallback({
+        type: VALUES_CHANGED_PUSH_TYPE,
+        id: "frame-1",
+        identifier: "modal",
+        values: sampleValues,
+      });
+
+      const rows = valuesContent().querySelectorAll(".value-row");
+      expect(rows).toHaveLength(4);
+      expect(rows[0].querySelector(".value-name").textContent).toBe("title");
+    });
+
+    it("ignores values-changed push when id does not match", async () => {
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      onValuesChangedCallback({
+        type: VALUES_CHANGED_PUSH_TYPE,
+        id: "frame-2",
+        identifier: "modal",
+        values: sampleValues,
+      });
+
+      expect(valuesContent().querySelectorAll(".value-row")).toHaveLength(0);
+      expect(valuesContent().textContent).toBe("No values declared.");
+    });
+
+    it("ignores values-changed push when identifier does not match", async () => {
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      onValuesChangedCallback({
+        type: VALUES_CHANGED_PUSH_TYPE,
+        id: "frame-1",
+        identifier: "dropdown",
+        values: sampleValues,
+      });
+
+      expect(valuesContent().querySelectorAll(".value-row")).toHaveLength(0);
+      expect(valuesContent().textContent).toBe("No values declared.");
+    });
+
+    it("ignores values-changed push when panel is closed", async () => {
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      panel
+        .querySelector(".details-panel-close")
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+
+      onValuesChangedCallback({
+        type: VALUES_CHANGED_PUSH_TYPE,
+        id: "frame-1",
+        identifier: "modal",
+        values: sampleValues,
+      });
+
+      expect(valuesContent().querySelectorAll(".value-row")).toHaveLength(0);
+    });
+
+    it("close calls unwatchControllerValues", async () => {
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      calls.length = 0;
+
+      panel
+        .querySelector(".details-panel-close")
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+
+      expect(calls).toEqual([["unwatchControllerValues"]]);
+    });
+
+    it("refresh while still present re-issues watchControllerValues", async () => {
+      mockValuesResponse({ success: true, values: sampleValues });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      calls.length = 0;
+
+      scanRefreshed([
+        { id: "frame-1", tagName: "div", controllers: ["modal", "dropdown"] },
+      ]);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(calls).toEqual([
+        ["controllerValues", "frame-1", "modal"],
+        ["watchControllerValues", "frame-1", "modal"],
+      ]);
+    });
+
+    it("watchControllerValues rejection is tolerated", async () => {
+      mockValuesResponse({ success: true, values: sampleValues });
+      document[PANEL_BRIDGE_PROPERTY].watchControllerValues = (
+        id,
+        identifier,
+      ) => {
+        calls.push(["watchControllerValues", id, identifier]);
+        return Promise.reject(new Error("watch failed"));
+      };
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(valuesContent().querySelectorAll(".value-row")).toHaveLength(4);
+      expect(calls).toContainEqual([
+        "watchControllerValues",
+        "frame-1",
+        "modal",
+      ]);
     });
   });
 });

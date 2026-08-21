@@ -20,7 +20,7 @@ This approach helps reduce debugging noise, avoids surprising side effects, and 
 
 ## Architecture
 
-Hotwire Inspector is split across the extension's DevTools panel, background script, content script, and a small injected page-context script. Messages flow from the panel toward the inspected page, while scan results and inspection data flow back through the same path.
+Hotwire Inspector is split across the extension's DevTools panel, background script, content script, and a small injected page-context script. Most communication uses a one-shot request/response relay through the background script. For live updates, a second channel uses long-lived ports so the content script can push changes to the panel as they happen.
 
 ```text
 ┌──────────────────────────────┐
@@ -31,7 +31,7 @@ Hotwire Inspector is split across the extension's DevTools panel, background scr
 │  │ entrypoints/panel/      │ │
 │  └───────────┬─────────────┘ │
 └──────────────▲───────────────┘
-               │ extension messages
+               │ one-shot relay / port events
                ▼
 ┌──────────────────────────────┐
 │ Background script            │
@@ -39,7 +39,7 @@ Hotwire Inspector is split across the extension's DevTools panel, background scr
 │ entrypoints/background.js    │
 └──────────────┬───────────────┘
                ▲
-               | tab/content-script messages
+               | one-shot relay / port events
                ▼
 ┌──────────────────────────────┐
 │ Content script               │
@@ -49,15 +49,17 @@ Hotwire Inspector is split across the extension's DevTools panel, background scr
 │ - scans Turbo Frames         │
 │ - detects Stimulus metadata  │
 │ - highlights inspected nodes │
+│ - observes live value changes│
 └──────────────┬───────────────┘
-               │ injects page-context script
+               │ injects page-context script, listen to events it emits
                ▼
 ┌──────────────────────────────┐
 │ Inspected page context       │
 │                              │
 │ inspected-page-inject.js     │
 │                              │
-│ - track controller instances │
+│ - track controller instances |
+│ - infer values configuration |
 └──────────────────────────────┘
 ```
 

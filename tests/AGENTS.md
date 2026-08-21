@@ -36,3 +36,7 @@ Run Firefox smoke separately from the default Chromium E2E suite.
 - Avoid broad cross-browser refactors unless requested.
 - Use adapter capabilities for unsupported browser mechanics instead of broad hidden skips.
 - If changing content-script messages, panel rendering, or extension loading, update related E2E tests and docs.
+
+## Mock seams
+
+- `addMockPanelApis` in `tests/e2e/support/panel-assertions.js` mocks `browser.runtime.connect` to return a fake events port. Use `getEventsPortName()` to read the port name, `simulateValuesChanged()` to push a mock values-changed message, and `simulateEventsPortDisconnect()` to trigger the port's `onDisconnect` listeners. These helpers are used by `panel.spec.js` live-update tests.

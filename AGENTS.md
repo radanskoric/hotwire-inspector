@@ -34,6 +34,8 @@ Core tooling currently includes:
   - pure tree-building logic used by the panel
 - `lib/controller-values.js`
   - pure Stimulus value logic; used by the injected page script (definition extraction), the content script (attribute resolution), and the panel (formatting)
+- `lib/value-watcher.js`
+  - MutationObserver-based Stimulus value watcher; used by the content script for live value streaming
 - `lib/types.js`
   - shared JSDoc typedefs for the panel ↔ background ↔ content script ↔ inspected page messaging shapes (no runtime exports)
 - `tests/unit/`
@@ -53,6 +55,13 @@ Core tooling currently includes:
 - Prefer changes that keep the inspected page behavior as close to untouched runtime behavior as possible.
 - Keep the extension cross-browser friendly.
 - If you change central behavior in the content script or panel messaging, review the related E2E tests.
+
+### Messaging architecture
+
+The extension uses two messaging channels between the panel and the content script:
+
+1. **One-shot relay** (panel → background → content script): the panel sends a `scan`, `highlight`, `unhighlight`, `inspect`, `watchValues`, or `unwatchValues` request via `browser.tabs.sendMessage` through the background relay. The content script responds via `browser.runtime.sendMessage`.
+2. **Port-based event channel** (content script → background → panel): for live value updates, the content script opens a `ContentEventsPort` via `browser.runtime.connect` and pushes `ValuesChangedPush` messages. The background script routes these to the panel's `PanelEventsPort`. Ports provide `onDisconnect` lifecycle awareness for clean teardown.
 
 ## Technical Decisions
 

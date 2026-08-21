@@ -1,28 +1,24 @@
 # Further quality tooling — findings, open questions, exploration avenues
 
-**This is not an execution plan.** It summarizes the remaining proposals from the 2026-08 quality-tooling review that are not covered by their own execution plans:
+**This is not an execution plan.** It summarizes the remaining proposals from the 2026-08 quality-tooling review that were not implemented immediately in that pass:
 
-- `docs/plans/add-eslint.md`
-- `docs/plans/add-prettier-and-editorconfig.md`
-- `docs/plans/add-jsdoc-type-safety.md`
-- `docs/plans/add-stylelint.md`
+- ESLint
+- Prettier 
+- Stylelint
+- JSDoc typesafety (using Typescripts checker)
 
 Use this document to decide _whether and when_ to pursue each item; spin off a dedicated execution plan per adopted item.
 
 ## Review context (2026-08)
 
-What the project already had at review time: Vitest with hard 100% coverage thresholds on `lib/**`, Playwright E2E against the real built extension (Chromium + Firefox), multi-browser WXT builds, and `scripts/test-all.js` as a manual orchestrator. What was missing entirely: linting, formatting, type checking, CI, git hooks, dependency/security scanning, Node version pinning, EditorConfig/`.gitattributes`.
+What the project already had at review time beyond the improvements (mentioned above) that were implemented then: Vitest with hard 100% coverage thresholds on `lib/**`, Playwright E2E against the real built extension (Chromium + Firefox), multi-browser WXT builds, and `scripts/test-all.js` as a manual orchestrator. What was missing entirely: linting, formatting, type checking, CI, git hooks, dependency/security scanning, Node version pinning, EditorConfig/`.gitattributes`.
 
 ## Suggested sequencing and dependencies
 
-The four execution plans plus the items below overlap on `package.json`, `scripts/test-all.js`, and `AGENTS.md`, so landing them sequentially (or rebasing carefully) avoids merge churn:
-
-1. **Prettier + EditorConfig** (first — one bulk reformat, then all later diffs stay clean)
-2. **ESLint**, **Stylelint** (independent of each other)
-3. **checkJs typecheck** (independent; has its own decision gate)
-4. **Git hooks** (needs lint + format to exist to be useful)
-5. **CI** (needs the checks above to exist to be useful)
-6. **Dependabot / security scanning** (after CI exists, so update PRs get validated)
+Suggested sequence for remaining un-implemented suggestions:
+1. **Git hooks** (needs lint + format to exist to be useful)
+2. **CI** (needs the checks above to exist to be useful)
+3. **Dependabot / security scanning** (after CI exists, so update PRs get validated)
 
 ## 1. CI — GitHub Actions (largest remaining gap)
 

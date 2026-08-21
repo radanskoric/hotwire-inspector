@@ -85,6 +85,41 @@ export async function addMockPanelApis(
 
         return Promise.resolve({ success: true, selector: "#mock" });
       };
+
+      globalThis.__hotwireInspectorEventsPortName = null;
+      globalThis.__hotwireInspectorEventsPort = null;
+
+      browser.runtime.connect = (options) => {
+        const portName = typeof options === "string" ? options : options?.name;
+        globalThis.__hotwireInspectorEventsPortName = portName;
+        const port = {
+          name: portName,
+          postMessageCalls: [],
+          postMessage(msg) {
+            this.postMessageCalls.push(msg);
+          },
+          onMessage: {
+            addListener(cb) {
+              port._messageListeners.push(cb);
+            },
+          },
+          onDisconnect: {
+            addListener(cb) {
+              port._disconnectListeners.push(cb);
+            },
+          },
+          disconnectCalls: 0,
+          disconnect() {
+            this.disconnectCalls++;
+            this._disconnectListeners.forEach((cb) => cb());
+          },
+          _messageListeners: [],
+          _disconnectListeners: [],
+        };
+        globalThis.__hotwireInspectorEventsPort = port;
+        return port;
+      };
+
       globalThis.chrome = globalThis.browser;
     },
     {
@@ -343,7 +378,11 @@ export function withExpectedClickInspects(
   };
 }
 
-async function openDetailsPanel(panelPage, nodeId, controllerIdentifier) {
+export async function openDetailsPanel(
+  panelPage,
+  nodeId,
+  controllerIdentifier,
+) {
   const detailsPanel = panelPage.locator("#details-panel");
   const badge = panelPage
     .locator(".node-row")
@@ -390,14 +429,16 @@ export function withExpectedBadgeClickOpensDetailsPanel(
     // Clicking the badge highlights the row (via hover) and opening the
     // panel fetches the controller's values; storing happens from the panel
     // button.
-    expect(await getRecordedMessages(panelPage)).toEqual([
-      { type: CONTENT_HIGHLIGHT_MESSAGE_TYPE, id: nodeId },
-      {
-        type: CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
-        id: nodeId,
-        identifier: controllerIdentifier,
-      },
-    ]);
+    const messages = await getRecordedMessages(panelPage);
+    expect(messages).toContainEqual({
+      type: CONTENT_HIGHLIGHT_MESSAGE_TYPE,
+      id: nodeId,
+    });
+    expect(messages).toContainEqual({
+      type: CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
+      id: nodeId,
+      identifier: controllerIdentifier,
+    });
 
     await detailsPanel.locator(".details-panel-store").click();
 
@@ -577,6 +618,28 @@ export function withExpectedDetailsPanelPinnedOnScroll(
     expect(afterScroll.y).toBe(beforeScroll.y);
     await expect(detailsPanel).toBeVisible();
   };
+}
+
+export async function getEventsPortName(panelPage) {
+  return panelPage.evaluate(() => globalThis.__hotwireInspectorEventsPortName);
+}
+
+export async function simulateValuesChanged(panelPage, payload) {
+  await panelPage.evaluate((payload) => {
+    const port = globalThis.__hotwireInspectorEventsPort;
+    if (port) {
+      port._messageListeners.forEach((cb) => cb(payload));
+    }
+  }, payload);
+}
+
+export async function simulateEventsPortDisconnect(panelPage) {
+  await panelPage.evaluate(() => {
+    const port = globalThis.__hotwireInspectorEventsPort;
+    if (port) {
+      port._disconnectListeners.forEach((cb) => cb());
+    }
+  });
 }
 
 export async function expectDoubleClickTogglesNodeChildren(panelPage) {

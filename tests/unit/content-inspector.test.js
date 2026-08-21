@@ -8,6 +8,7 @@ import {
   ID_PREFIX,
   STORE_CONTROLLER_REQUEST_EVENT,
   STORE_CONTROLLER_RESPONSE_EVENT,
+  VALUES_CHANGED_PUSH_TYPE,
 } from "../../lib/constants.js";
 
 describe("ContentInspector", () => {
@@ -739,6 +740,366 @@ describe("ContentInspector", () => {
       await inspector.controllerValues("modal-controller", "modal");
 
       expect(injectionCount).toBe(1);
+    });
+  });
+
+  describe("watchValues", () => {
+    function createFakePort() {
+      const listeners = { message: [], disconnect: [] };
+      return {
+        postMessage: vi.fn(),
+        onMessage: { addListener: (cb) => listeners.message.push(cb) },
+        onDisconnect: { addListener: (cb) => listeners.disconnect.push(cb) },
+        disconnect: vi.fn(),
+        _listeners: listeners,
+      };
+    }
+
+    function createFakeObserverClass() {
+      let lastInstance;
+      const FakeObserver = vi.fn(function (callback) {
+        this.observe = vi.fn();
+        this.disconnect = vi.fn();
+        this._callback = callback;
+        lastInstance = this;
+      });
+      FakeObserver._lastInstance = () => lastInstance;
+      return FakeObserver;
+    }
+
+    function makeDefinitionsScript(script) {
+      script.addEventListener(
+        CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
+        (event) => {
+          const detail = JSON.parse(event.detail);
+          script.dispatchEvent(
+            new CustomEvent(CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT, {
+              detail: JSON.stringify({
+                requestId: detail.requestId,
+                success: true,
+                definitions: [
+                  {
+                    name: "title",
+                    type: "string",
+                    defaultValue: "",
+                    attributeName: "data-modal-title-value",
+                  },
+                ],
+              }),
+            }),
+          );
+        },
+      );
+    }
+
+    function makeErrorDefinitionsScript(script, errorMessage) {
+      script.addEventListener(
+        CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
+        (event) => {
+          const detail = JSON.parse(event.detail);
+          script.dispatchEvent(
+            new CustomEvent(CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT, {
+              detail: JSON.stringify({
+                requestId: detail.requestId,
+                success: false,
+                error: errorMessage,
+              }),
+            }),
+          );
+        },
+      );
+    }
+
+    it("returns success and starts observing when element and definitions exist", async () => {
+      document.body.innerHTML =
+        '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
+      const script = new EventTarget();
+      makeDefinitionsScript(script);
+      const injectScript = () => Promise.resolve({ script });
+      const fakePort = createFakePort();
+      const FakeObserver = createFakeObserverClass();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript,
+        connectPort: () => fakePort,
+        observerClass: FakeObserver,
+      });
+
+      inspector.scan();
+
+      const result = await inspector.watchValues("modal-controller", "modal");
+
+      expect(result).toEqual({ success: true });
+      expect(FakeObserver).toHaveBeenCalledTimes(1);
+      expect(FakeObserver._lastInstance().observe).toHaveBeenCalled();
+    });
+
+    it("returns error when element is not found", async () => {
+      const inspector = new ContentInspector({ document, cssEscape });
+
+      const result = await inspector.watchValues("missing", "modal");
+
+      expect(result).toEqual({
+        success: false,
+        error: "Element not found",
+      });
+    });
+
+    it("returns error when definitions request fails", async () => {
+      document.body.innerHTML =
+        '<div id="modal-controller" data-controller="modal"></div>';
+      const script = new EventTarget();
+      makeErrorDefinitionsScript(script, "Controller not found");
+      const injectScript = () => Promise.resolve({ script });
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript,
+      });
+
+      inspector.scan();
+
+      const result = await inspector.watchValues("modal-controller", "modal");
+
+      expect(result).toEqual({
+        requestId: expect.any(String),
+        success: false,
+        error: "Controller not found",
+      });
+    });
+
+    it("returns error when definitions request throws", async () => {
+      document.body.innerHTML =
+        '<div id="modal-controller" data-controller="modal"></div>';
+      const inspector = new ContentInspector({ document, cssEscape });
+
+      inspector.sendValueDefinitionsRequest = async () => {
+        throw new Error("Injected page script loader unavailable");
+      };
+      inspector.scan();
+
+      const result = await inspector.watchValues("modal-controller", "modal");
+
+      expect(result).toEqual({
+        success: false,
+        error: "Injected page script loader unavailable",
+      });
+    });
+
+    it("uses fallback error text when definitions request throws without message", async () => {
+      document.body.innerHTML =
+        '<div id="modal-controller" data-controller="modal"></div>';
+      const inspector = new ContentInspector({ document, cssEscape });
+
+      inspector.sendValueDefinitionsRequest = async () => {
+        throw new Error();
+      };
+      inspector.scan();
+
+      const result = await inspector.watchValues("modal-controller", "modal");
+
+      expect(result).toEqual({
+        success: false,
+        error: "Controller values failed",
+      });
+    });
+
+    it("skips port connection when connectPort is not provided", async () => {
+      document.body.innerHTML =
+        '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
+      const script = new EventTarget();
+      makeDefinitionsScript(script);
+      const injectScript = () => Promise.resolve({ script });
+      const FakeObserver = createFakeObserverClass();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript,
+        observerClass: FakeObserver,
+      });
+
+      inspector.scan();
+
+      const result = await inspector.watchValues("modal-controller", "modal");
+
+      expect(result).toEqual({ success: true });
+      expect(inspector.eventsPort).toBeNull();
+    });
+
+    it("replaces existing watch when called again", async () => {
+      document.body.innerHTML =
+        '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
+      const script = new EventTarget();
+      makeDefinitionsScript(script);
+      const injectScript = () => Promise.resolve({ script });
+      const fakePort = createFakePort();
+      const FakeObserver = createFakeObserverClass();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript,
+        connectPort: () => fakePort,
+        observerClass: FakeObserver,
+      });
+
+      inspector.scan();
+      await inspector.watchValues("modal-controller", "modal");
+
+      const firstObserver = FakeObserver._lastInstance();
+      FakeObserver.mockClear();
+
+      await inspector.watchValues("modal-controller", "modal");
+
+      expect(firstObserver.disconnect).toHaveBeenCalled();
+      expect(FakeObserver).toHaveBeenCalledTimes(1);
+    });
+
+    it("pushes values-changed message on attribute mutation", async () => {
+      document.body.innerHTML =
+        '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
+      const script = new EventTarget();
+      makeDefinitionsScript(script);
+      const injectScript = () => Promise.resolve({ script });
+      const fakePort = createFakePort();
+      const FakeObserver = createFakeObserverClass();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript,
+        connectPort: () => fakePort,
+        observerClass: FakeObserver,
+      });
+
+      inspector.scan();
+      await inspector.watchValues("modal-controller", "modal");
+
+      const observerInstance = FakeObserver._lastInstance();
+      const element = document.querySelector("#modal-controller");
+
+      element.setAttribute("data-modal-title-value", "World");
+      observerInstance._callback();
+
+      expect(fakePort.postMessage).toHaveBeenCalledWith({
+        type: VALUES_CHANGED_PUSH_TYPE,
+        id: "modal-controller",
+        identifier: "modal",
+        values: [
+          {
+            name: "title",
+            type: "string",
+            defaultValue: "",
+            value: "World",
+            hasValue: true,
+          },
+        ],
+      });
+    });
+
+    it("suppresses push when values unchanged", async () => {
+      document.body.innerHTML =
+        '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
+      const script = new EventTarget();
+      makeDefinitionsScript(script);
+      const injectScript = () => Promise.resolve({ script });
+      const fakePort = createFakePort();
+      const FakeObserver = createFakeObserverClass();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript,
+        connectPort: () => fakePort,
+        observerClass: FakeObserver,
+      });
+
+      inspector.scan();
+      await inspector.watchValues("modal-controller", "modal");
+
+      const observerInstance = FakeObserver._lastInstance();
+      const postMessageCallCount = fakePort.postMessage.mock.calls.length;
+
+      observerInstance._callback();
+
+      expect(fakePort.postMessage).toHaveBeenCalledTimes(postMessageCallCount);
+    });
+
+    it("unwatchValues stops watcher and disconnects port", async () => {
+      document.body.innerHTML =
+        '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
+      const script = new EventTarget();
+      makeDefinitionsScript(script);
+      const injectScript = () => Promise.resolve({ script });
+      const fakePort = createFakePort();
+      const FakeObserver = createFakeObserverClass();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript,
+        connectPort: () => fakePort,
+        observerClass: FakeObserver,
+      });
+
+      inspector.scan();
+      await inspector.watchValues("modal-controller", "modal");
+
+      const observerInstance = FakeObserver._lastInstance();
+      const result = inspector.unwatchValues();
+
+      expect(result).toEqual({ success: true });
+      expect(observerInstance.disconnect).toHaveBeenCalled();
+      expect(fakePort.disconnect).toHaveBeenCalled();
+      expect(inspector.activeWatcher).toBeNull();
+      expect(inspector.eventsPort).toBeNull();
+      expect(inspector.activeWatchTarget).toBeNull();
+    });
+
+    it("unwatchValues is idempotent", () => {
+      const inspector = new ContentInspector({ document, cssEscape });
+
+      const result = inspector.unwatchValues();
+
+      expect(result).toEqual({ success: true });
+    });
+
+    it("port onDisconnect reconnects and re-pushes when watch is active", async () => {
+      document.body.innerHTML =
+        '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
+      const script = new EventTarget();
+      makeDefinitionsScript(script);
+      const injectScript = () => Promise.resolve({ script });
+      const firstPort = createFakePort();
+      const secondPort = createFakePort();
+      const FakeObserver = createFakeObserverClass();
+      let connectPortCallCount = 0;
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript,
+        connectPort: () =>
+          connectPortCallCount++ === 0 ? firstPort : secondPort,
+        observerClass: FakeObserver,
+      });
+
+      inspector.scan();
+      await inspector.watchValues("modal-controller", "modal");
+
+      firstPort._listeners.disconnect[0]();
+
+      expect(inspector.eventsPort).toBe(secondPort);
+      expect(secondPort.postMessage).toHaveBeenCalledWith({
+        type: VALUES_CHANGED_PUSH_TYPE,
+        id: "modal-controller",
+        identifier: "modal",
+        values: [
+          {
+            name: "title",
+            type: "string",
+            defaultValue: "",
+            value: "Hello",
+            hasValue: true,
+          },
+        ],
+      });
     });
   });
 });

@@ -1,21 +1,44 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+  CONTENT_UNWATCH_VALUES_MESSAGE_TYPE,
+  CONTENT_WATCH_VALUES_MESSAGE_TYPE,
+  PANEL_EVENTS_PORT_NAME_PREFIX,
   RELAY_ERROR_TYPE,
   RELAY_MESSAGE_TYPE,
+  VALUES_CHANGED_PUSH_TYPE,
 } from "../../lib/constants.js";
 import { PanelBridge } from "../../lib/panel-bridge.js";
+
+function createFakePort() {
+  const listeners = { message: [], disconnect: [] };
+  return {
+    name: undefined,
+    postMessage: vi.fn(),
+    onMessage: { addListener: (cb) => listeners.message.push(cb) },
+    onDisconnect: { addListener: (cb) => listeners.disconnect.push(cb) },
+    disconnect: vi.fn(),
+    _listeners: listeners,
+  };
+}
 
 function createBrowserApi(
   sendMessageImplementation,
   evalResult = { success: true, name: "temp1" },
+  connectImplementation,
 ) {
   const evalCalls = [];
+  const connectCalls = [];
+  let connectHandler = connectImplementation;
   return {
     runtime: {
       sendMessage: sendMessageImplementation,
+      connect(options) {
+        connectCalls.push(options);
+        return connectHandler?.(options) ?? createFakePort();
+      },
     },
     devtools: {
       inspectedWindow: {
@@ -27,6 +50,10 @@ function createBrowserApi(
       },
     },
     evalCalls,
+    connectCalls,
+    setConnectHandler(handler) {
+      connectHandler = handler;
+    },
   };
 }
 
@@ -219,5 +246,141 @@ describe("PanelBridge", () => {
         },
       ],
     });
+  });
+
+  it("watchControllerValues connects events port and sends watch message", async () => {
+    const sentMessages = [];
+    const fakePort = createFakePort();
+    const browserApi = createBrowserApi(
+      (message) => {
+        sentMessages.push(message);
+        return Promise.resolve({ success: true });
+      },
+      { success: true, name: "temp1" },
+      () => fakePort,
+    );
+    const bridge = new PanelBridge({ browserApi });
+
+    await bridge.watchControllerValues("ctrl-1", "counter");
+
+    expect(browserApi.connectCalls).toEqual([
+      { name: PANEL_EVENTS_PORT_NAME_PREFIX + 42 },
+    ]);
+    expect(sentMessages).toEqual([
+      {
+        type: RELAY_MESSAGE_TYPE,
+        tabId: 42,
+        message: {
+          type: CONTENT_WATCH_VALUES_MESSAGE_TYPE,
+          id: "ctrl-1",
+          identifier: "counter",
+        },
+      },
+    ]);
+  });
+
+  it("unwatchControllerValues sends unwatch message", async () => {
+    const sentMessages = [];
+    const browserApi = createBrowserApi((message) => {
+      sentMessages.push(message);
+      return Promise.resolve({ success: true });
+    });
+    const bridge = new PanelBridge({ browserApi });
+
+    await bridge.unwatchControllerValues();
+
+    expect(sentMessages).toEqual([
+      {
+        type: RELAY_MESSAGE_TYPE,
+        tabId: 42,
+        message: { type: CONTENT_UNWATCH_VALUES_MESSAGE_TYPE },
+      },
+    ]);
+  });
+
+  it("watchControllerValues reuses existing port", async () => {
+    const fakePort = createFakePort();
+    const browserApi = createBrowserApi(
+      () => Promise.resolve({ success: true }),
+      { success: true, name: "temp1" },
+      () => fakePort,
+    );
+    const bridge = new PanelBridge({ browserApi });
+
+    await bridge.watchControllerValues("ctrl-1", "counter");
+    await bridge.watchControllerValues("ctrl-1", "counter");
+
+    expect(browserApi.connectCalls).toHaveLength(1);
+  });
+
+  it("onValuesChanged callback receives values-changed port messages", async () => {
+    const fakePort = createFakePort();
+    const browserApi = createBrowserApi(
+      () => Promise.resolve({ success: true }),
+      { success: true, name: "temp1" },
+      () => fakePort,
+    );
+    const bridge = new PanelBridge({ browserApi });
+
+    const callback = vi.fn();
+    await bridge.watchControllerValues("ctrl-1", "counter");
+    bridge.onValuesChanged(callback);
+
+    const pushMessage = {
+      type: VALUES_CHANGED_PUSH_TYPE,
+      id: "ctrl-1",
+      values: [{ name: "count", type: "number", value: 5 }],
+    };
+    for (const cb of fakePort._listeners.message) {
+      cb(pushMessage);
+    }
+
+    expect(callback).toHaveBeenCalledWith(pushMessage);
+  });
+
+  it("onValuesChanged callback ignores non-values-changed messages", async () => {
+    const fakePort = createFakePort();
+    const browserApi = createBrowserApi(
+      () => Promise.resolve({ success: true }),
+      { success: true, name: "temp1" },
+      () => fakePort,
+    );
+    const bridge = new PanelBridge({ browserApi });
+
+    const callback = vi.fn();
+    await bridge.watchControllerValues("ctrl-1", "counter");
+    bridge.onValuesChanged(callback);
+
+    const otherMessage = { type: "some-other-type", data: "irrelevant" };
+    for (const cb of fakePort._listeners.message) {
+      cb(otherMessage);
+    }
+
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("events port disconnect nulls the port and next watch reconnects", async () => {
+    let callCount = 0;
+    const browserApi = createBrowserApi(
+      () => Promise.resolve({ success: true }),
+      { success: true, name: "temp1" },
+      () => {
+        callCount++;
+        return createFakePort();
+      },
+    );
+    const bridge = new PanelBridge({ browserApi });
+
+    await bridge.watchControllerValues("ctrl-1", "counter");
+    expect(bridge.eventsPort).not.toBeNull();
+
+    const port = bridge.eventsPort;
+    for (const cb of port._listeners.disconnect) {
+      cb();
+    }
+    expect(bridge.eventsPort).toBeNull();
+
+    await bridge.watchControllerValues("ctrl-1", "counter");
+    expect(callCount).toBe(2);
   });
 });
