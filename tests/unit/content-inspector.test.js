@@ -830,6 +830,101 @@ describe("ContentInspector", () => {
         vi.useRealTimers();
       }
     });
+
+    it("posts a tree-changed message on persisted pageshow", () => {
+      const fakePort = createFakePort();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        connectPort: () => fakePort,
+      });
+
+      inspector.startPageLifecycleWatcher();
+      const event = new Event("pageshow");
+      Object.defineProperty(event, "persisted", { value: true });
+      document.defaultView?.dispatchEvent(event);
+
+      expect(fakePort.postMessage).toHaveBeenCalledWith({
+        type: TREE_CHANGED_PUSH_TYPE,
+      });
+    });
+
+    it("reconnects the events port before posting on persisted pageshow", () => {
+      const firstPort = createFakePort();
+      const secondPort = createFakePort();
+      let callCount = 0;
+      const connectPort = vi.fn(() =>
+        callCount++ === 0 ? firstPort : secondPort,
+      );
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        connectPort,
+      });
+
+      inspector.startPageLifecycleWatcher();
+      const event = new Event("pageshow");
+      Object.defineProperty(event, "persisted", { value: true });
+      document.defaultView?.dispatchEvent(event);
+
+      expect(firstPort.disconnect).toHaveBeenCalled();
+      expect(secondPort.postMessage).toHaveBeenCalledWith({
+        type: TREE_CHANGED_PUSH_TYPE,
+      });
+    });
+
+    it("ignores pageshow when not persisted", () => {
+      const fakePort = createFakePort();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        connectPort: () => fakePort,
+      });
+
+      inspector.startPageLifecycleWatcher();
+      const event = new Event("pageshow");
+      Object.defineProperty(event, "persisted", { value: false });
+      document.defaultView?.dispatchEvent(event);
+
+      expect(fakePort.postMessage).not.toHaveBeenCalledWith({
+        type: TREE_CHANGED_PUSH_TYPE,
+      });
+    });
+
+    it("is safe when the document has no default view", () => {
+      const fakePort = createFakePort();
+      const disconnectedDocument = document.implementation.createHTMLDocument();
+      const inspector = new ContentInspector({
+        document: disconnectedDocument,
+        cssEscape,
+        connectPort: () => fakePort,
+      });
+
+      expect(() => inspector.startPageLifecycleWatcher()).not.toThrow();
+      expect(fakePort.postMessage).not.toHaveBeenCalledWith({
+        type: TREE_CHANGED_PUSH_TYPE,
+      });
+    });
+
+    it("disconnect removes the pageshow listener", () => {
+      const fakePort = createFakePort();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        connectPort: () => fakePort,
+      });
+
+      inspector.startPageLifecycleWatcher();
+      inspector.disconnect();
+
+      const event = new Event("pageshow");
+      Object.defineProperty(event, "persisted", { value: true });
+      document.defaultView?.dispatchEvent(event);
+
+      expect(fakePort.postMessage).not.toHaveBeenCalledWith({
+        type: TREE_CHANGED_PUSH_TYPE,
+      });
+    });
   });
 
   describe("watchValues", () => {

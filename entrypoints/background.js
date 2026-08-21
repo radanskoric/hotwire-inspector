@@ -6,6 +6,7 @@ import {
   RELAY_ERROR_TYPE,
   RELAY_MESSAGE_TYPE,
 } from "../lib/constants.js";
+import { handleTabUpdated } from "../lib/background-handler.js";
 
 /** @type {Map<number, import("wxt/browser").Browser.runtime.Port>} */
 const panelPortsByTab = new Map();
@@ -71,5 +72,9 @@ export default defineBackground(() => {
         }
       });
     }
+  });
+
+  browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    handleTabUpdated(panelPortsByTab, tabId, changeInfo);
   });
 });

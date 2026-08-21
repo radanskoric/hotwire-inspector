@@ -284,6 +284,51 @@ describe("createReconnectingPort", () => {
     expect(connectPort).toHaveBeenCalledTimes(1);
   });
 
+  it("reconnect immediately disconnects the current port and opens a new one", () => {
+    const firstPort = createFakePort();
+    const secondPort = createFakePort();
+    let callCount = 0;
+    const connectPort = vi.fn(() =>
+      callCount++ === 0 ? firstPort : secondPort,
+    );
+
+    const handle = createReconnectingPort({
+      connectPort,
+      setTimeoutImpl: timeout.fakeSetTimeout,
+      clearTimeoutImpl: timeout.fakeClearTimeout,
+    });
+
+    handle.reconnect();
+
+    expect(firstPort.disconnect).toHaveBeenCalled();
+    expect(connectPort).toHaveBeenCalledTimes(2);
+    expect(handle.port).toBe(secondPort);
+    expect(timeout.pending).toHaveLength(0);
+  });
+
+  it("reconnect resets the backoff delay", () => {
+    const ports = [createFakePort(), createFakePort(), createFakePort()];
+    let callCount = 0;
+    const connectPort = vi.fn(() => ports[callCount++]);
+
+    const handle = createReconnectingPort({
+      connectPort,
+      setTimeoutImpl: timeout.fakeSetTimeout,
+      clearTimeoutImpl: timeout.fakeClearTimeout,
+    });
+
+    ports[0]._listeners.disconnect[0]();
+    timeout.flush();
+    ports[1]._listeners.disconnect[0]();
+    expect(timeout.pending[0].delay).toBe(200);
+
+    handle.reconnect();
+
+    expect(handle.port).toBe(ports[2]);
+    ports[2]._listeners.disconnect[0]();
+    expect(timeout.pending.find((e) => !e.cleared)?.delay).toBe(100);
+  });
+
   it("does not schedule reconnect when disconnect() is called before onDisconnect", () => {
     const firstPort = createFakePort();
     const connectPort = vi.fn(() => firstPort);
