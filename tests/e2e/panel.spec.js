@@ -3,6 +3,7 @@ import { chromiumAdapter } from "./adapters/chromium-adapter.js";
 import { firefoxAdapter } from "./adapters/firefox-adapter.js";
 import {
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
+  CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_UNWATCH_VALUES_MESSAGE_TYPE,
@@ -427,6 +428,51 @@ test.describe("Panel UI", () => {
         "Targets",
         "Outlets",
       ]),
+    );
+  });
+
+  test("clicking an outlet badge opens the details panel for the outlet controller", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        const detailsPanel = await openDetailsPanel(
+          panelPage,
+          "modal-controller",
+          "modal",
+        );
+
+        const outletBadge = detailsPanel
+          .locator(".details-panel-section")
+          .nth(2)
+          .locator(".element-name.badge");
+        await expect(outletBadge).toHaveText("user-status");
+
+        await outletBadge.click();
+
+        await expect(detailsPanel.locator(".details-panel-title")).toHaveText(
+          "user-status",
+        );
+
+        const messages = await getRecordedMessages(panelPage);
+        const outletRequests = messages.filter(
+          (m) => m.type === CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE,
+        );
+
+        expect(outletRequests.length).toBeGreaterThanOrEqual(2);
+        expect(outletRequests[outletRequests.length - 1]).toEqual({
+          type: CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE,
+          id: "user-status-element",
+          identifier: "user-status",
+        });
+      },
     );
   });
 

@@ -5,6 +5,8 @@ import { ContentInspector } from "../../lib/content-inspector.js";
 import { createReconnectingPort } from "../../lib/port-reconnect.js";
 import { TreeWatcher } from "../../lib/tree-watcher.js";
 import {
+  CONTROLLER_OUTLET_DEFINITIONS_REQUEST_EVENT,
+  CONTROLLER_OUTLET_DEFINITIONS_RESPONSE_EVENT,
   CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
   CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT,
   ID_PREFIX,
@@ -766,6 +768,252 @@ describe("ContentInspector", () => {
       await inspector.controllerValues("modal-controller", "modal");
 
       expect(injectionCount).toBe(1);
+    });
+  });
+
+  describe("controllerTargets", () => {
+    it("returns each element declared as a target", () => {
+      document.body.innerHTML = `
+        <div id="modal-controller" data-controller="modal">
+          <button id="close-button" data-modal-target="closeButton"></button>
+          <input id="trigger" data-modal-target="trigger">
+        </div>
+      `;
+      const inspector = new ContentInspector({ document, cssEscape });
+
+      inspector.scan();
+
+      expect(inspector.controllerTargets("modal-controller", "modal")).toEqual({
+        success: true,
+        targets: [
+          { id: "close-button", tagName: "button", name: "closeButton" },
+          { id: "trigger", tagName: "input", name: "trigger" },
+        ],
+      });
+    });
+
+    it("returns an empty list when the controller declares no targets", () => {
+      document.body.innerHTML =
+        '<div id="modal-controller" data-controller="modal"></div>';
+      const inspector = new ContentInspector({ document, cssEscape });
+
+      inspector.scan();
+
+      expect(inspector.controllerTargets("modal-controller", "modal")).toEqual({
+        success: true,
+        targets: [],
+      });
+    });
+
+    it("returns an error when the element is not found", () => {
+      const inspector = new ContentInspector({ document, cssEscape });
+
+      expect(inspector.controllerTargets("missing", "modal")).toEqual({
+        success: false,
+        error: "Element not found",
+      });
+    });
+  });
+
+  describe("controllerOutlets", () => {
+    function makeOutletDefinitionsScript(script, names) {
+      script.addEventListener(
+        CONTROLLER_OUTLET_DEFINITIONS_REQUEST_EVENT,
+        (event) => {
+          const detail = JSON.parse(event.detail);
+
+          script.dispatchEvent(
+            new CustomEvent(CONTROLLER_OUTLET_DEFINITIONS_RESPONSE_EVENT, {
+              detail: JSON.stringify({
+                requestId: detail.requestId,
+                success: true,
+                outlets: names,
+              }),
+            }),
+          );
+        },
+      );
+    }
+
+    it("resolves outlets using the default selector when no explicit attribute is set", async () => {
+      document.body.innerHTML = `
+        <div id="host" data-controller="host">
+          <div id="status-el" data-controller="user-status"></div>
+          <div id="menu-el" data-controller="menu"></div>
+        </div>
+      `;
+      const script = new EventTarget();
+      makeOutletDefinitionsScript(script, ["user-status", "menu"]);
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript: () => Promise.resolve({ script }),
+      });
+
+      inspector.scan();
+
+      await expect(
+        inspector.controllerOutlets("host", "host"),
+      ).resolves.toEqual({
+        success: true,
+        outlets: [
+          { id: "status-el", tagName: "div", name: "user-status" },
+          { id: "menu-el", tagName: "div", name: "menu" },
+        ],
+      });
+    });
+
+    it("uses an explicit outlet selector when the data-attribute is set", async () => {
+      document.body.innerHTML = `
+        <div
+          id="host"
+          data-controller="host"
+          data-host-user-status-outlet="#status-via-id"
+        >
+          <div data-user-status data-controller="user-status"></div>
+          <div id="status-via-id" data-controller="user-status-old"></div>
+        </div>
+      `;
+      const script = new EventTarget();
+      makeOutletDefinitionsScript(script, ["user-status"]);
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript: () => Promise.resolve({ script }),
+      });
+
+      inspector.scan();
+
+      const response = await inspector.controllerOutlets("host", "host");
+
+      expect(response).toEqual({
+        success: true,
+        outlets: [{ id: "status-via-id", tagName: "div", name: "user-status" }],
+      });
+    });
+
+    it("returns an error when the element is not found", async () => {
+      const inspector = new ContentInspector({ document, cssEscape });
+
+      await expect(
+        inspector.controllerOutlets("missing", "host"),
+      ).resolves.toEqual({
+        success: false,
+        error: "Element not found",
+      });
+    });
+
+    it("propagates request errors from the injected script", async () => {
+      document.body.innerHTML = '<div id="host" data-controller="host"></div>';
+      const script = new EventTarget();
+      script.addEventListener(
+        CONTROLLER_OUTLET_DEFINITIONS_REQUEST_EVENT,
+        (event) => {
+          const detail = JSON.parse(event.detail);
+
+          script.dispatchEvent(
+            new CustomEvent(CONTROLLER_OUTLET_DEFINITIONS_RESPONSE_EVENT, {
+              detail: JSON.stringify({
+                requestId: detail.requestId,
+                success: false,
+                error: "Controller not found",
+              }),
+            }),
+          );
+        },
+      );
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript: () => Promise.resolve({ script }),
+      });
+
+      inspector.scan();
+
+      await expect(
+        inspector.controllerOutlets("host", "host"),
+      ).resolves.toEqual({
+        requestId: expect.any(String),
+        success: false,
+        error: "Controller not found",
+      });
+    });
+
+    it("uses fallback error text when the request rejects without a message", async () => {
+      document.body.innerHTML = '<div id="host" data-controller="host"></div>';
+      const inspector = new ContentInspector({ document, cssEscape });
+
+      inspector.sendOutletDefinitionsRequest = async () => {
+        throw new Error();
+      };
+      inspector.scan();
+
+      await expect(
+        inspector.controllerOutlets("host", "host"),
+      ).resolves.toEqual({
+        success: false,
+        error: "Controller outlets failed",
+      });
+    });
+
+    it("handles empty outlet attribute by falling back to default selector", async () => {
+      document.body.innerHTML = `
+        <div
+          id="host"
+          data-controller="host"
+          data-host-menu-outlet=""
+        >
+          <nav data-controller="menu">Menu</nav>
+        </div>
+      `;
+      const script = new EventTarget();
+      makeOutletDefinitionsScript(script, ["menu"]);
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript: () => Promise.resolve({ script }),
+      });
+
+      inspector.scan();
+
+      await expect(
+        inspector.controllerOutlets("host", "host"),
+      ).resolves.toEqual({
+        success: true,
+        outlets: [
+          {
+            id: expect.stringMatching(/^hotwire-inspector-/),
+            tagName: "nav",
+            name: "menu",
+          },
+        ],
+      });
+    });
+
+    it("skips outlets whose default selector finds no matches", async () => {
+      document.body.innerHTML = `
+        <div
+          id="host"
+          data-controller="host"
+          data-host-menu-outlet=""
+        ></div>
+      `;
+      const script = new EventTarget();
+      makeOutletDefinitionsScript(script, ["menu"]);
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript: () => Promise.resolve({ script }),
+      });
+
+      inspector.scan();
+
+      await expect(
+        inspector.controllerOutlets("host", "host"),
+      ).resolves.toEqual({
+        success: true,
+        outlets: [],
+      });
     });
   });
 

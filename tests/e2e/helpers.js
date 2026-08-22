@@ -2,6 +2,7 @@ export {
   deepFixtureUrl,
   fixtureUrl,
   fixturesRoot,
+  outletsFixtureUrl,
   stimulusAppFixtureUrl,
   StimulusAppFixtureUrl,
 } from "./support/fixtures.js";

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE,
+  CONTENT_CONTROLLER_TARGETS_MESSAGE_TYPE,
   CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
@@ -244,6 +246,88 @@ describe("PanelBridge", () => {
           value: "Hello",
           defaultValue: "",
           hasValue: true,
+        },
+      ],
+    });
+  });
+
+  it("controllerTargets sends CONTENT_CONTROLLER_TARGETS_MESSAGE_TYPE to the content script", async () => {
+    const sentMessages = [];
+    const browserApi = createBrowserApi((message) => {
+      sentMessages.push(message);
+      return Promise.resolve({
+        success: true,
+        targets: [
+          { id: "close-button", tagName: "button", name: "closeButton" },
+        ],
+      });
+    });
+    const bridge = new PanelBridge({ browserApi });
+
+    const response = await bridge.controllerTargets(
+      "modal-controller",
+      "modal",
+    );
+
+    expect(sentMessages).toEqual([
+      {
+        type: RELAY_MESSAGE_TYPE,
+        tabId: 42,
+        message: {
+          type: CONTENT_CONTROLLER_TARGETS_MESSAGE_TYPE,
+          id: "modal-controller",
+          identifier: "modal",
+        },
+      },
+    ]);
+    expect(browserApi.evalCalls).toEqual([]);
+    expect(response).toEqual({
+      success: true,
+      targets: [{ id: "close-button", tagName: "button", name: "closeButton" }],
+    });
+  });
+
+  it("controllerOutlets sends CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE to the content script", async () => {
+    const sentMessages = [];
+    const browserApi = createBrowserApi((message) => {
+      sentMessages.push(message);
+      return Promise.resolve({
+        success: true,
+        outlets: [
+          {
+            id: "user-status-element",
+            tagName: "div",
+            name: "user-status",
+          },
+        ],
+      });
+    });
+    const bridge = new PanelBridge({ browserApi });
+
+    const response = await bridge.controllerOutlets(
+      "modal-controller",
+      "modal",
+    );
+
+    expect(sentMessages).toEqual([
+      {
+        type: RELAY_MESSAGE_TYPE,
+        tabId: 42,
+        message: {
+          type: CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE,
+          id: "modal-controller",
+          identifier: "modal",
+        },
+      },
+    ]);
+    expect(browserApi.evalCalls).toEqual([]);
+    expect(response).toEqual({
+      success: true,
+      outlets: [
+        {
+          id: "user-status-element",
+          tagName: "div",
+          name: "user-status",
         },
       ],
     });

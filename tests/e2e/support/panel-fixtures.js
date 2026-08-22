@@ -141,6 +141,30 @@ export const fixtureValuesResponse = {
   ],
 };
 
+// Default answer for controller-targets messages in panel tests.
+export const fixtureTargetsResponse = {
+  success: true,
+  targets: [
+    {
+      id: "modal-close",
+      tagName: "button",
+      name: "closeButton",
+    },
+  ],
+};
+
+// Default answer for controller-outlets messages in panel tests.
+export const fixtureOutletsResponse = {
+  success: true,
+  outlets: [
+    {
+      id: "user-status-element",
+      tagName: "div",
+      name: "user-status",
+    },
+  ],
+};
+
 // Enough root nodes to make the tree taller than any test viewport, so the
 // tree area becomes scrollable.
 export const tallScanResponse = {

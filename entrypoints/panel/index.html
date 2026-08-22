@@ -91,11 +91,17 @@
             </details>
             <details class="details-panel-section" open>
               <summary>Targets</summary>
-              <div class="details-panel-section-content">TODO</div>
+              <div
+                class="details-panel-section-content"
+                data-details-panel-target="targets"
+              ></div>
             </details>
             <details class="details-panel-section" open>
               <summary>Outlets</summary>
-              <div class="details-panel-section-content">TODO</div>
+              <div
+                class="details-panel-section-content"
+                data-details-panel-target="outlets"
+              ></div>
             </details>
           </div>
         </aside>
@@ -137,6 +143,24 @@
     </template>
     <template id="badge-template">
       <span class="badge"></span>
+    </template>
+    <template id="details-element-row-template">
+      <div
+        class="element-row"
+        data-controller="panel-node"
+        data-panel-node-id-value=""
+      >
+        <img
+          src="/icons/reveal-in-elements.svg"
+          class="icon icon-btn"
+          data-action="click->panel-node#inspect"
+          alt=""
+          aria-hidden="true"
+        />
+        <span class="node-kind"></span>
+        <span class="node-id"></span>
+        <span class="element-name"></span>
+      </div>
     </template>
     <template id="notice-template">
       <div

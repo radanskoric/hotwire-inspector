@@ -7,3 +7,4 @@ export const stimulusAppFixtureUrl = (origin) =>
   `${origin}/stimulus-app-page.html`;
 export const StimulusAppFixtureUrl = (origin) =>
   `${origin}/StimulusApp-page.html`;
+export const outletsFixtureUrl = (origin) => `${origin}/outlets-page.html`;

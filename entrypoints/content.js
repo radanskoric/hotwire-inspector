@@ -2,6 +2,8 @@ import { browser } from "wxt/browser";
 import { injectScript } from "wxt/utils/inject-script";
 import {
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
+  CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE,
+  CONTENT_CONTROLLER_TARGETS_MESSAGE_TYPE,
   CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
   CONTENT_EVENTS_PORT_NAME,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
@@ -60,6 +62,20 @@ export default defineContentScript({
       if (message.type === CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE) {
         inspector
           .controllerValues(message.id, message.identifier)
+          .then(sendResponse);
+        return true;
+      }
+
+      if (message.type === CONTENT_CONTROLLER_TARGETS_MESSAGE_TYPE) {
+        sendResponse(
+          inspector.controllerTargets(message.id, message.identifier),
+        );
+        return true;
+      }
+
+      if (message.type === CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE) {
+        inspector
+          .controllerOutlets(message.id, message.identifier)
           .then(sendResponse);
         return true;
       }

@@ -1,9 +1,12 @@
 import {
+  CONTROLLER_OUTLET_DEFINITIONS_REQUEST_EVENT,
+  CONTROLLER_OUTLET_DEFINITIONS_RESPONSE_EVENT,
   CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
   CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT,
   STORE_CONTROLLER_REQUEST_EVENT,
   STORE_CONTROLLER_RESPONSE_EVENT,
 } from "../lib/constants.js";
+import { extractControllerOutletDefinitions } from "../lib/controller-outlets.js";
 import { extractControllerValueDefinitions } from "../lib/controller-values.js";
 
 /**
@@ -33,6 +36,12 @@ export default defineUnlistedScript(() => {
     CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
     CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT,
     getValueDefinitions,
+  );
+  onRequest(
+    script,
+    CONTROLLER_OUTLET_DEFINITIONS_REQUEST_EVENT,
+    CONTROLLER_OUTLET_DEFINITIONS_RESPONSE_EVENT,
+    getOutletDefinitions,
   );
 });
 
@@ -164,5 +173,23 @@ function getValueDefinitions(selector, identifier) {
   return {
     success: true,
     definitions: extractControllerValueDefinitions(result.controller),
+  };
+}
+
+/**
+ * @param {string} selector
+ * @param {string} identifier
+ * @returns {import("../lib/types.js").ControllerOutletDefinitionsResponse}
+ */
+function getOutletDefinitions(selector, identifier) {
+  const result = findController(selector, identifier);
+
+  if ("success" in result) {
+    return result;
+  }
+
+  return {
+    success: true,
+    outlets: extractControllerOutletDefinitions(result.controller),
   };
 }

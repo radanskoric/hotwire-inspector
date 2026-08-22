@@ -454,6 +454,21 @@ main {
   font-style: italic;
 }
 
+.details-note {
+  font-style: italic;
+}
+
+.element-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-inline);
+  padding-block: 0.125rem;
+}
+
+.element-name {
+  color: var(--color-ink-muted);
+}
+
 .value-row {
   display: flex;
   align-items: baseline;

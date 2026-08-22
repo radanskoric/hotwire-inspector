@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 import {
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
+  CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE,
+  CONTENT_CONTROLLER_TARGETS_MESSAGE_TYPE,
   CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_INSPECT_MESSAGE_TYPE,
@@ -11,6 +13,7 @@ import {
   deepFixtureUrl,
   fixturesRoot,
   fixtureUrl,
+  outletsFixtureUrl,
   stimulusAppFixtureUrl,
   StimulusAppFixtureUrl,
   withChromiumExtension,
@@ -462,6 +465,136 @@ test.describe("Content Script", () => {
             page.evaluate(() => window.temp1 === window.modalController),
           )
           .toBe(true);
+      });
+    });
+  });
+
+  test("reports Stimulus targets for a controller", async ({ browserName }) => {
+    test.skip(browserName !== "chromium");
+
+    await withStaticServer(fixturesRoot, async (origin) => {
+      await withChromiumExtension(async ({ page, context }) => {
+        await page.goto(outletsFixtureUrl(origin));
+
+        const frame = await getExtensionDevtoolsFrame(context);
+        const result = await sendToContentScript(frame, {
+          type: CONTENT_CONTROLLER_TARGETS_MESSAGE_TYPE,
+          id: "modal-controller",
+          identifier: "modal",
+        });
+
+        expect(result).toEqual({
+          success: true,
+          targets: [
+            {
+              id: "modal-close",
+              tagName: "button",
+              name: "closeButton",
+            },
+          ],
+        });
+      });
+    });
+  });
+
+  test("returns an error when reading targets for an unknown element", async ({
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium");
+
+    await withStaticServer(fixturesRoot, async (origin) => {
+      await withChromiumExtension(async ({ page, context }) => {
+        await page.goto(outletsFixtureUrl(origin));
+
+        const frame = await getExtensionDevtoolsFrame(context);
+        const result = await sendToContentScript(frame, {
+          type: CONTENT_CONTROLLER_TARGETS_MESSAGE_TYPE,
+          id: "missing",
+          identifier: "modal",
+        });
+
+        expect(result).toEqual({
+          success: false,
+          error: "Element not found",
+        });
+      });
+    });
+  });
+
+  test("reports Stimulus outlets using declared selectors", async ({
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium");
+
+    await withStaticServer(fixturesRoot, async (origin) => {
+      await withChromiumExtension(async ({ page, context }) => {
+        await page.goto(outletsFixtureUrl(origin));
+
+        const frame = await getExtensionDevtoolsFrame(context);
+        const result = await sendToContentScript(frame, {
+          type: CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE,
+          id: "modal-controller",
+          identifier: "modal",
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.outlets).toEqual([
+          {
+            id: "user-status-element",
+            tagName: "div",
+            name: "user-status",
+          },
+          {
+            id: expect.stringMatching(/hotwire-inspector-/),
+            tagName: "nav",
+            name: "menu",
+          },
+        ]);
+      });
+    });
+  });
+
+  test("returns an error when reading outlets for an unknown element", async ({
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium");
+
+    await withStaticServer(fixturesRoot, async (origin) => {
+      await withChromiumExtension(async ({ page, context }) => {
+        await page.goto(outletsFixtureUrl(origin));
+
+        const frame = await getExtensionDevtoolsFrame(context);
+        const result = await sendToContentScript(frame, {
+          type: CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE,
+          id: "missing",
+          identifier: "modal",
+        });
+
+        expect(result).toEqual({
+          success: false,
+          error: "Element not found",
+        });
+      });
+    });
+  });
+
+  test("inspect works on a controller target element", async ({
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium");
+
+    await withStaticServer(fixturesRoot, async (origin) => {
+      await withChromiumExtension(async ({ page, context }) => {
+        await page.goto(outletsFixtureUrl(origin));
+
+        const frame = await getExtensionDevtoolsFrame(context);
+        const result = await sendToContentScript(frame, {
+          type: CONTENT_INSPECT_MESSAGE_TYPE,
+          id: "modal-close",
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.selector).toBe("#modal-close");
       });
     });
   });

@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Outlets Test Page</title>
+    <script>
+      class ModalControllerClass {
+        static outlets = ["user-status", "menu"];
+        static values = {
+          title: { type: String, default: "" },
+        };
+      }
+      class UserStatusControllerClass {}
+      class MenuControllerClass {}
+
+      window.modalController = Object.assign(new ModalControllerClass(), {
+        name: "modal-controller",
+        valueDescriptorMap: {
+          "data-modal-title-value": {
+            name: "titleValue",
+            type: "string",
+            defaultValue: "",
+          },
+        },
+      });
+      window.userStatusController = new UserStatusControllerClass();
+      window.menuController = new MenuControllerClass();
+
+      window.Stimulus = {
+        getControllerForElementAndIdentifier(element, identifier) {
+          if (
+            identifier === "modal" &&
+            element.matches('[data-controller~="modal"]')
+          ) {
+            return window.modalController;
+          }
+          if (
+            identifier === "user-status" &&
+            element.matches('[data-controller~="user-status"]')
+          ) {
+            return window.userStatusController;
+          }
+          if (
+            identifier === "menu" &&
+            element.matches('[data-controller~="menu"]')
+          ) {
+            return window.menuController;
+          }
+          return null;
+        },
+      };
+    </script>
+  </head>
+
+  <body>
+    <div
+      id="modal-controller"
+      data-controller="modal"
+      data-modal-title-value="Greeting"
+      data-modal-user-status-outlet="#user-status-element"
+      data-modal-menu-outlet=""
+    >
+      <button id="modal-close" data-modal-target="closeButton">Close</button>
+      <div id="user-status-element" data-controller="user-status">User</div>
+      <nav data-controller="menu">Menu</nav>
+    </div>
+  </body>
+</html>

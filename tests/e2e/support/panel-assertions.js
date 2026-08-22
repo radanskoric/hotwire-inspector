@@ -1,11 +1,17 @@
 import { expect } from "@playwright/test";
 import {
+  CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE,
+  CONTENT_CONTROLLER_TARGETS_MESSAGE_TYPE,
   CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
   CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
 } from "../../../lib/constants.js";
-import { fixtureValuesResponse } from "./panel-fixtures.js";
+import {
+  fixtureOutletsResponse,
+  fixtureTargetsResponse,
+  fixtureValuesResponse,
+} from "./panel-fixtures.js";
 
 export async function addMockPanelApis(
   page,
@@ -15,6 +21,8 @@ export async function addMockPanelApis(
     scanResponses,
     persistedTheme,
     valuesResponse,
+    targetsResponse,
+    outletsResponse,
   } = {},
 ) {
   await page.addInitScript(
@@ -24,9 +32,13 @@ export async function addMockPanelApis(
       scanResponses,
       persistedTheme,
       valuesResponse,
+      targetsResponse,
+      outletsResponse,
       scanMessageType,
       storeControllerMessageType,
       controllerValuesMessageType,
+      controllerTargetsMessageType,
+      controllerOutletsMessageType,
     }) => {
       globalThis.browser ??= {};
       globalThis.browser.runtime ??= {};
@@ -83,6 +95,14 @@ export async function addMockPanelApis(
           return Promise.resolve(valuesResponse);
         }
 
+        if (message.type === controllerTargetsMessageType) {
+          return Promise.resolve(targetsResponse);
+        }
+
+        if (message.type === controllerOutletsMessageType) {
+          return Promise.resolve(outletsResponse);
+        }
+
         return Promise.resolve({ success: true, selector: "#mock" });
       };
 
@@ -128,9 +148,13 @@ export async function addMockPanelApis(
       scanResponses,
       persistedTheme,
       valuesResponse: valuesResponse ?? fixtureValuesResponse,
+      targetsResponse: targetsResponse ?? fixtureTargetsResponse,
+      outletsResponse: outletsResponse ?? fixtureOutletsResponse,
       scanMessageType: CONTENT_SCAN_MESSAGE_TYPE,
       storeControllerMessageType: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
       controllerValuesMessageType: CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
+      controllerTargetsMessageType: CONTENT_CONTROLLER_TARGETS_MESSAGE_TYPE,
+      controllerOutletsMessageType: CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE,
     },
   );
 }
@@ -503,23 +527,20 @@ export function withExpectedDetailsPanelSections(
     await expect(sections.locator("> summary")).toHaveText(expectedSections);
 
     // The Values section renders the controller's Stimulus values (default
-    // mock response); Targets and Outlets are still placeholders.
+    // mock response); Targets and Outlets each render one row from their
+    // default mock responses.
     const valuesContent = sections
       .first()
       .locator(".details-panel-section-content");
     await expect(valuesContent.locator(".value-row")).toHaveCount(3);
 
-    for (const section of await sections.all()) {
-      const summary = await section.locator("> summary").textContent();
+    await expect(
+      sections.nth(1).locator(".details-panel-section-content .element-row"),
+    ).toHaveCount(1);
 
-      if (summary === "Values") {
-        continue;
-      }
-
-      await expect(
-        section.locator(".details-panel-section-content"),
-      ).toHaveText("TODO");
-    }
+    await expect(
+      sections.nth(2).locator(".details-panel-section-content .element-row"),
+    ).toHaveCount(1);
 
     // Sections collapse and expand natively via their summary.
     const firstSection = sections.first();

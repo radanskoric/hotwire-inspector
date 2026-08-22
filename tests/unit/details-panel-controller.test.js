@@ -1,9 +1,11 @@
 // @vitest-environment happy-dom
 
 import { Application } from "@hotwired/stimulus";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DetailsPanelController } from "../../lib/panel/controllers/details-panel-controller.js";
+import { PanelNodeController } from "../../lib/panel/controllers/panel-node-controller.js";
 import {
+  ID_PREFIX,
   PANEL_BRIDGE_PROPERTY,
   SHOW_CONTROLLER_DETAILS_EVENT,
   SCAN_REFRESHED_EVENT,
@@ -23,6 +25,14 @@ describe("DetailsPanelController", () => {
       <template id="notice-template">
         <div class="status-notice" data-controller="status" role="status" aria-live="polite">
           <span slot="text"></span>
+        </div>
+      </template>
+      <template id="details-element-row-template">
+        <div class="element-row" data-controller="panel-node" data-panel-node-id-value="">
+          <img src="/icons/reveal-in-elements.svg" class="icon icon-btn" data-action="click->panel-node#inspect" alt="" aria-hidden="true" />
+          <span class="node-kind"></span>
+          <span class="node-id"></span>
+          <span class="element-name"></span>
         </div>
       </template>
       <aside
@@ -45,11 +55,11 @@ describe("DetailsPanelController", () => {
           </details>
           <details class="details-panel-section" open>
             <summary>Targets</summary>
-            <div class="details-panel-section-content">TODO</div>
+            <div class="details-panel-section-content" data-details-panel-target="targets"></div>
           </details>
           <details class="details-panel-section" open>
             <summary>Outlets</summary>
-            <div class="details-panel-section-content">TODO</div>
+            <div class="details-panel-section-content" data-details-panel-target="outlets"></div>
           </details>
         </div>
       </aside>
@@ -62,6 +72,14 @@ describe("DetailsPanelController", () => {
       controllerValues(id, identifier) {
         calls.push(["controllerValues", id, identifier]);
         return Promise.resolve({ success: true, values: [] });
+      },
+      controllerTargets(id, identifier) {
+        calls.push(["controllerTargets", id, identifier]);
+        return Promise.resolve({ success: true, targets: [] });
+      },
+      controllerOutlets(id, identifier) {
+        calls.push(["controllerOutlets", id, identifier]);
+        return Promise.resolve({ success: true, outlets: [] });
       },
       watchControllerValues(id, identifier) {
         calls.push(["watchControllerValues", id, identifier]);
@@ -77,6 +95,7 @@ describe("DetailsPanelController", () => {
     };
     application = Application.start();
     application.register("details-panel", DetailsPanelController);
+    application.register("panel-node", PanelNodeController);
     panel = document.getElementById("details-panel");
 
     await Promise.resolve();
@@ -122,6 +141,8 @@ describe("DetailsPanelController", () => {
     expect(panel.dataset.detailsPanelIdentifierValue).toBe("modal");
     expect(calls).toEqual([
       ["controllerValues", "frame-1", "modal"],
+      ["controllerTargets", "frame-1", "modal"],
+      ["controllerOutlets", "frame-1", "modal"],
       ["watchControllerValues", "frame-1", "modal"],
     ]);
   });
@@ -160,6 +181,8 @@ describe("DetailsPanelController", () => {
 
     expect(calls).toEqual([
       ["controllerValues", "frame-1", "modal"],
+      ["controllerTargets", "frame-1", "modal"],
+      ["controllerOutlets", "frame-1", "modal"],
       ["watchControllerValues", "frame-1", "modal"],
       ["storeControllerNode", "frame-1", "modal"],
     ]);
@@ -183,6 +206,8 @@ describe("DetailsPanelController", () => {
     expect(document.querySelector(".status-notice")).toBeNull();
     expect(calls).toEqual([
       ["controllerValues", "frame-1", "modal"],
+      ["controllerTargets", "frame-1", "modal"],
+      ["controllerOutlets", "frame-1", "modal"],
       ["watchControllerValues", "frame-1", "modal"],
       ["storeControllerNode", "frame-1", "modal"],
     ]);
@@ -534,8 +559,12 @@ describe("DetailsPanelController", () => {
 
       expect(calls).toEqual([
         ["controllerValues", "frame-1", "modal"],
+        ["controllerTargets", "frame-1", "modal"],
+        ["controllerOutlets", "frame-1", "modal"],
         ["watchControllerValues", "frame-1", "modal"],
         ["controllerValues", "frame-1", "modal"],
+        ["controllerTargets", "frame-1", "modal"],
+        ["controllerOutlets", "frame-1", "modal"],
         ["watchControllerValues", "frame-1", "modal"],
       ]);
       expect(valuesContent().querySelectorAll(".value-row")).toHaveLength(4);
@@ -548,6 +577,8 @@ describe("DetailsPanelController", () => {
 
       expect(calls).toEqual([
         ["controllerValues", "frame-1", "modal"],
+        ["controllerTargets", "frame-1", "modal"],
+        ["controllerOutlets", "frame-1", "modal"],
         ["watchControllerValues", "frame-1", "modal"],
       ]);
     });
@@ -653,6 +684,8 @@ describe("DetailsPanelController", () => {
 
       expect(calls).toEqual([
         ["controllerValues", "frame-1", "modal"],
+        ["controllerTargets", "frame-1", "modal"],
+        ["controllerOutlets", "frame-1", "modal"],
         ["watchControllerValues", "frame-1", "modal"],
       ]);
     });
@@ -676,6 +709,453 @@ describe("DetailsPanelController", () => {
         "watchControllerValues",
         "frame-1",
         "modal",
+      ]);
+    });
+  });
+
+  describe("targets section", () => {
+    function targetsContent() {
+      return panel.querySelector("[data-details-panel-target='targets']");
+    }
+
+    function mockTargetsResponse(response) {
+      document[PANEL_BRIDGE_PROPERTY].controllerTargets = (id, identifier) => {
+        calls.push(["controllerTargets", id, identifier]);
+        return Promise.resolve(response);
+      };
+    }
+
+    function mockTargetsDeferred() {
+      const pending = [];
+      document[PANEL_BRIDGE_PROPERTY].controllerTargets = (id, identifier) => {
+        calls.push(["controllerTargets", id, identifier]);
+        return new Promise((resolve) => pending.push(resolve));
+      };
+      return pending;
+    }
+
+    it("shows a loading note while targets are being fetched", () => {
+      mockTargetsDeferred();
+
+      showDetails();
+
+      expect(targetsContent().textContent).toBe("Loading…");
+      expect(targetsContent().classList.contains("details-note")).toBe(true);
+    });
+
+    it("renders one row per target with kind, id, and name", async () => {
+      mockTargetsResponse({
+        success: true,
+        targets: [
+          { id: "modal-close", tagName: "button", name: "closeButton" },
+          { id: "modal-trigger", tagName: "button", name: "trigger" },
+        ],
+      });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const rows = targetsContent().querySelectorAll(".element-row");
+      expect(rows).toHaveLength(2);
+      expect(rows[0].dataset.panelNodeIdValue).toBe("modal-close");
+      expect(rows[0].querySelector(".node-kind").textContent).toBe("button");
+      expect(rows[0].querySelector(".node-id").textContent).toBe("modal-close");
+      expect(rows[0].querySelector(".element-name").textContent).toBe(
+        "closeButton",
+      );
+      const icon = rows[0].querySelector("img.icon-btn");
+      expect(icon).not.toBeNull();
+      expect(icon.getAttribute("src")).toBe("/icons/reveal-in-elements.svg");
+      expect(icon.getAttribute("alt")).toBe("");
+      expect(icon.getAttribute("data-action")).toBe(
+        "click->panel-node#inspect",
+      );
+      // Plain target name — no badge style or show-details action.
+      expect(
+        rows[0].querySelector(".element-name").classList.contains("badge"),
+      ).toBe(false);
+    });
+
+    it("hides internal generated ids in target rows", async () => {
+      mockTargetsResponse({
+        success: true,
+        targets: [
+          { id: "modal-close", tagName: "button", name: "closeButton" },
+          {
+            id: `${ID_PREFIX}-uuid-1`,
+            tagName: "input",
+            name: "input",
+          },
+        ],
+      });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const rows = targetsContent().querySelectorAll(".element-row");
+      expect(rows).toHaveLength(2);
+      // The id still needs to be set on the panel-node-data attribute so
+      // the reveal icon can inspect it, just hidden from the user.
+      expect(rows[1].dataset.panelNodeIdValue).toBe(`${ID_PREFIX}-uuid-1`);
+      expect(rows[1].querySelector(".node-id").hidden).toBe(true);
+    });
+
+    it("shows a note when the controller declares no targets", async () => {
+      mockTargetsResponse({ success: true, targets: [] });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(targetsContent().textContent).toBe("No targets");
+      expect(targetsContent().classList.contains("details-note")).toBe(true);
+      expect(targetsContent().querySelectorAll(".element-row")).toHaveLength(0);
+    });
+
+    it("shows the error when fetching targets fails", async () => {
+      mockTargetsResponse({
+        success: false,
+        error: "Controller not found",
+      });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(targetsContent().textContent).toBe("Controller not found");
+    });
+
+    it("shows a fallback note when fetching targets fails without an error", async () => {
+      mockTargetsResponse({ success: false });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(targetsContent().textContent).toBe("Controller targets failed");
+    });
+
+    it("shows a fallback note when the targets request rejects", async () => {
+      document[PANEL_BRIDGE_PROPERTY].controllerTargets = () =>
+        Promise.reject(new Error(""));
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(targetsContent().textContent).toBe("Controller targets failed");
+    });
+
+    it("shows the relay error when the targets request rejects", async () => {
+      document[PANEL_BRIDGE_PROPERTY].controllerTargets = () =>
+        Promise.reject(new Error("Could not establish connection"));
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(targetsContent().textContent).toBe(
+        "Could not establish connection",
+      );
+    });
+
+    it("ignores a stale targets response after the controller changes", async () => {
+      const pending = mockTargetsDeferred();
+
+      showDetails({ nodeId: "frame-1", identifier: "modal" });
+      showDetails({ nodeId: "frame-2", identifier: "dropdown" });
+
+      pending[1]({
+        success: true,
+        targets: [{ id: "dropdown-item", tagName: "li", name: "item" }],
+      });
+      await Promise.resolve();
+      expect(targetsContent().querySelectorAll(".element-row")).toHaveLength(1);
+
+      pending[0]({
+        success: true,
+        targets: [
+          { id: "modal-close", tagName: "button", name: "closeButton" },
+        ],
+      });
+      await Promise.resolve();
+      expect(targetsContent().querySelectorAll(".element-row")).toHaveLength(1);
+      expect(
+        targetsContent().querySelector(".element-row").dataset.panelNodeIdValue,
+      ).toBe("dropdown-item");
+    });
+
+    it("ignores a stale targets response after the panel was closed", async () => {
+      const pending = mockTargetsDeferred();
+
+      showDetails();
+      panel
+        .querySelector(".details-panel-close")
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+      pending[0]({
+        success: true,
+        targets: [
+          { id: "modal-close", tagName: "button", name: "closeButton" },
+        ],
+      });
+      await Promise.resolve();
+
+      expect(targetsContent().querySelectorAll(".element-row")).toHaveLength(0);
+      expect(targetsContent().textContent).toBe("Loading…");
+    });
+
+    it("replaces note styling when targets render after a previous note", async () => {
+      mockTargetsResponse({ success: true, targets: [] });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(targetsContent().classList.contains("details-note")).toBe(true);
+
+      mockTargetsResponse({
+        success: true,
+        targets: [
+          { id: "modal-close", tagName: "button", name: "closeButton" },
+        ],
+      });
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(targetsContent().classList.contains("details-note")).toBe(false);
+      expect(targetsContent().querySelectorAll(".element-row")).toHaveLength(1);
+    });
+
+    it("refetches targets when a scan refresh still finds the controller", async () => {
+      mockTargetsResponse({ success: true, targets: [] });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      scanRefreshed([
+        { id: "frame-1", tagName: "div", controllers: ["modal", "dropdown"] },
+      ]);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const targetCalls = calls.filter(
+        ([name]) => name === "controllerTargets",
+      );
+
+      expect(targetCalls).toEqual([
+        ["controllerTargets", "frame-1", "modal"],
+        ["controllerTargets", "frame-1", "modal"],
+      ]);
+    });
+  });
+
+  describe("outlets section", () => {
+    function outletsContent() {
+      return panel.querySelector("[data-details-panel-target='outlets']");
+    }
+
+    function mockOutletsResponse(response) {
+      document[PANEL_BRIDGE_PROPERTY].controllerOutlets = (id, identifier) => {
+        calls.push(["controllerOutlets", id, identifier]);
+        return Promise.resolve(response);
+      };
+    }
+
+    function mockOutletsDeferred() {
+      const pending = [];
+      document[PANEL_BRIDGE_PROPERTY].controllerOutlets = (id, identifier) => {
+        calls.push(["controllerOutlets", id, identifier]);
+        return new Promise((resolve) => pending.push(resolve));
+      };
+      return pending;
+    }
+
+    it("shows a loading note while outlets are being fetched", () => {
+      mockOutletsDeferred();
+
+      showDetails();
+
+      expect(outletsContent().textContent).toBe("Loading…");
+      expect(outletsContent().classList.contains("details-note")).toBe(true);
+    });
+
+    it("renders one row per outlet with the outlet name as a clickable badge", async () => {
+      mockOutletsResponse({
+        success: true,
+        outlets: [
+          { id: "user-status-element", tagName: "div", name: "user-status" },
+          { id: "menu-element", tagName: "nav", name: "menu" },
+        ],
+      });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const rows = outletsContent().querySelectorAll(".element-row");
+      expect(rows).toHaveLength(2);
+      expect(rows[0].dataset.panelNodeIdValue).toBe("user-status-element");
+      expect(rows[0].querySelector(".node-kind").textContent).toBe("div");
+      const name = rows[0].querySelector(".element-name");
+      expect(name.textContent).toBe("user-status");
+      expect(name.classList.contains("badge")).toBe(true);
+      expect(name.dataset.controllerIdentifier).toBe("user-status");
+      expect(name.dataset.action).toBe("click->panel-node#showDetails");
+    });
+
+    it("dispatches SHOW_CONTROLLER_DETAILS_EVENT with the outlet element's nodeId and the outlet name when an outlet badge is clicked", async () => {
+      mockOutletsResponse({
+        success: true,
+        outlets: [
+          { id: "user-status-element", tagName: "div", name: "user-status" },
+        ],
+      });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const showListener = vi.fn();
+      document.addEventListener(SHOW_CONTROLLER_DETAILS_EVENT, showListener);
+
+      const outletName = outletsContent().querySelector(".element-name");
+      outletName.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+      await Promise.resolve();
+
+      expect(showListener).toHaveBeenCalledTimes(1);
+      const detail = showListener.mock.calls[0][0].detail;
+      expect(detail).toEqual({
+        nodeId: "user-status-element",
+        identifier: "user-status",
+      });
+    });
+
+    it("shows a note when the controller declares no outlets", async () => {
+      mockOutletsResponse({ success: true, outlets: [] });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(outletsContent().textContent).toBe("No outlets");
+      expect(outletsContent().classList.contains("details-note")).toBe(true);
+      expect(outletsContent().querySelectorAll(".element-row")).toHaveLength(0);
+    });
+
+    it("shows the error when fetching outlets fails", async () => {
+      mockOutletsResponse({
+        success: false,
+        error: "Controller not found",
+      });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(outletsContent().textContent).toBe("Controller not found");
+    });
+
+    it("shows a fallback note when fetching outlets fails without an error", async () => {
+      mockOutletsResponse({ success: false });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(outletsContent().textContent).toBe("Controller outlets failed");
+    });
+
+    it("shows a fallback note when the outlets request rejects", async () => {
+      document[PANEL_BRIDGE_PROPERTY].controllerOutlets = () =>
+        Promise.reject(new Error(""));
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(outletsContent().textContent).toBe("Controller outlets failed");
+    });
+
+    it("shows the relay error when the outlets request rejects", async () => {
+      document[PANEL_BRIDGE_PROPERTY].controllerOutlets = () =>
+        Promise.reject(new Error("Could not establish connection"));
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(outletsContent().textContent).toBe(
+        "Could not establish connection",
+      );
+    });
+
+    it("ignores a stale outlets response after the controller changes", async () => {
+      const pending = mockOutletsDeferred();
+
+      showDetails({ nodeId: "frame-1", identifier: "modal" });
+      showDetails({ nodeId: "frame-2", identifier: "dropdown" });
+
+      pending[1]({
+        success: true,
+        outlets: [{ id: "dropdown-outlet", tagName: "div", name: "menu" }],
+      });
+      await Promise.resolve();
+      expect(outletsContent().querySelectorAll(".element-row")).toHaveLength(1);
+
+      pending[0]({
+        success: true,
+        outlets: [{ id: "modal-outlet", tagName: "div", name: "user-status" }],
+      });
+      await Promise.resolve();
+      expect(outletsContent().querySelectorAll(".element-row")).toHaveLength(1);
+      expect(
+        outletsContent().querySelector(".element-row").dataset.panelNodeIdValue,
+      ).toBe("dropdown-outlet");
+    });
+
+    it("ignores a stale outlets response after the panel was closed", async () => {
+      const pending = mockOutletsDeferred();
+
+      showDetails();
+      panel
+        .querySelector(".details-panel-close")
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+      pending[0]({
+        success: true,
+        outlets: [{ id: "modal-outlet", tagName: "div", name: "user-status" }],
+      });
+      await Promise.resolve();
+
+      expect(outletsContent().querySelectorAll(".element-row")).toHaveLength(0);
+      expect(outletsContent().textContent).toBe("Loading…");
+    });
+
+    it("refetches outlets when a scan refresh still finds the controller", async () => {
+      mockOutletsResponse({ success: true, outlets: [] });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      scanRefreshed([
+        { id: "frame-1", tagName: "div", controllers: ["modal", "dropdown"] },
+      ]);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const outletCalls = calls.filter(
+        ([name]) => name === "controllerOutlets",
+      );
+
+      expect(outletCalls).toEqual([
+        ["controllerOutlets", "frame-1", "modal"],
+        ["controllerOutlets", "frame-1", "modal"],
       ]);
     });
   });
