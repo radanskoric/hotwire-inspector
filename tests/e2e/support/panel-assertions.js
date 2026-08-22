@@ -535,11 +535,11 @@ export function withExpectedDetailsPanelSections(
     await expect(valuesContent.locator(".value-row")).toHaveCount(3);
 
     await expect(
-      sections.nth(1).locator(".details-panel-section-content .element-row"),
+      sections.nth(1).locator(".details-panel-section-content .node"),
     ).toHaveCount(1);
 
     await expect(
-      sections.nth(2).locator(".details-panel-section-content .element-row"),
+      sections.nth(2).locator(".details-panel-section-content .node"),
     ).toHaveCount(1);
 
     // Sections collapse and expand natively via their summary.

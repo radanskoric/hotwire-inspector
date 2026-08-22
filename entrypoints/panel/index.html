@@ -145,21 +145,24 @@
       <span class="badge"></span>
     </template>
     <template id="details-element-row-template">
-      <div
-        class="element-row"
-        data-controller="panel-node"
-        data-panel-node-id-value=""
-      >
-        <img
-          src="/icons/reveal-in-elements.svg"
-          class="icon icon-btn"
-          data-action="click->panel-node#inspect"
-          alt=""
-          aria-hidden="true"
-        />
-        <span class="node-kind"></span>
-        <span class="node-id"></span>
-        <span class="element-name"></span>
+      <div class="node">
+        <div
+          class="node-row"
+          data-controller="panel-node"
+          data-panel-node-id-value=""
+          data-action="mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight"
+        >
+          <img
+            src="/icons/reveal-in-elements.svg"
+            class="icon icon-btn"
+            data-action="click->panel-node#inspect"
+            alt=""
+            aria-hidden="true"
+          />
+          <span class="node-kind"></span>
+          <span class="node-id"></span>
+          <span class="element-name"></span>
+        </div>
       </div>
     </template>
     <template id="notice-template">

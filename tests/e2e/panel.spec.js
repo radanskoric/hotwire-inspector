@@ -27,6 +27,7 @@ import {
   expectThemeChanges,
   expectThemeSwitcher,
   getRecordedMessages,
+  getRecordedEvalCalls,
   openDetailsPanel,
   simulateTreeChanged,
   simulateValuesChanged,
@@ -472,6 +473,75 @@ test.describe("Panel UI", () => {
           id: "user-status-element",
           identifier: "user-status",
         });
+      },
+    );
+  });
+
+  test("details panel rows reveal their element in the Elements panel on icon click", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        const detailsPanel = await openDetailsPanel(
+          panelPage,
+          "modal-controller",
+          "modal",
+        );
+
+        const targetRow = detailsPanel
+          .locator(".details-panel-section")
+          .nth(1)
+          .locator(".node")
+          .first();
+        const outletRow = detailsPanel
+          .locator(".details-panel-section")
+          .nth(2)
+          .locator(".node")
+          .first();
+
+        await panelPage.locator("h1").hover();
+        await clearRecordedMessages(panelPage);
+
+        await targetRow.hover();
+        await targetRow.locator(".icon-btn").first().click();
+
+        await outletRow.hover();
+        await outletRow.locator(".icon-btn").first().click();
+
+        const messages = await getRecordedMessages(panelPage);
+        const evalCalls = await getRecordedEvalCalls(panelPage);
+
+        expect(messages).toContainEqual({
+          type: CONTENT_HIGHLIGHT_MESSAGE_TYPE,
+          id: "modal-close",
+        });
+        expect(messages).toContainEqual({
+          type: CONTENT_INSPECT_MESSAGE_TYPE,
+          id: "modal-close",
+        });
+        expect(messages).toContainEqual({
+          type: CONTENT_HIGHLIGHT_MESSAGE_TYPE,
+          id: "user-status-element",
+        });
+        expect(messages).toContainEqual({
+          type: CONTENT_INSPECT_MESSAGE_TYPE,
+          id: "user-status-element",
+        });
+
+        // Each click reflects back through the content script mock, which
+        // replies with success: true / selector: "#mock" by default. The
+        // important regression signal is the key id passed to the inspect
+        // message — that's what was silently empty before.
+        expect(evalCalls).toHaveLength(2);
+        expect(evalCalls[0]).toBe('inspect(document.querySelector("#mock"))');
+        expect(evalCalls[1]).toBe('inspect(document.querySelector("#mock"))');
       },
     );
   });

@@ -448,6 +448,9 @@ main {
   padding-block-end: 0.75rem;
   padding-inline-start: calc(0.375rem + 0.5ch);
   font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
 }
 
 .values-note {
@@ -456,13 +459,6 @@ main {
 
 .details-note {
   font-style: italic;
-}
-
-.element-row {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-inline);
-  padding-block: 0.125rem;
 }
 
 .element-name {

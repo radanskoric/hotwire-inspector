@@ -28,11 +28,24 @@ describe("DetailsPanelController", () => {
         </div>
       </template>
       <template id="details-element-row-template">
-        <div class="element-row" data-controller="panel-node" data-panel-node-id-value="">
-          <img src="/icons/reveal-in-elements.svg" class="icon icon-btn" data-action="click->panel-node#inspect" alt="" aria-hidden="true" />
-          <span class="node-kind"></span>
-          <span class="node-id"></span>
-          <span class="element-name"></span>
+        <div class="node">
+          <div
+            class="node-row"
+            data-controller="panel-node"
+            data-panel-node-id-value=""
+            data-action="mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight"
+          >
+            <img
+              src="/icons/reveal-in-elements.svg"
+              class="icon icon-btn"
+              data-action="click->panel-node#inspect"
+              alt=""
+              aria-hidden="true"
+            />
+            <span class="node-kind"></span>
+            <span class="node-id"></span>
+            <span class="element-name"></span>
+          </div>
         </div>
       </template>
       <aside
@@ -88,6 +101,14 @@ describe("DetailsPanelController", () => {
       unwatchControllerValues() {
         calls.push(["unwatchControllerValues"]);
         return Promise.resolve({ success: true });
+      },
+      sendToInspectedTab(message) {
+        calls.push(["sendToInspectedTab", message]);
+        return Promise.resolve({ success: true });
+      },
+      inspectNode(id) {
+        calls.push(["inspectNode", id]);
+        return Promise.resolve();
       },
       onValuesChanged(callback) {
         onValuesChangedCallback = callback;
@@ -756,9 +777,11 @@ describe("DetailsPanelController", () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      const rows = targetsContent().querySelectorAll(".element-row");
+      const rows = targetsContent().querySelectorAll(".node");
       expect(rows).toHaveLength(2);
-      expect(rows[0].dataset.panelNodeIdValue).toBe("modal-close");
+      expect(rows[0].querySelector(".node-row").dataset.panelNodeIdValue).toBe(
+        "modal-close",
+      );
       expect(rows[0].querySelector(".node-kind").textContent).toBe("button");
       expect(rows[0].querySelector(".node-id").textContent).toBe("modal-close");
       expect(rows[0].querySelector(".element-name").textContent).toBe(
@@ -794,11 +817,13 @@ describe("DetailsPanelController", () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      const rows = targetsContent().querySelectorAll(".element-row");
+      const rows = targetsContent().querySelectorAll(".node");
       expect(rows).toHaveLength(2);
-      // The id still needs to be set on the panel-node-data attribute so
+      // The id still needs to be set on the panel-node data attribute so
       // the reveal icon can inspect it, just hidden from the user.
-      expect(rows[1].dataset.panelNodeIdValue).toBe(`${ID_PREFIX}-uuid-1`);
+      expect(rows[1].querySelector(".node-row").dataset.panelNodeIdValue).toBe(
+        `${ID_PREFIX}-uuid-1`,
+      );
       expect(rows[1].querySelector(".node-id").hidden).toBe(true);
     });
 
@@ -811,7 +836,7 @@ describe("DetailsPanelController", () => {
 
       expect(targetsContent().textContent).toBe("No targets");
       expect(targetsContent().classList.contains("details-note")).toBe(true);
-      expect(targetsContent().querySelectorAll(".element-row")).toHaveLength(0);
+      expect(targetsContent().querySelectorAll(".node")).toHaveLength(0);
     });
 
     it("shows the error when fetching targets fails", async () => {
@@ -872,7 +897,7 @@ describe("DetailsPanelController", () => {
         targets: [{ id: "dropdown-item", tagName: "li", name: "item" }],
       });
       await Promise.resolve();
-      expect(targetsContent().querySelectorAll(".element-row")).toHaveLength(1);
+      expect(targetsContent().querySelectorAll(".node")).toHaveLength(1);
 
       pending[0]({
         success: true,
@@ -881,9 +906,10 @@ describe("DetailsPanelController", () => {
         ],
       });
       await Promise.resolve();
-      expect(targetsContent().querySelectorAll(".element-row")).toHaveLength(1);
+      expect(targetsContent().querySelectorAll(".node")).toHaveLength(1);
       expect(
-        targetsContent().querySelector(".element-row").dataset.panelNodeIdValue,
+        targetsContent().querySelector(".node .node-row").dataset
+          .panelNodeIdValue,
       ).toBe("dropdown-item");
     });
 
@@ -903,7 +929,7 @@ describe("DetailsPanelController", () => {
       });
       await Promise.resolve();
 
-      expect(targetsContent().querySelectorAll(".element-row")).toHaveLength(0);
+      expect(targetsContent().querySelectorAll(".node")).toHaveLength(0);
       expect(targetsContent().textContent).toBe("Loading…");
     });
 
@@ -926,7 +952,7 @@ describe("DetailsPanelController", () => {
       await Promise.resolve();
 
       expect(targetsContent().classList.contains("details-note")).toBe(false);
-      expect(targetsContent().querySelectorAll(".element-row")).toHaveLength(1);
+      expect(targetsContent().querySelectorAll(".node")).toHaveLength(1);
     });
 
     it("refetches targets when a scan refresh still finds the controller", async () => {
@@ -949,6 +975,82 @@ describe("DetailsPanelController", () => {
       expect(targetCalls).toEqual([
         ["controllerTargets", "frame-1", "modal"],
         ["controllerTargets", "frame-1", "modal"],
+      ]);
+    });
+
+    it("reveal icon sends an inspect message for the row's element key", async () => {
+      mockTargetsResponse({
+        success: true,
+        targets: [
+          { id: "modal-close", tagName: "button", name: "closeButton" },
+          {
+            id: `${ID_PREFIX}-uuid-1`,
+            tagName: "input",
+            name: "input",
+          },
+        ],
+      });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const inspectCallsBefore = calls.filter(
+        ([name]) => name === "inspectNode",
+      ).length;
+
+      const rows = targetsContent().querySelectorAll(".node");
+      expect(rows).toHaveLength(2);
+
+      for (const row of rows) {
+        const icon = row.querySelector("img.icon-btn");
+        icon.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      }
+
+      const inspectCalls = calls
+        .filter(([name]) => name === "inspectNode")
+        .slice(inspectCallsBefore);
+
+      expect(inspectCalls).toEqual([
+        ["inspectNode", "modal-close"],
+        ["inspectNode", `${ID_PREFIX}-uuid-1`],
+      ]);
+    });
+
+    it("hovering a target row sends highlight and leave sends clearHighlight for that element, just like in tree view", async () => {
+      mockTargetsResponse({
+        success: true,
+        targets: [
+          { id: "modal-close", tagName: "button", name: "closeButton" },
+        ],
+      });
+
+      showDetails();
+      await Promise.resolve();
+      await Promise.resolve();
+      // Allow Stimulus's MutationObserver to flush and wire up the
+      // dynamic panel-node controller on the inserted row.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const row = targetsContent().querySelector(".node .node-row");
+      row.dispatchEvent(new MouseEvent("mouseenter", { bubbles: false }));
+      row.dispatchEvent(new MouseEvent("mouseleave", { bubbles: false }));
+      await Promise.resolve();
+
+      const highlightMessages = calls.filter(
+        ([name, message]) =>
+          name === "sendToInspectedTab" &&
+          (message?.type === "hotwire-inspector:highlight" ||
+            message?.type === "hotwire-inspector:clear-highlight"),
+      );
+
+      expect(highlightMessages).toEqual([
+        [
+          "sendToInspectedTab",
+          { type: "hotwire-inspector:highlight", id: "modal-close" },
+        ],
+        ["sendToInspectedTab", { type: "hotwire-inspector:clear-highlight" }],
       ]);
     });
   });
@@ -996,9 +1098,11 @@ describe("DetailsPanelController", () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      const rows = outletsContent().querySelectorAll(".element-row");
+      const rows = outletsContent().querySelectorAll(".node");
       expect(rows).toHaveLength(2);
-      expect(rows[0].dataset.panelNodeIdValue).toBe("user-status-element");
+      expect(rows[0].querySelector(".node-row").dataset.panelNodeIdValue).toBe(
+        "user-status-element",
+      );
       expect(rows[0].querySelector(".node-kind").textContent).toBe("div");
       const name = rows[0].querySelector(".element-name");
       expect(name.textContent).toBe("user-status");
@@ -1044,7 +1148,7 @@ describe("DetailsPanelController", () => {
 
       expect(outletsContent().textContent).toBe("No outlets");
       expect(outletsContent().classList.contains("details-note")).toBe(true);
-      expect(outletsContent().querySelectorAll(".element-row")).toHaveLength(0);
+      expect(outletsContent().querySelectorAll(".node")).toHaveLength(0);
     });
 
     it("shows the error when fetching outlets fails", async () => {
@@ -1105,16 +1209,17 @@ describe("DetailsPanelController", () => {
         outlets: [{ id: "dropdown-outlet", tagName: "div", name: "menu" }],
       });
       await Promise.resolve();
-      expect(outletsContent().querySelectorAll(".element-row")).toHaveLength(1);
+      expect(outletsContent().querySelectorAll(".node")).toHaveLength(1);
 
       pending[0]({
         success: true,
         outlets: [{ id: "modal-outlet", tagName: "div", name: "user-status" }],
       });
       await Promise.resolve();
-      expect(outletsContent().querySelectorAll(".element-row")).toHaveLength(1);
+      expect(outletsContent().querySelectorAll(".node")).toHaveLength(1);
       expect(
-        outletsContent().querySelector(".element-row").dataset.panelNodeIdValue,
+        outletsContent().querySelector(".node .node-row").dataset
+          .panelNodeIdValue,
       ).toBe("dropdown-outlet");
     });
 
@@ -1132,7 +1237,7 @@ describe("DetailsPanelController", () => {
       });
       await Promise.resolve();
 
-      expect(outletsContent().querySelectorAll(".element-row")).toHaveLength(0);
+      expect(outletsContent().querySelectorAll(".node")).toHaveLength(0);
       expect(outletsContent().textContent).toBe("Loading…");
     });
 
