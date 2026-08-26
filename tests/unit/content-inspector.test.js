@@ -15,6 +15,8 @@ import {
   TREE_CHANGED_PUSH_TYPE,
   VALUES_CHANGED_PUSH_TYPE,
 } from "../../lib/constants.js";
+import { createFakeExtensionPort } from "./helpers/port.js";
+import { withFakeTimers } from "./helpers/fake-timers.js";
 
 describe("ContentInspector", () => {
   let cssEscape;
@@ -27,17 +29,6 @@ describe("ContentInspector", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
-
-  function createFakePort() {
-    const listeners = { message: [], disconnect: [] };
-    return {
-      postMessage: vi.fn(),
-      onMessage: { addListener: (cb) => listeners.message.push(cb) },
-      onDisconnect: { addListener: (cb) => listeners.disconnect.push(cb) },
-      disconnect: vi.fn(),
-      _listeners: listeners,
-    };
-  }
 
   function createFakeObserverClass() {
     let lastInstance;
@@ -769,6 +760,109 @@ describe("ContentInspector", () => {
 
       expect(injectionCount).toBe(1);
     });
+
+    function setupTimeoutInspector({ respondImmediately = false } = {}) {
+      document.body.innerHTML =
+        '<div id="modal-controller" data-controller="modal"></div>';
+      const script = new EventTarget();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        injectScript: () => Promise.resolve({ script }),
+        requestTimeoutMs: 100,
+      });
+
+      if (respondImmediately) {
+        script.addEventListener(
+          CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
+          (event) => {
+            const detail = JSON.parse(event.detail);
+            script.dispatchEvent(
+              new CustomEvent(CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT, {
+                detail: JSON.stringify({
+                  requestId: detail.requestId,
+                  success: true,
+                  definitions: [],
+                }),
+              }),
+            );
+          },
+        );
+      }
+
+      inspector.scan();
+      return { script, inspector };
+    }
+
+    it("settles with an error response when the injected page script never answers", async () => {
+      await withFakeTimers(async () => {
+        const { inspector } = setupTimeoutInspector();
+
+        const neverSettled = Symbol("never-settled");
+        const result = await Promise.race([
+          inspector.controllerValues("modal-controller", "modal"),
+          vi.advanceTimersByTimeAsync(60_000).then(() => neverSettled),
+        ]);
+
+        expect(result).not.toBe(neverSettled);
+        expect(result).toEqual(
+          expect.objectContaining({
+            success: false,
+            error: expect.any(String),
+          }),
+        );
+        expect(result.error.toLowerCase()).toContain("respond");
+      });
+    });
+
+    it("does not double-settle when a late response arrives after the timeout", async () => {
+      await withFakeTimers(async () => {
+        const { inspector, script } = setupTimeoutInspector();
+
+        const result = await Promise.race([
+          inspector.controllerValues("modal-controller", "modal"),
+          vi.advanceTimersByTimeAsync(60_000).then(() => Symbol("never")),
+        ]);
+
+        expect(result).toEqual(
+          expect.objectContaining({
+            success: false,
+          }),
+        );
+
+        const list = script.eventNames?.() ?? [];
+        // No leftover listeners after the timeout fired.
+        expect(list).not.toContain(CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT);
+
+        // Dispatching a stale response event must not throw.
+        expect(() =>
+          script.dispatchEvent(
+            new CustomEvent(CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT, {
+              detail: JSON.stringify({
+                requestId: "stale",
+                success: true,
+                definitions: [],
+              }),
+            }),
+          ),
+        ).not.toThrow();
+      });
+    });
+
+    it("clears the timeout when the injected page script answers in time", async () => {
+      await withFakeTimers(async () => {
+        const { inspector } = setupTimeoutInspector({
+          respondImmediately: true,
+        });
+
+        await expect(
+          inspector.controllerValues("modal-controller", "modal"),
+        ).resolves.toEqual(expect.objectContaining({ success: true }));
+
+        // No leftover timer for the request we just settled.
+        expect(vi.getTimerCount()).toBe(0);
+      });
+    });
   });
 
   describe("controllerTargets", () => {
@@ -1019,7 +1113,7 @@ describe("ContentInspector", () => {
 
   describe("treeWatcher", () => {
     it("postTreeChanged sends the correct port message", () => {
-      const fakePort = createFakePort();
+      const fakePort = createFakeExtensionPort();
       const inspector = new ContentInspector({
         document,
         cssEscape,
@@ -1034,7 +1128,7 @@ describe("ContentInspector", () => {
     });
 
     it("startTreeWatcher initializes the TreeWatcher", () => {
-      const fakePort = createFakePort();
+      const fakePort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
@@ -1049,11 +1143,9 @@ describe("ContentInspector", () => {
       expect(FakeObserver).toHaveBeenCalledTimes(1);
     });
 
-    it("startTreeWatcher pushes a tree-changed message when the DOM changes", () => {
-      vi.useFakeTimers();
-
-      try {
-        const fakePort = createFakePort();
+    it("startTreeWatcher pushes a tree-changed message when the DOM changes", async () => {
+      await withFakeTimers(() => {
+        const fakePort = createFakeExtensionPort();
         const FakeObserver = createFakeObserverClass();
         document.body.innerHTML = "<div></div>";
         const inspector = new ContentInspector({
@@ -1074,13 +1166,11 @@ describe("ContentInspector", () => {
         expect(fakePort.postMessage).toHaveBeenCalledWith({
           type: TREE_CHANGED_PUSH_TYPE,
         });
-      } finally {
-        vi.useRealTimers();
-      }
+      });
     });
 
     it("posts a tree-changed message on persisted pageshow", () => {
-      const fakePort = createFakePort();
+      const fakePort = createFakeExtensionPort();
       const inspector = new ContentInspector({
         document,
         cssEscape,
@@ -1098,8 +1188,8 @@ describe("ContentInspector", () => {
     });
 
     it("reconnects the events port before posting on persisted pageshow", () => {
-      const firstPort = createFakePort();
-      const secondPort = createFakePort();
+      const firstPort = createFakeExtensionPort();
+      const secondPort = createFakeExtensionPort();
       let callCount = 0;
       const connectPort = vi.fn(() =>
         callCount++ === 0 ? firstPort : secondPort,
@@ -1122,7 +1212,7 @@ describe("ContentInspector", () => {
     });
 
     it("ignores pageshow when not persisted", () => {
-      const fakePort = createFakePort();
+      const fakePort = createFakeExtensionPort();
       const inspector = new ContentInspector({
         document,
         cssEscape,
@@ -1140,7 +1230,7 @@ describe("ContentInspector", () => {
     });
 
     it("is safe when the document has no default view", () => {
-      const fakePort = createFakePort();
+      const fakePort = createFakeExtensionPort();
       const disconnectedDocument = document.implementation.createHTMLDocument();
       const inspector = new ContentInspector({
         document: disconnectedDocument,
@@ -1155,7 +1245,7 @@ describe("ContentInspector", () => {
     });
 
     it("disconnect removes the pageshow listener", () => {
-      const fakePort = createFakePort();
+      const fakePort = createFakeExtensionPort();
       const inspector = new ContentInspector({
         document,
         cssEscape,
@@ -1252,7 +1342,7 @@ describe("ContentInspector", () => {
       const script = new EventTarget();
       makeDefinitionsScript(script);
       const injectScript = () => Promise.resolve({ script });
-      const fakePort = createFakePort();
+      const fakePort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
@@ -1369,7 +1459,7 @@ describe("ContentInspector", () => {
       const script = new EventTarget();
       makeDefinitionsScript(script);
       const injectScript = () => Promise.resolve({ script });
-      const fakePort = createFakePort();
+      const fakePort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
@@ -1397,7 +1487,7 @@ describe("ContentInspector", () => {
       const script = new EventTarget();
       makeDefinitionsScript(script);
       const injectScript = () => Promise.resolve({ script });
-      const fakePort = createFakePort();
+      const fakePort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
@@ -1438,7 +1528,7 @@ describe("ContentInspector", () => {
       const script = new EventTarget();
       makeDefinitionsScript(script);
       const injectScript = () => Promise.resolve({ script });
-      const fakePort = createFakePort();
+      const fakePort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
@@ -1465,7 +1555,7 @@ describe("ContentInspector", () => {
       const script = new EventTarget();
       makeDefinitionsScript(script);
       const injectScript = () => Promise.resolve({ script });
-      const fakePort = createFakePort();
+      const fakePort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
@@ -1505,7 +1595,7 @@ describe("ContentInspector", () => {
     });
 
     it("disconnect() tears down the tree watcher when it is active", () => {
-      const fakePort = createFakePort();
+      const fakePort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
@@ -1528,7 +1618,7 @@ describe("ContentInspector", () => {
       const script = new EventTarget();
       makeDefinitionsScript(script);
       const injectScript = () => Promise.resolve({ script });
-      const fakePort = createFakePort();
+      const fakePort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
@@ -1553,8 +1643,8 @@ describe("ContentInspector", () => {
       const script = new EventTarget();
       makeDefinitionsScript(script);
       const injectScript = () => Promise.resolve({ script });
-      const firstPort = createFakePort();
-      const secondPort = createFakePort();
+      const firstPort = createFakeExtensionPort();
+      const secondPort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const timeout = createFakeTimeout();
       let connectPortCallCount = 0;

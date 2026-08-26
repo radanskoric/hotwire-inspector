@@ -48,29 +48,48 @@ export default defineUnlistedScript(() => {
 /**
  * Wires a request/response CustomEvent pair on the injected script element:
  * parses the request detail, runs the handler, and answers with the result
- * correlated by requestId.
+ * correlated by requestId. Always answers, even when parsing or the handler
+ * throws — otherwise the requesting side would hang and the inspected page
+ * would surface the exception as noise.
  *
  * @param {Element} script - the injected script element
  * @param {string} requestEvent
  * @param {string} responseEvent
- * @param {(selector: string, identifier: string) => object} handler
+ * @param {(selector: string | undefined, identifier: string | undefined) => object} handler
  */
 function onRequest(script, requestEvent, responseEvent, handler) {
   script.addEventListener(requestEvent, (event) => {
     const customEvent = /** @type {CustomEvent} */ (event);
-    const detail =
-      /** @type {{ selector: string, identifier: string, requestId: string }} */ (
-        typeof customEvent.detail === "string"
-          ? JSON.parse(customEvent.detail)
-          : customEvent.detail
-      );
-    const { selector, identifier, requestId } = detail ?? {};
+    let requestId = null;
 
-    script.dispatchEvent(
-      new CustomEvent(responseEvent, {
-        detail: JSON.stringify({ requestId, ...handler(selector, identifier) }),
-      }),
-    );
+    try {
+      const detail =
+        /** @type {{ selector?: string, identifier?: string, requestId?: string }} */ (
+          typeof customEvent.detail === "string"
+            ? JSON.parse(customEvent.detail)
+            : customEvent.detail
+        );
+      requestId = detail?.requestId ?? null;
+
+      script.dispatchEvent(
+        new CustomEvent(responseEvent, {
+          detail: JSON.stringify({
+            requestId,
+            ...handler(detail?.selector, detail?.identifier),
+          }),
+        }),
+      );
+    } catch (error) {
+      script.dispatchEvent(
+        new CustomEvent(responseEvent, {
+          detail: JSON.stringify({
+            requestId,
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        }),
+      );
+    }
   });
 }
 
@@ -104,11 +123,15 @@ function detectApplication() {
  * Finds the Stimulus controller instance for the given selector and
  * identifier, or answers with an error response.
  *
- * @param {string} selector
- * @param {string} identifier
+ * @param {string | undefined} selector
+ * @param {string | undefined} identifier
  * @returns {{ controller: any } | { success: false, error: string }}
  */
 function findController(selector, identifier) {
+  if (typeof selector !== "string") {
+    return { success: false, error: "Element not found" };
+  }
+
   const element = document.querySelector(selector);
 
   if (!element) {
@@ -122,7 +145,7 @@ function findController(selector, identifier) {
 
   const controller = application.getControllerForElementAndIdentifier(
     element,
-    identifier,
+    /** @type {string} */ (identifier ?? ""),
   );
 
   if (!controller) {
@@ -133,8 +156,8 @@ function findController(selector, identifier) {
 }
 
 /**
- * @param {string} selector
- * @param {string} identifier
+ * @param {string | undefined} selector
+ * @param {string | undefined} identifier
  * @returns {import("../lib/types.js").StoreControllerResponse}
  */
 function storeController(selector, identifier) {
@@ -150,17 +173,24 @@ function storeController(selector, identifier) {
     if (!(name in window)) {
       /** @type {PageWindow} */ (window)[name] = result.controller;
       console.info(
-        "Hotwire Inspector: " + identifier + " controller stored as " + name,
+        "Hotwire Inspector: " +
+          (identifier ?? "") +
+          " controller stored as " +
+          name,
         result.controller,
       );
-      return { success: true, name, identifier };
+      return {
+        success: true,
+        name,
+        identifier: /** @type {string} */ (identifier ?? ""),
+      };
     }
   }
 }
 
 /**
- * @param {string} selector
- * @param {string} identifier
+ * @param {string | undefined} selector
+ * @param {string | undefined} identifier
  * @returns {import("../lib/types.js").ControllerValueDefinitionsResponse}
  */
 function getValueDefinitions(selector, identifier) {
@@ -177,8 +207,8 @@ function getValueDefinitions(selector, identifier) {
 }
 
 /**
- * @param {string} selector
- * @param {string} identifier
+ * @param {string | undefined} selector
+ * @param {string | undefined} identifier
  * @returns {import("../lib/types.js").ControllerOutletDefinitionsResponse}
  */
 function getOutletDefinitions(selector, identifier) {

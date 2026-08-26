@@ -8,6 +8,7 @@ import {
 } from "../../lib/constants.js";
 import { PanelApp } from "../../lib/panel-app.js";
 import { buildTree } from "../../lib/tree-builder.js";
+import { withFakeTimers } from "./helpers/fake-timers.js";
 
 function mountPanelDom() {
   document.body.innerHTML = `
@@ -88,6 +89,30 @@ function createBridge(sendToInspectedTabImplementation) {
   return {
     sendToInspectedTab: sendToInspectedTabImplementation,
     onTreeChanged: () => {},
+  };
+}
+
+function createDeferredScanBridge() {
+  /** @type {(() => void)[]} */
+  const resolvers = [];
+  let onTreeChangedCallback = null;
+  const sendToInspectedTab = vi.fn(
+    () =>
+      new Promise((resolve) => {
+        resolvers.push(() => resolve({ items: [] }));
+      }),
+  );
+  return {
+    bridge: {
+      sendToInspectedTab,
+      onTreeChanged: (cb) => {
+        onTreeChangedCallback = cb;
+      },
+    },
+    resolvers,
+    sendToInspectedTab,
+    pushTreeChanged: () => onTreeChangedCallback?.(),
+    resolveNext: (items) => resolvers.shift()({ items }),
   };
 }
 
@@ -465,9 +490,7 @@ describe("PanelApp", () => {
   });
 
   it("throttles auto-refresh calls to refreshTree", async () => {
-    vi.useFakeTimers();
-
-    try {
+    await withFakeTimers(async () => {
       const refreshCalls = [];
       const app = createPanelApp();
 
@@ -479,15 +502,106 @@ describe("PanelApp", () => {
       app.throttledRefreshTree();
       app.throttledRefreshTree();
 
+      await vi.advanceTimersByTimeAsync(0);
       expect(refreshCalls).toEqual(["refresh"]);
 
-      vi.advanceTimersByTime(50);
+      await vi.advanceTimersByTimeAsync(50);
       app.throttledRefreshTree();
 
       expect(refreshCalls).toEqual(["refresh", "refresh"]);
-    } finally {
-      vi.useRealTimers();
-    }
+    });
+  });
+
+  it("performs a trailing refresh when a push arrives during the cooldown window", async () => {
+    await withFakeTimers(async () => {
+      const { bridge, sendToInspectedTab, pushTreeChanged, resolveNext } =
+        createDeferredScanBridge();
+      const app = createPanelApp({ bridge });
+
+      const frameItem = (id) => ({
+        id,
+        parentId: null,
+        tagName: "turbo-frame",
+        controllers: [],
+        src: null,
+      });
+
+      app.start();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(sendToInspectedTab).toHaveBeenCalledTimes(1);
+
+      resolveNext([frameItem("frame-a")]);
+      await vi.advanceTimersByTimeAsync(0);
+
+      // First push triggers refresh #2 and opens the cooldown window.
+      pushTreeChanged();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(sendToInspectedTab).toHaveBeenCalledTimes(2);
+
+      // Second push arrives while still inside the 50 ms cooldown: no extra
+      // scan yet, but the trailing refresh is now scheduled for after the
+      // cooldown expires.
+      pushTreeChanged();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(sendToInspectedTab).toHaveBeenCalledTimes(2);
+
+      // Drain the in-flight refresh triggered by the first push so the
+      // cooldown-expiry timer gets scheduled, then advance past it.
+      resolveNext([frameItem("frame-b")]);
+      await vi.advanceTimersByTimeAsync(50);
+
+      expect(sendToInspectedTab).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  it("coalesces many suppressed pushes into one trailing refresh", async () => {
+    await withFakeTimers(async () => {
+      const { bridge, sendToInspectedTab, pushTreeChanged, resolveNext } =
+        createDeferredScanBridge();
+      const app = createPanelApp({ bridge });
+
+      app.start();
+      resolveNext([]);
+      await vi.advanceTimersByTimeAsync(0);
+
+      // First refresh fires; now lock the cooldown with a slow scan.
+      pushTreeChanged();
+      await vi.advanceTimersByTimeAsync(0);
+      const secondPushCount = sendToInspectedTab.mock.calls.length;
+
+      // While the cooldown window is active, three more pushes arrive.
+      pushTreeChanged();
+      pushTreeChanged();
+      pushTreeChanged();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(sendToInspectedTab.mock.calls.length).toBe(secondPushCount);
+
+      // Drain the in-flight scan, advance past the cooldown, and confirm
+      // the three suppressed pushes coalesce into exactly one extra refresh.
+      resolveNext([]);
+      await vi.advanceTimersByTimeAsync(50);
+
+      expect(sendToInspectedTab.mock.calls.length).toBe(secondPushCount + 1);
+    });
+  });
+
+  it("does not schedule a trailing refresh when no push arrives during cooldown", async () => {
+    await withFakeTimers(async () => {
+      const resolveScan = () => Promise.resolve({ items: [] });
+      const bridge = createBridge(
+        vi.fn().mockImplementation(() => resolveScan()),
+      );
+      const app = createPanelApp({ bridge });
+
+      app.start();
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Cooldown naturally expires with no pushes during the window.
+      await vi.advanceTimersByTimeAsync(50);
+
+      expect(bridge.sendToInspectedTab).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("preserves collapsed node state across renders", () => {

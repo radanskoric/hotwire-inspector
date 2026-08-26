@@ -46,10 +46,12 @@ export default defineBackground(() => {
       );
       panelPortsByTab.set(tabId, port);
       port.onDisconnect.addListener(() => {
-        panelPortsByTab.delete(tabId);
-        browser.tabs
-          .sendMessage(tabId, { type: CONTENT_UNWATCH_VALUES_MESSAGE_TYPE })
-          .catch(() => {});
+        if (panelPortsByTab.get(tabId) === port) {
+          panelPortsByTab.delete(tabId);
+          browser.tabs
+            .sendMessage(tabId, { type: CONTENT_UNWATCH_VALUES_MESSAGE_TYPE })
+            .catch(() => {});
+        }
       });
       return;
     }

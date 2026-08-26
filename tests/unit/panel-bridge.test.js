@@ -14,18 +14,7 @@ import {
   VALUES_CHANGED_PUSH_TYPE,
 } from "../../lib/constants.js";
 import { PanelBridge } from "../../lib/panel-bridge.js";
-
-function createFakePort() {
-  const listeners = { message: [], disconnect: [] };
-  return {
-    name: undefined,
-    postMessage: vi.fn(),
-    onMessage: { addListener: (cb) => listeners.message.push(cb) },
-    onDisconnect: { addListener: (cb) => listeners.disconnect.push(cb) },
-    disconnect: vi.fn(),
-    _listeners: listeners,
-  };
-}
+import { createFakeExtensionPort } from "./helpers/port.js";
 
 function createBrowserApi(
   sendMessageImplementation,
@@ -40,7 +29,7 @@ function createBrowserApi(
       sendMessage: sendMessageImplementation,
       connect(options) {
         connectCalls.push(options);
-        return connectHandler?.(options) ?? createFakePort();
+        return connectHandler?.(options) ?? createFakeExtensionPort();
       },
     },
     devtools: {
@@ -335,7 +324,7 @@ describe("PanelBridge", () => {
 
   it("watchControllerValues connects events port and sends watch message", async () => {
     const sentMessages = [];
-    const fakePort = createFakePort();
+    const fakePort = createFakeExtensionPort();
     const browserApi = createBrowserApi(
       (message) => {
         sentMessages.push(message);
@@ -384,7 +373,7 @@ describe("PanelBridge", () => {
   });
 
   it("watchControllerValues reuses existing port", async () => {
-    const fakePort = createFakePort();
+    const fakePort = createFakeExtensionPort();
     const browserApi = createBrowserApi(
       () => Promise.resolve({ success: true }),
       { success: true, name: "temp1" },
@@ -399,7 +388,7 @@ describe("PanelBridge", () => {
   });
 
   it("onValuesChanged callback receives values-changed port messages", async () => {
-    const fakePort = createFakePort();
+    const fakePort = createFakeExtensionPort();
     const browserApi = createBrowserApi(
       () => Promise.resolve({ success: true }),
       { success: true, name: "temp1" },
@@ -425,7 +414,7 @@ describe("PanelBridge", () => {
   });
 
   it("onValuesChanged callback ignores non-values-changed messages", async () => {
-    const fakePort = createFakePort();
+    const fakePort = createFakeExtensionPort();
     const browserApi = createBrowserApi(
       () => Promise.resolve({ success: true }),
       { success: true, name: "temp1" },
@@ -446,7 +435,7 @@ describe("PanelBridge", () => {
   });
 
   it("onTreeChanged callback receives tree-changed port messages", async () => {
-    const fakePort = createFakePort();
+    const fakePort = createFakeExtensionPort();
     const browserApi = createBrowserApi(
       () => Promise.resolve({ success: true }),
       { success: true, name: "temp1" },
@@ -471,7 +460,7 @@ describe("PanelBridge", () => {
   });
 
   it("onTreeChanged callback ignores non-tree-changed messages", async () => {
-    const fakePort = createFakePort();
+    const fakePort = createFakeExtensionPort();
     const browserApi = createBrowserApi(
       () => Promise.resolve({ success: true }),
       { success: true, name: "temp1" },
@@ -497,7 +486,7 @@ describe("PanelBridge", () => {
       { success: true, name: "temp1" },
       () => {
         callCount++;
-        return createFakePort();
+        return createFakeExtensionPort();
       },
     );
     const bridge = new PanelBridge({ browserApi });
