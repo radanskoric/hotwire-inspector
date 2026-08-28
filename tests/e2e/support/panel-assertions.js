@@ -198,13 +198,30 @@ export function expectTurboEventsTabEmptyState() {
     await panelPage.locator("label.tab[for='tab-events']").click();
     await expect(panelPage.locator("#panel-elements")).toBeHidden();
     await expect(panelPage.locator("#panel-events")).toBeVisible();
+    await expect(
+      panelPage.locator("#panel-events .events-empty"),
+    ).toBeVisible();
     await expect(panelPage.locator("#panel-events .events-empty")).toHaveText(
-      "TODO",
+      "No Turbo events yet",
     );
+    await expect(panelPage.locator("#panel-events .events-list")).toBeHidden();
+    await expect(
+      panelPage.locator("#panel-events .events-dropped-notice"),
+    ).toBeHidden();
 
-    // Switching back restores the elements panel.
+    // Switching back must fully hide the events panel (regression for a
+    // CSS rule that left #panel-events display: flex unconditionally).
     await panelPage.locator("label.tab[for='tab-elements']").click();
-    await expect(panelPage.locator("#panel-elements")).toBeVisible();
+    await expect(
+      panelPage
+        .locator("#panel-elements")
+        .evaluate((el) => window.getComputedStyle(el).display),
+    ).resolves.toBe("flex");
+    await expect(
+      panelPage
+        .locator("#panel-events")
+        .evaluate((el) => window.getComputedStyle(el).display),
+    ).resolves.toBe("none");
     await expect(panelPage.locator("#panel-events")).toBeHidden();
   };
 }

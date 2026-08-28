@@ -65,8 +65,23 @@
             </div>
             <div id="tree" class="tree" role="tree"></div>
           </section>
-          <section class="tab-panel" id="panel-events">
-            <p class="events-empty">TODO</p>
+          <section
+            id="panel-events"
+            class="tab-panel"
+            data-controller="turbo-events"
+          >
+            <p
+              class="events-dropped-notice"
+              data-turbo-events-target="droppedNotice"
+              hidden
+            ></p>
+            <div
+              class="events-list"
+              data-turbo-events-target="list"
+              role="log"
+              aria-live="polite"
+            ></div>
+            <p class="events-empty">No Turbo events yet</p>
           </section>
         </main>
         <aside
