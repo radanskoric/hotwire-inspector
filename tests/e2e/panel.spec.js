@@ -24,8 +24,10 @@ import {
   clearRecordedMessages,
   expectDoubleClickTogglesNodeChildren,
   expectRefreshRescans,
+  expectTabsVisible,
   expectThemeChanges,
   expectThemeSwitcher,
+  expectTurboEventsTabEmptyState,
   getRecordedMessages,
   getRecordedEvalCalls,
   openDetailsPanel,
@@ -306,6 +308,27 @@ test.describe("Panel UI", () => {
       page,
       { scanResponse: fixtureScanResponse, persistedTheme: "dark" },
       withExpectedPersistedTheme("dark"),
+    );
+  });
+
+  test("renders two tabs and shows the placeholder on the Turbo Events tab", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      expectTabsVisible,
+    );
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      expectTurboEventsTabEmptyState,
     );
   });
 

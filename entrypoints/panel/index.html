@@ -41,10 +41,33 @@
       </header>
       <div class="workspace">
         <main>
-          <div id="empty-state" class="empty-state" hidden>
-            No turbo frames or Stimulus controllers found.
-          </div>
-          <div id="tree" class="tree" role="tree"></div>
+          <fieldset class="tab-switcher">
+            <legend class="visually-hidden">View</legend>
+            <input
+              type="radio"
+              name="panel-tab"
+              id="tab-elements"
+              class="tab-input"
+              checked
+            />
+            <label class="tab" for="tab-elements">Hotwire Elements</label>
+            <input
+              type="radio"
+              name="panel-tab"
+              id="tab-events"
+              class="tab-input"
+            />
+            <label class="tab" for="tab-events">Turbo Events</label>
+          </fieldset>
+          <section class="tab-panel" id="panel-elements">
+            <div id="empty-state" class="empty-state" hidden>
+              No turbo frames or Stimulus controllers found.
+            </div>
+            <div id="tree" class="tree" role="tree"></div>
+          </section>
+          <section class="tab-panel" id="panel-events">
+            <p class="events-empty">TODO</p>
+          </section>
         </main>
         <aside
           id="details-panel"

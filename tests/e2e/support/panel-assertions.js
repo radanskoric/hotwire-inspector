@@ -180,6 +180,35 @@ export function withExpectedHeadingAndSummary(heading, summary) {
   };
 }
 
+export function expectTabsVisible() {
+  return async (panelPage) => {
+    await expect(panelPage.locator(".tab-switcher")).toBeVisible();
+    await expect(
+      panelPage.locator(".tab-switcher input[type='radio']"),
+    ).toHaveCount(2);
+    await expect(panelPage.locator(".tab-switcher label.tab")).toHaveText([
+      "Hotwire Elements",
+      "Turbo Events",
+    ]);
+  };
+}
+
+export function expectTurboEventsTabEmptyState() {
+  return async (panelPage) => {
+    await panelPage.locator("label.tab[for='tab-events']").click();
+    await expect(panelPage.locator("#panel-elements")).toBeHidden();
+    await expect(panelPage.locator("#panel-events")).toBeVisible();
+    await expect(panelPage.locator("#panel-events .events-empty")).toHaveText(
+      "TODO",
+    );
+
+    // Switching back restores the elements panel.
+    await panelPage.locator("label.tab[for='tab-elements']").click();
+    await expect(panelPage.locator("#panel-elements")).toBeVisible();
+    await expect(panelPage.locator("#panel-events")).toBeHidden();
+  };
+}
+
 export function withExpectedNodeIds(expectedIds) {
   return async (panelPage) => {
     await expect(panelPage.locator(".node-id")).toHaveText(expectedIds);
@@ -625,7 +654,7 @@ export function withExpectedDetailsPanelPinnedOnScroll(
 
     const beforeScroll = await detailsPanel.boundingBox();
 
-    const treeArea = panelPage.locator("main");
+    const treeArea = panelPage.locator("#panel-elements");
     await treeArea.evaluate((element) =>
       element.scrollTo(0, element.scrollHeight),
     );
