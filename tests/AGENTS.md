@@ -40,3 +40,7 @@ Run Firefox smoke separately from the default Chromium E2E suite.
 ## Mock seams
 
 - `addMockPanelApis` in `tests/e2e/support/panel-assertions.js` mocks `browser.runtime.connect` to return a fake events port. Use `getEventsPortName()` to read the port name, `simulateValuesChanged()` to push a mock values-changed message, and `simulateEventsPortDisconnect()` to trigger the port's `onDisconnect` listeners. These helpers are used by `panel.spec.js` live-update tests.
+
+### Observing content-script pushes from the devtools frame
+
+For tests that need to observe the actual `TURBO_EVENT_PUSH_TYPE` (or any push) traffic flowing over the content→background→panel port pipeline, use `withPanelMessagesListener(frame, body)` from `tests/e2e/helpers.js` (defined in `tests/e2e/adapters/chromium-adapter.js`). It impersonates the inspected tab's panel port from the devtools frame by connecting with `${PANEL_EVENTS_PORT_NAME_PREFIX}${chrome.devtools.inspectedWindow.tabId}` — the background treats the connection as the panel's events port and relays each content-side push onto it. The handler receives a `readMessages()` function suitable for `expect.poll`. The port is disconnected and the frame globals are cleared in `finally` so `panelPortsByTab` is released for the next test. There is no production-code test seam; everything runs through the real extension message bus, so the test asserts on the same shapes the real panel observes.

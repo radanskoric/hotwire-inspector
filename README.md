@@ -15,6 +15,7 @@ An important goal of the project is to inspect the page without disturbing it. H
 1. Tracking the elements on the page inside the extension rather than writing tracking attributes into the target DOM. This requires never holding a strong reference to the elements, so they can be garbage collected. Element's ID is used when possible and [WeakMap](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WeakMap) and [WeakRef](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WeakRef) are used whenever a direct reference to the element object is needed.
 2. Highlighting is done by inserting absolutely positioned elements into the root of the DOM rather than modifying the target elements directly. This is the minimal possible intrusion into the DOM that allows visual highlighting.
 3. Controller instance storage uses a WXT-injected page script element to find and track controller instances. The script listens only on its own element. The only writes to the page's global scope are `window.tempN` variables that are only set after a user requests it. This approach is selected because the only alternative is eval-ing code in the context of the page. A single isolated script is a cleaner approach.
+4. Turbo event capture uses capture-phase listeners in the content scripts which exists outside the page's context, not in the injected script.
 
 This approach helps reduce debugging noise, avoids surprising side effects, and keeps the inspected page behavior as close as possible to its normal runtime behavior.
 
@@ -50,6 +51,7 @@ Hotwire Inspector is split across the extension's DevTools panel, background scr
 │ - detects Stimulus metadata  │
 │ - highlights inspected nodes │
 │ - observes live value changes│
+│ - captures Turbo DOM events  │
 └──────────────┬───────────────┘
                │ injects page-context script, listen to events it emits
                ▼
