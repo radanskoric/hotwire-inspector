@@ -13,6 +13,7 @@ import {
   STORE_CONTROLLER_REQUEST_EVENT,
   STORE_CONTROLLER_RESPONSE_EVENT,
   TREE_CHANGED_PUSH_TYPE,
+  TURBO_EVENT_PUSH_TYPE,
   VALUES_CHANGED_PUSH_TYPE,
 } from "../../lib/constants.js";
 import { createFakeExtensionPort } from "./helpers/port.js";
@@ -1262,6 +1263,74 @@ describe("ContentInspector", () => {
       expect(fakePort.postMessage).not.toHaveBeenCalledWith({
         type: TREE_CHANGED_PUSH_TYPE,
       });
+    });
+  });
+
+  describe("turboEventWatcher", () => {
+    it("startTurboEventWatcher posts TURBO_EVENT_PUSH_TYPE on document turbo events", () => {
+      const fakePort = createFakeExtensionPort();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        connectPort: () => fakePort,
+      });
+
+      inspector.startTurboEventWatcher();
+
+      const event = new Event("turbo:load");
+      Object.defineProperty(event, "timeStamp", { value: 12345 });
+      document.dispatchEvent(event);
+
+      expect(fakePort.postMessage).toHaveBeenCalledWith({
+        type: TURBO_EVENT_PUSH_TYPE,
+        name: "turbo:load",
+        timestamp: 12345,
+      });
+    });
+
+    it("startTurboEventWatcher forwards every known Turbo event name", () => {
+      const fakePort = createFakeExtensionPort();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        connectPort: () => fakePort,
+      });
+
+      inspector.startTurboEventWatcher();
+
+      document.dispatchEvent(new Event("turbo:render"));
+      document.dispatchEvent(new Event("turbo:visit"));
+      document.dispatchEvent(new Event("turbo:frame-load"));
+
+      const names = fakePort.postMessage.mock.calls.map(
+        (call) => /** @type {{ name: string }} */ (call[0]).name,
+      );
+      expect(names).toEqual([
+        "turbo:render",
+        "turbo:visit",
+        "turbo:frame-load",
+      ]);
+    });
+
+    it("startTurboEventWatcher is a no-op when the events port is unavailable", () => {
+      const inspector = new ContentInspector({ document, cssEscape });
+
+      expect(() => inspector.startTurboEventWatcher()).not.toThrow();
+      expect(inspector.turboEventWatcher).not.toBeNull();
+    });
+
+    it("disconnect tears down the turbo event watcher", () => {
+      const fakePort = createFakeExtensionPort();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        connectPort: () => fakePort,
+      });
+
+      inspector.startTurboEventWatcher();
+      inspector.disconnect();
+
+      expect(inspector.turboEventWatcher).toBeNull();
     });
   });
 

@@ -11,6 +11,7 @@ import {
   RELAY_ERROR_TYPE,
   RELAY_MESSAGE_TYPE,
   TREE_CHANGED_PUSH_TYPE,
+  TURBO_EVENT_PUSH_TYPE,
   VALUES_CHANGED_PUSH_TYPE,
 } from "../../lib/constants.js";
 import { PanelBridge } from "../../lib/panel-bridge.js";
@@ -477,6 +478,93 @@ describe("PanelBridge", () => {
     }
 
     expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("onTurboEvent callback receives turbo-event port messages", async () => {
+    const fakePort = createFakeExtensionPort();
+    const browserApi = createBrowserApi(
+      () => Promise.resolve({ success: true }),
+      { success: true, name: "temp1" },
+      () => fakePort,
+    );
+    const bridge = new PanelBridge({ browserApi });
+
+    const callback = vi.fn();
+    bridge.onTurboEvent(callback);
+
+    expect(browserApi.connectCalls).toEqual([
+      { name: PANEL_EVENTS_PORT_NAME_PREFIX + 42 },
+    ]);
+
+    const pushMessage = {
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:load",
+      timestamp: 12345,
+    };
+    const receivedMessage = JSON.parse(JSON.stringify(pushMessage));
+    for (const cb of fakePort._listeners.message) {
+      cb(receivedMessage);
+    }
+
+    expect(callback).toHaveBeenCalledWith(receivedMessage);
+  });
+
+  it("onTurboEvent callback ignores non-turbo-event messages", async () => {
+    const fakePort = createFakeExtensionPort();
+    const browserApi = createBrowserApi(
+      () => Promise.resolve({ success: true }),
+      { success: true, name: "temp1" },
+      () => fakePort,
+    );
+    const bridge = new PanelBridge({ browserApi });
+
+    const callback = vi.fn();
+    bridge.onTurboEvent(callback);
+
+    const otherMessage = { type: "some-other-type", data: "irrelevant" };
+    for (const cb of fakePort._listeners.message) {
+      cb(otherMessage);
+    }
+
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("offTurboEvent clears the callback so subsequent pushes are dropped", async () => {
+    const fakePort = createFakeExtensionPort();
+    const browserApi = createBrowserApi(
+      () => Promise.resolve({ success: true }),
+      { success: true, name: "temp1" },
+      () => fakePort,
+    );
+    const bridge = new PanelBridge({ browserApi });
+
+    const callback = vi.fn();
+    bridge.onTurboEvent(callback);
+
+    bridge.offTurboEvent();
+
+    const pushMessage = {
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:load",
+      timestamp: 1,
+    };
+    for (const cb of fakePort._listeners.message) {
+      cb(pushMessage);
+    }
+
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("offTurboEvent is safe when no callback was registered", async () => {
+    const fakePort = createFakeExtensionPort();
+    const browserApi = createBrowserApi(
+      () => Promise.resolve({ success: true }),
+      { success: true, name: "temp1" },
+      () => fakePort,
+    );
+    const bridge = new PanelBridge({ browserApi });
+
+    expect(() => bridge.offTurboEvent()).not.toThrow();
   });
 
   it("events port disconnect nulls the port and next watch reconnects", async () => {

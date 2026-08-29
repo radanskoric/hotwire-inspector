@@ -16,4 +16,5 @@ export {
   sendToContentScript,
   waitForPage,
   withChromiumExtension,
+  withPanelMessagesListener,
 } from "./adapters/chromium-adapter.js";

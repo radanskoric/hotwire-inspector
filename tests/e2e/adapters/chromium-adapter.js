@@ -1,6 +1,7 @@
 import { chromium } from "@playwright/test";
 import { spawn } from "child_process";
 import path from "path";
+import { PANEL_EVENTS_PORT_NAME_PREFIX } from "../../../lib/constants.js";
 import { addMockPanelApis } from "../support/panel-assertions.js";
 
 export const extensionPath = path.resolve("output/chrome-mv3");
@@ -161,4 +162,90 @@ export async function sendToContentScript(extensionFrame, message) {
       });
     });
   }, message);
+}
+
+/**
+ * @typedef {object} PanelMessagesListenerOptions
+ * @property {string} [messagesGlobal] - window property name holding the
+ *   array of received messages. Defaults to
+ *   "__hotwireInspectorPanelPortMessages".
+ * @property {string} [portGlobal] - window property name holding the open
+ *   `runtime.Port` instance. Defaults to
+ *   "__hotwireInspectorPanelPort".
+ */
+
+/**
+ * @typedef {object} PanelMessagesListenerContext
+ * @property {() => Promise<any[]>} readMessages - returns a snapshot of
+ *   every message received on the panel port so far. Designed to be
+ *   passed straight to `expect.poll`.
+ */
+
+/**
+ * Connects a port from the extension devtools frame using the
+ * `${PANEL_EVENTS_PORT_NAME_PREFIX}${tabId}` pattern, so the background
+ * treats it as the inspected tab's panel events port and relays each
+ * content-side push onto it. The test body receives a `readMessages`
+ * function that returns a snapshot of every message received so far,
+ * suitable for use with `expect.poll`.
+ *
+ * The port is disconnected and the listeners' frame globals are cleared
+ * once the test body resolves, releasing the background's
+ * `panelPortsByTab` mapping before the next test runs.
+ *
+ * `frame` is expected to be the extension's `devtools.html` iframe
+ * inside Chrome DevTools, returned by {@link getExtensionDevtoolsFrame}.
+ *
+ * @param {import("@playwright/test").Frame} frame
+ * @param {(context: PanelMessagesListenerContext) => Promise<void>} testBody
+ * @param {PanelMessagesListenerOptions} [options]
+ * @returns {Promise<void>}
+ */
+export async function withPanelMessagesListener(frame, testBody, options = {}) {
+  const messagesGlobal =
+    options.messagesGlobal ?? "__hotwireInspectorPanelPortMessages";
+  const portGlobal = options.portGlobal ?? "__hotwireInspectorPanelPort";
+
+  const tabId = await frame.evaluate(
+    () => chrome.devtools.inspectedWindow.tabId,
+  );
+  const panelPortName = `${PANEL_EVENTS_PORT_NAME_PREFIX}${tabId}`;
+
+  await frame.evaluate(
+    ({ panelPortName, messagesGlobal, portGlobal }) =>
+      new Promise((resolve) => {
+        const port = chrome.runtime.connect({ name: panelPortName });
+        /** @type {any[]} */
+        const messages = [];
+        port.onMessage.addListener((msg) => messages.push(msg));
+        globalThis[messagesGlobal] = messages;
+        globalThis[portGlobal] = port;
+        resolve(null);
+      }),
+    { panelPortName, messagesGlobal, portGlobal },
+  );
+
+  try {
+    await testBody({
+      readMessages: () =>
+        frame.evaluate(
+          (key) => /** @type {any[]} */ (globalThis[key]),
+          messagesGlobal,
+        ),
+    });
+  } finally {
+    await frame
+      .evaluate(
+        ({ messagesGlobal, portGlobal }) => {
+          globalThis[portGlobal]?.disconnect();
+          delete globalThis[messagesGlobal];
+          delete globalThis[portGlobal];
+        },
+        { messagesGlobal, portGlobal },
+      )
+      .catch(() => {
+        // The frame or globals may already be gone if the test's outer
+        // `withChromiumExtension` fixture tore down before us.
+      });
+  }
 }

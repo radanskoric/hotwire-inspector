@@ -89,6 +89,29 @@ function activateEventsTab() {
 }
 
 /**
+ * @returns {{
+ *   bridge: {
+ *     onTurboEvent: (cb: (push: { name: string, timestamp: number }) => void) => void,
+ *     offTurboEvent: () => void,
+ *     _onTurboEvent: ((push: { name: string, timestamp: number }) => void) | null
+ *   }
+ * }}
+ */
+function createStubBridge() {
+  const bridge = {
+    /** @type {((push: { name: string, timestamp: number }) => void) | null} */
+    _onTurboEvent: null,
+    onTurboEvent(callback) {
+      this._onTurboEvent = callback;
+    },
+    offTurboEvent() {
+      this._onTurboEvent = null;
+    },
+  };
+  return { bridge };
+}
+
+/**
  * Settles a few Stimulus target-lifecycle ticks. addEvent appends a
  * `.event-box`; Stimulus dispatches `eventTargetConnected` (and any
  * `eventTargetDisconnected` for trims done inline) asynchronously via
@@ -145,10 +168,13 @@ describe("TurboEventsController", () => {
   let elements;
   /** @type {TurboEventsController} */
   let controller;
+  /** @type {ReturnType<typeof createStubBridge>["bridge"]} */
+  let bridge;
 
   beforeEach(async () => {
     elements = mountDom();
-    document[PANEL_BRIDGE_PROPERTY] = {};
+    ({ bridge } = createStubBridge());
+    document[PANEL_BRIDGE_PROPERTY] = bridge;
 
     application = Application.start();
     application.register("turbo-events", TurboEventsController);
@@ -376,6 +402,108 @@ describe("TurboEventsController", () => {
     activateEventsTab();
     expect(() => controller.maybeAutoscroll()).not.toThrow();
   });
+
+  it("subscribes to bridge turbo-event pushes on connect", () => {
+    expect(bridge._onTurboEvent).toBeTypeOf("function");
+  });
+
+  it("unsubscribes from bridge turbo-event pushes on disconnect", () => {
+    expect(bridge._onTurboEvent).toBeTypeOf("function");
+
+    controller.disconnect();
+
+    expect(bridge._onTurboEvent).toBeNull();
+  });
+
+  it("does not render events dispatched after disconnect", async () => {
+    controller.addEvent("turbo:load");
+    await flushTargetLifecycle();
+    const countBeforeDisconnect = controller.eventTargets.length;
+
+    controller.disconnect();
+    expect(() =>
+      bridge._onTurboEvent?.({ name: "turbo:render", timestamp: 0 }),
+    ).not.toThrow();
+
+    await flushTargetLifecycle();
+    expect(controller.eventTargets.length).toBe(countBeforeDisconnect);
+  });
+
+  it("appends an event box from a bridge push payload", async () => {
+    expect(controller.eventTargets).toHaveLength(0);
+
+    bridge._onTurboEvent({ name: "turbo:load", timestamp: 1000 });
+    await flushTargetLifecycle();
+
+    expect(controller.eventTargets).toHaveLength(1);
+    expect(controller.eventTargets[0].textContent).toBe("turbo:load");
+    expect(
+      controller.eventTargets[0].getAttribute("data-turbo-events-target"),
+    ).toBe("event");
+  });
+
+  it("continues appending events across many bridge pushes", async () => {
+    activateEventsTab();
+    stubRectBottom(elements.list, 1000);
+    setScrollMetrics(elements.list, { scrollHeight: 1000, clientHeight: 100 });
+
+    for (let i = 0; i < 5; i += 1) {
+      bridge._onTurboEvent({ name: `turbo:event-${i}`, timestamp: i });
+    }
+    await flushTargetLifecycle();
+
+    expect(controller.eventTargets).toHaveLength(5);
+    expect(controller.eventTargets.map((target) => target.textContent)).toEqual(
+      [
+        "turbo:event-0",
+        "turbo:event-1",
+        "turbo:event-2",
+        "turbo:event-3",
+        "turbo:event-4",
+      ],
+    );
+  });
+
+  it("respects the cap and dropped notice under push bursts", async () => {
+    activateEventsTab();
+    stubRectBottom(elements.list, 1000);
+    setScrollMetrics(elements.list, { scrollHeight: 1000, clientHeight: 100 });
+
+    // 0 initial + 505 pushes = 505 → trim 5 at cap 500.
+    for (let i = 0; i < MAX_EVENTS_DEFAULT + 5; i += 1) {
+      stubRectBottom(controller.createEventBox(`turbo:event-${i}`), 1000);
+      bridge._onTurboEvent({ name: `turbo:event-${i}`, timestamp: i });
+    }
+    await flushTargetLifecycle();
+
+    expect(controller.eventTargets.length).toBe(MAX_EVENTS_DEFAULT);
+    expect(controller.droppedCountValue).toBe(5);
+    expect(elements.notice.hidden).toBe(false);
+    expect(elements.notice.textContent).toBe(
+      "5 older events have been dropped",
+    );
+  });
+
+  it("re-subscribes to the bridge on a fresh application start", async () => {
+    application.stop();
+    expect(bridge._onTurboEvent).not.toBeNull();
+
+    const resetBridge = createStubBridge().bridge;
+    document[PANEL_BRIDGE_PROPERTY] = resetBridge;
+
+    application = Application.start();
+    application.register("turbo-events", TurboEventsController);
+    await flushTargetLifecycle();
+
+    controller = /** @type {TurboEventsController} */ (
+      application.getControllerForElementAndIdentifier(
+        elements.section,
+        "turbo-events",
+      )
+    );
+
+    expect(resetBridge._onTurboEvent).toBeTypeOf("function");
+  });
 });
 
 describe("TurboEventsController without tab radio wiring", () => {
@@ -401,7 +529,7 @@ describe("TurboEventsController without tab radio wiring", () => {
       ></div>
       <p class="events-empty">No Turbo events yet</p>
     </section>`;
-    document[PANEL_BRIDGE_PROPERTY] = {};
+    ({ bridge: document[PANEL_BRIDGE_PROPERTY] } = createStubBridge());
   });
 
   afterEach(() => {

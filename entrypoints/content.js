@@ -26,6 +26,7 @@ export default defineContentScript({
 
     inspector.startTreeWatcher();
     inspector.startPageLifecycleWatcher();
+    inspector.startTurboEventWatcher();
 
     browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (!message || typeof message !== "object") {

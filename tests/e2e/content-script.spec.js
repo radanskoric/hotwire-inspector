@@ -8,6 +8,7 @@ import {
   CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
   CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+  TURBO_EVENT_PUSH_TYPE,
 } from "../../lib/constants.js";
 import {
   deepFixtureUrl,
@@ -19,6 +20,7 @@ import {
   withChromiumExtension,
   getExtensionDevtoolsFrame,
   sendToContentScript,
+  withPanelMessagesListener,
   withStaticServer,
 } from "./helpers.js";
 
@@ -595,6 +597,38 @@ test.describe("Content Script", () => {
 
         expect(result.success).toBe(true);
         expect(result.selector).toBe("#modal-close");
+      });
+    });
+  });
+
+  test("forwards Turbo events dispatched on the page to the events port", async ({
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium");
+
+    await withFixturePage(async ({ page, context }) => {
+      const frame = await getExtensionDevtoolsFrame(context);
+
+      await withPanelMessagesListener(frame, async ({ readMessages }) => {
+        await page.evaluate(() => {
+          document.dispatchEvent(
+            new CustomEvent("turbo:load", { bubbles: true }),
+          );
+          document.dispatchEvent(
+            new CustomEvent("turbo:render", { bubbles: true }),
+          );
+        });
+
+        await expect.poll(readMessages).toEqual([
+          expect.objectContaining({
+            type: TURBO_EVENT_PUSH_TYPE,
+            name: "turbo:load",
+          }),
+          expect.objectContaining({
+            type: TURBO_EVENT_PUSH_TYPE,
+            name: "turbo:render",
+          }),
+        ]);
       });
     });
   });
