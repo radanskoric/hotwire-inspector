@@ -687,4 +687,33 @@ test.describe("Content Script", () => {
       expect(afterRemoval).toEqual({ success: false, selector: null });
     });
   });
+
+  test("turbo:load details (URL) propagate through the content→panel port", async ({
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium");
+
+    await withFixturePage(async ({ page, context }) => {
+      const frame = await getExtensionDevtoolsFrame(context);
+
+      await withPanelMessagesListener(frame, async ({ readMessages }) => {
+        await page.evaluate(() => {
+          document.dispatchEvent(
+            new CustomEvent("turbo:load", {
+              bubbles: true,
+              detail: { url: "https://app.test/dashboard" },
+            }),
+          );
+        });
+
+        await expect.poll(readMessages).toContainEqual(
+          expect.objectContaining({
+            type: TURBO_EVENT_PUSH_TYPE,
+            name: "turbo:load",
+            details: { url: "https://app.test/dashboard" },
+          }),
+        );
+      });
+    });
+  });
 });

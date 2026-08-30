@@ -193,4 +193,14 @@ export const turboEventsFixturePush = {
   name: "turbo:click",
   timestamp: 1700000000000,
   targetId: "main-frame",
+  details: {},
+};
+
+// Turbo-event push carrying the URL detail captured for `turbo:load`.
+export const turboEventsWithDetailsFixturePush = {
+  type: "hotwire-inspector:turbo-event",
+  name: "turbo:load",
+  timestamp: 1700000000000,
+  targetId: null,
+  details: { url: "https://app.test/dashboard" },
 };

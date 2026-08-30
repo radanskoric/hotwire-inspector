@@ -591,6 +591,57 @@ main:has(#tab-events:checked) #panel-events {
   cursor: pointer;
 }
 
+.event-box-details {
+  inline-size: 100%;
+  margin-block-start: 0.25rem;
+  font-family: inherit;
+  color: var(--color-ink);
+}
+
+.event-box-details > summary {
+  display: inline-flex;
+  align-items: center;
+  list-style: none;
+  cursor: pointer;
+  color: var(--color-ink-muted);
+  font-size: 0.6875rem;
+}
+
+.event-box-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.event-box-details > summary::before {
+  content: "▶";
+  display: inline-block;
+  margin-inline-end: 0.4ch;
+  transition: transform 200ms ease;
+}
+
+.event-box-details-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.125rem 1ch;
+  margin: 0.375rem 0 0;
+  padding: 0;
+}
+
+.event-box-details-key {
+  color: var(--color-ink-muted);
+  font-family:
+    ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.event-box-details-value {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
 .details-panel-section > summary::before {
   content: "";
   border-block: 0.25rem solid transparent;
@@ -600,6 +651,10 @@ main:has(#tab-events:checked) #panel-events {
 }
 
 .details-panel-section[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.event-box-details[open] > summary::before {
   transform: rotate(90deg);
 }
 

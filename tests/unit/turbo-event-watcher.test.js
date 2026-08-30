@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   TURBO_EVENT_NAMES,
   TurboEventWatcher,
+  turboEventDetailsFor,
 } from "../../lib/turbo-event-watcher.js";
 
 function createDocumentSpy() {
@@ -100,7 +101,7 @@ describe("TurboEventWatcher", () => {
   it("forwards the event name with Date.now() as the capture timestamp", () => {
     const spy = createDocumentSpy();
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1700000000000);
-    /** @type {{ name: string, timestamp: number }[]} */
+    /** @type {{ name: string, timestamp: number, details: Record<string, string> }[]} */
     const received = [];
     const watcher = new TurboEventWatcher({
       document: spy.document,
@@ -113,7 +114,7 @@ describe("TurboEventWatcher", () => {
     spy.addCalls[0].handler(event);
 
     expect(received).toEqual([
-      { name: "turbo:load", timestamp: 1700000000000 },
+      { name: "turbo:load", timestamp: 1700000000000, details: {} },
     ]);
     expect(nowSpy).toHaveBeenCalled();
   });
@@ -178,5 +179,83 @@ describe("TurboEventWatcher", () => {
 
     expect(() => watcher.stop()).not.toThrow();
     expect(watcher.started).toBe(false);
+  });
+});
+
+describe("turboEventDetailsFor", () => {
+  it("extracts url from turbo:load event detail", () => {
+    expect(
+      turboEventDetailsFor("turbo:load", {
+        detail: { url: "https://app.test/dashboard" },
+      }),
+    ).toEqual({ url: "https://app.test/dashboard" });
+  });
+
+  it("returns an empty object when the event is missing", () => {
+    expect(turboEventDetailsFor("turbo:load", undefined)).toEqual({});
+  });
+
+  it("returns an empty object when detail is absent", () => {
+    expect(turboEventDetailsFor("turbo:load", {})).toEqual({});
+  });
+
+  it("returns an empty object when url is an empty string", () => {
+    expect(turboEventDetailsFor("turbo:load", { detail: { url: "" } })).toEqual(
+      {},
+    );
+  });
+
+  it("returns an empty object when url is not a string", () => {
+    expect(
+      turboEventDetailsFor("turbo:load", { detail: { url: 12345 } }),
+    ).toEqual({});
+  });
+
+  it("returns an empty object for events with no rule", () => {
+    expect(turboEventDetailsFor("turbo:render", { detail: {} })).toEqual({});
+    expect(turboEventDetailsFor("turbo:visit", null)).toEqual({});
+  });
+});
+
+describe("TurboEventWatcher details", () => {
+  it("threads details extracted from the captured event into the payload", () => {
+    const spy = createDocumentSpy();
+    /** @type {{ name: string, details: Record<string, string> }[]} */
+    const received = [];
+    const watcher = new TurboEventWatcher({
+      document: spy.document,
+      eventNames: ["turbo:load"],
+      onEvent: (payload) => received.push(payload),
+    });
+
+    watcher.start();
+    spy.addCalls[0].handler({
+      type: "turbo:load",
+      timeStamp: 12345,
+      detail: { url: "https://app.test/x" },
+    });
+
+    expect(received).toHaveLength(1);
+    expect(received[0].details).toEqual({ url: "https://app.test/x" });
+  });
+
+  it("threads an empty details record for events with no rule", () => {
+    const spy = createDocumentSpy();
+    /** @type {{ name: string, details: Record<string, string> }[]} */
+    const received = [];
+    const watcher = new TurboEventWatcher({
+      document: spy.document,
+      eventNames: ["turbo:render"],
+      onEvent: (payload) => received.push(payload),
+    });
+
+    watcher.start();
+    spy.addCalls[0].handler({
+      type: "turbo:render",
+      timeStamp: 12345,
+      detail: {},
+    });
+
+    expect(received[0].details).toEqual({});
   });
 });

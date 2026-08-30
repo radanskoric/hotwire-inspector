@@ -1298,7 +1298,38 @@ describe("ContentInspector", () => {
         name: "turbo:load",
         timestamp: 1700000000000,
         targetId: null,
+        details: {},
       });
+    });
+
+    it("startTurboEventWatcher threads url details from turbo:load event detail", () => {
+      const fakePort = createFakeExtensionPort();
+      const inspector = new ContentInspector({
+        document,
+        cssEscape,
+        connectPort: () => fakePort,
+      });
+
+      inspector.startTurboEventWatcher();
+
+      document.dispatchEvent(
+        new CustomEvent("turbo:load", { detail: { url: "https://app.test/" } }),
+      );
+
+      const push =
+        /** @type {{ type: string, name: string, details: Record<string, string> } | undefined} */ (
+          fakePort.postMessage.mock.calls
+            .map((call) => call[0])
+            .find(
+              (message) =>
+                /** @type {{ type: string, name: string }} */ (message)
+                  ?.type === TURBO_EVENT_PUSH_TYPE &&
+                /** @type {{ name: string }} */ (message)?.name ===
+                  "turbo:load",
+            )
+        );
+      expect(push).toBeDefined();
+      expect(push?.details).toEqual({ url: "https://app.test/" });
     });
 
     it("startTurboEventWatcher forwards every known Turbo event name", () => {

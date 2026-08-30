@@ -20,6 +20,7 @@ import {
   internalIdScanResponse,
   tallScanResponse,
   turboEventsFixturePush,
+  turboEventsWithDetailsFixturePush,
 } from "./support/panel-fixtures.js";
 import {
   clearRecordedMessages,
@@ -849,6 +850,63 @@ test.describe("Panel UI", () => {
         await expect(notice).toHaveText(
           "Element no longer exists — cannot reveal it.",
         );
+      },
+    );
+  });
+
+  test("turbo event details block renders URL inside the collapsed details panel", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        await panelPage.locator("label.tab[for='tab-events']").click();
+
+        await simulateTurboEvent(panelPage, turboEventsWithDetailsFixturePush);
+
+        const details = panelPage
+          .locator("#panel-events .event-box .event-box-details")
+          .first();
+        await expect(details).toHaveCount(1);
+        await expect(details).toHaveJSProperty("tagName", "DETAILS");
+        await expect(details).not.toHaveAttribute("open");
+
+        await details.locator("summary").click();
+        await expect(details).toHaveAttribute("open");
+
+        const key = details.locator(".event-box-details-key").first();
+        const value = details.locator(".event-box-details-value").first();
+        await expect(key).toHaveText("url");
+        await expect(value).toHaveText("https://app.test/dashboard");
+      },
+    );
+  });
+
+  test("turbo event with empty details does not render a details block", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        await panelPage.locator("label.tab[for='tab-events']").click();
+
+        await simulateTurboEvent(panelPage, turboEventsFixturePush);
+
+        await expect(
+          panelPage.locator("#panel-events .event-box .event-box-details"),
+        ).toHaveCount(0);
       },
     );
   });
