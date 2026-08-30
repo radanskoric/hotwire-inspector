@@ -632,4 +632,59 @@ test.describe("Content Script", () => {
       });
     });
   });
+
+  test("Turbo events carry the dispatching element's inspector targetId", async ({
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium");
+
+    await withFixturePage(async ({ page, context }) => {
+      await page.evaluate(() => {
+        const link = document.createElement("a");
+        link.id = "preview-link";
+        link.textContent = "link";
+        document.body.appendChild(link);
+      });
+
+      const frame = await getExtensionDevtoolsFrame(context);
+
+      await withPanelMessagesListener(frame, async ({ readMessages }) => {
+        await page.evaluate(() => {
+          document
+            .getElementById("preview-link")
+            .dispatchEvent(new CustomEvent("turbo:click", { bubbles: true }));
+        });
+
+        await expect.poll(readMessages).toContainEqual(
+          expect.objectContaining({
+            type: TURBO_EVENT_PUSH_TYPE,
+            name: "turbo:click",
+            targetId: "preview-link",
+          }),
+        );
+      });
+
+      // The same content-script pipeline that stamped targetId for the
+      // push also replies to a direct inspect request with a selector
+      // pointing at the matching element.
+      const inspectResult = await sendToContentScript(frame, {
+        type: CONTENT_INSPECT_MESSAGE_TYPE,
+        id: "preview-link",
+      });
+      expect(inspectResult.success).toBe(true);
+      expect(inspectResult.selector).toBe("#preview-link");
+
+      // Removing the element from the page invalidates the live key, so
+      // the next inspect request through the same path reports a miss.
+      await page.evaluate(() => {
+        document.getElementById("preview-link").remove();
+      });
+
+      const afterRemoval = await sendToContentScript(frame, {
+        type: CONTENT_INSPECT_MESSAGE_TYPE,
+        id: "preview-link",
+      });
+      expect(afterRemoval).toEqual({ success: false, selector: null });
+    });
+  });
 });

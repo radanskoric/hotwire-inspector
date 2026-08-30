@@ -122,7 +122,7 @@ describe("PanelBridge", () => {
     });
     const bridge = new PanelBridge({ browserApi });
 
-    await bridge.inspectNode("frame-1");
+    const response = await bridge.inspectNode("frame-1");
 
     expect(sentMessages).toEqual([
       {
@@ -134,6 +134,7 @@ describe("PanelBridge", () => {
     expect(browserApi.evalCalls).toEqual([
       'inspect(document.querySelector("#frame-1"))',
     ]);
+    expect(response).toEqual({ success: true, selector: "#frame-1" });
   });
 
   it("inspectNode does not call inspectElementBySelector when response lacks success", async () => {
@@ -142,9 +143,10 @@ describe("PanelBridge", () => {
     );
     const bridge = new PanelBridge({ browserApi });
 
-    await bridge.inspectNode("frame-1");
+    const response = await bridge.inspectNode("frame-1");
 
     expect(browserApi.evalCalls).toEqual([]);
+    expect(response).toEqual({ success: false, selector: "#frame-1" });
   });
 
   it("inspectNode does not call inspectElementBySelector when response lacks selector", async () => {
@@ -153,9 +155,21 @@ describe("PanelBridge", () => {
     );
     const bridge = new PanelBridge({ browserApi });
 
-    await bridge.inspectNode("frame-1");
+    const response = await bridge.inspectNode("frame-1");
 
     expect(browserApi.evalCalls).toEqual([]);
+    expect(response).toEqual({ success: true, selector: null });
+  });
+
+  it("inspectNode resolves with the full response when no selector call is made", async () => {
+    const browserApi = createBrowserApi(() =>
+      Promise.resolve({ success: false, selector: null }),
+    );
+    const bridge = new PanelBridge({ browserApi });
+
+    const response = await bridge.inspectNode("missing");
+
+    expect(response).toEqual({ success: false, selector: null });
   });
 
   it("storeControllerNode sends CONTENT_STORE_CONTROLLER_MESSAGE_TYPE to the content script", async () => {

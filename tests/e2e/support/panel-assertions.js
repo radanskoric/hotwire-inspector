@@ -4,6 +4,7 @@ import {
   CONTENT_CONTROLLER_TARGETS_MESSAGE_TYPE,
   CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
   CONTENT_HIGHLIGHT_MESSAGE_TYPE,
+  CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
   CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
 } from "../../../lib/constants.js";
@@ -23,6 +24,8 @@ export async function addMockPanelApis(
     valuesResponse,
     targetsResponse,
     outletsResponse,
+    inspectResponse,
+    inspectResponses,
   } = {},
 ) {
   await page.addInitScript(
@@ -34,11 +37,14 @@ export async function addMockPanelApis(
       valuesResponse,
       targetsResponse,
       outletsResponse,
+      inspectResponse,
+      inspectResponses,
       scanMessageType,
       storeControllerMessageType,
       controllerValuesMessageType,
       controllerTargetsMessageType,
       controllerOutletsMessageType,
+      inspectMessageType,
     }) => {
       globalThis.browser ??= {};
       globalThis.browser.runtime ??= {};
@@ -61,6 +67,7 @@ export async function addMockPanelApis(
       };
 
       let scanCallCount = 0;
+      let inspectCallCount = 0;
 
       browser.runtime.sendMessage = (relayMessage) => {
         const message = relayMessage.message;
@@ -101,6 +108,22 @@ export async function addMockPanelApis(
 
         if (message.type === controllerOutletsMessageType) {
           return Promise.resolve(outletsResponse);
+        }
+
+        if (message.type === inspectMessageType) {
+          if (inspectResponses) {
+            const response =
+              inspectResponses[inspectCallCount] ??
+              inspectResponses[inspectResponses.length - 1];
+            inspectCallCount++;
+            return Promise.resolve(response);
+          }
+
+          if (inspectResponse) {
+            return Promise.resolve(inspectResponse);
+          }
+
+          return Promise.resolve({ success: true, selector: "#mock" });
         }
 
         return Promise.resolve({ success: true, selector: "#mock" });
@@ -150,11 +173,14 @@ export async function addMockPanelApis(
       valuesResponse: valuesResponse ?? fixtureValuesResponse,
       targetsResponse: targetsResponse ?? fixtureTargetsResponse,
       outletsResponse: outletsResponse ?? fixtureOutletsResponse,
+      inspectResponse,
+      inspectResponses,
       scanMessageType: CONTENT_SCAN_MESSAGE_TYPE,
       storeControllerMessageType: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
       controllerValuesMessageType: CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
       controllerTargetsMessageType: CONTENT_CONTROLLER_TARGETS_MESSAGE_TYPE,
       controllerOutletsMessageType: CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE,
+      inspectMessageType: CONTENT_INSPECT_MESSAGE_TYPE,
     },
   );
 }
@@ -701,6 +727,15 @@ export async function simulateValuesChanged(panelPage, payload) {
 }
 
 export async function simulateTreeChanged(panelPage, payload) {
+  await panelPage.evaluate((payload) => {
+    const port = globalThis.__hotwireInspectorEventsPort;
+    if (port) {
+      port._messageListeners.forEach((cb) => cb(payload));
+    }
+  }, payload);
+}
+
+export async function simulateTurboEvent(panelPage, payload) {
   await panelPage.evaluate((payload) => {
     const port = globalThis.__hotwireInspectorEventsPort;
     if (port) {

@@ -19,6 +19,7 @@ import {
   fixtureScanResponse,
   internalIdScanResponse,
   tallScanResponse,
+  turboEventsFixturePush,
 } from "./support/panel-fixtures.js";
 import {
   clearRecordedMessages,
@@ -32,6 +33,7 @@ import {
   getRecordedEvalCalls,
   openDetailsPanel,
   simulateTreeChanged,
+  simulateTurboEvent,
   simulateValuesChanged,
   withExpectedBadgeClickOpensDetailsPanel,
   withExpectedClickInspects,
@@ -772,6 +774,81 @@ test.describe("Panel UI", () => {
           "2 frames, 4 controllers",
         );
         await expect(panelPage.locator("#empty-state")).toBeHidden();
+      },
+    );
+  });
+
+  test("turbo event reveal icon triggers an element inspect message", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        await panelPage.locator("label.tab[for='tab-events']").click();
+
+        await simulateTurboEvent(panelPage, turboEventsFixturePush);
+
+        const reveal = panelPage.locator(
+          "#panel-events .event-box .event-reveal",
+        );
+        await expect(reveal).toHaveCount(1);
+
+        await clearRecordedMessages(panelPage);
+        await reveal.click();
+
+        const messages = await getRecordedMessages(panelPage);
+        const evalCalls = await getRecordedEvalCalls(panelPage);
+
+        expect(messages).toContainEqual({
+          type: CONTENT_INSPECT_MESSAGE_TYPE,
+          id: "main-frame",
+        });
+        // Default inspect mock returns #mock on success, so the eval
+        // call reflects the selector response rendered by the bridge.
+        expect(evalCalls).toEqual(['inspect(document.querySelector("#mock"))']);
+      },
+    );
+  });
+
+  test("turbo event reveal icon shows a warning when the target is gone", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      {
+        scanResponse: fixtureScanResponse,
+        inspectResponses: [{ success: false, selector: null }],
+      },
+      async (panelPage) => {
+        await panelPage.locator("label.tab[for='tab-events']").click();
+
+        await simulateTurboEvent(panelPage, turboEventsFixturePush);
+
+        const reveal = panelPage.locator(
+          "#panel-events .event-box .event-reveal",
+        );
+        await expect(reveal).toHaveCount(1);
+
+        await reveal.click();
+
+        const notice = panelPage.locator(
+          ".status-notice[data-status-tone-value='warning']",
+        );
+        await expect(notice).toBeVisible();
+        await expect(notice).toHaveText(
+          "Element no longer exists — cannot reveal it.",
+        );
       },
     );
   });

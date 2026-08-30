@@ -185,3 +185,12 @@ export const controllerRemovedScanResponse = {
       : item,
   ),
 };
+
+// Default turbo-event push payload used by panel tests: a click on a
+// known frame captured at a fixed timestamp.
+export const turboEventsFixturePush = {
+  type: "hotwire-inspector:turbo-event",
+  name: "turbo:click",
+  timestamp: 1700000000000,
+  targetId: "main-frame",
+};

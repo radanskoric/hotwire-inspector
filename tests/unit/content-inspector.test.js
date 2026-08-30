@@ -148,6 +148,17 @@ describe("ContentInspector", () => {
     expect(inspector.highlight(id)).toEqual({ success: false });
   });
 
+  it("treats detached elements as missing even when the weak reference is still resolvable", () => {
+    document.body.innerHTML = '<div data-controller="modal"></div>';
+    const inspector = new ContentInspector({ document, cssEscape });
+    const [{ id }] = inspector.scan();
+    const element = document.querySelector('[data-controller="modal"]');
+
+    element.remove();
+
+    expect(inspector.inspect(id)).toEqual({ success: false, selector: null });
+  });
+
   it("falls back to document id lookup when a weak reference is stale", () => {
     document.body.innerHTML = '<turbo-frame id="main-frame"></turbo-frame>';
     const inspector = new ContentInspector({ document, cssEscape });
@@ -1286,6 +1297,7 @@ describe("ContentInspector", () => {
         type: TURBO_EVENT_PUSH_TYPE,
         name: "turbo:load",
         timestamp: 1700000000000,
+        targetId: null,
       });
     });
 
@@ -1332,6 +1344,90 @@ describe("ContentInspector", () => {
       inspector.disconnect();
 
       expect(inspector.turboEventWatcher).toBeNull();
+    });
+
+    describe("targetId capture", () => {
+      function pushOfType(name) {
+        return /** @type {{ type: string, name: string, timestamp: number, targetId: string | null }} */ (
+          fakePort.postMessage.mock.calls
+            .map((call) => call[0])
+            .find(
+              (message) =>
+                /** @type {{ type: string, name: string }} */ (message)
+                  ?.type === TURBO_EVENT_PUSH_TYPE &&
+                /** @type {{ name: string }} */ (message)?.name === name,
+            )
+        );
+      }
+
+      let fakePort;
+      let inspector;
+
+      beforeEach(() => {
+        fakePort = createFakeExtensionPort();
+        inspector = new ContentInspector({
+          document,
+          cssEscape,
+          connectPort: () => fakePort,
+        });
+        inspector.startTurboEventWatcher();
+      });
+
+      it("uses the element's own id when present", () => {
+        document.body.innerHTML = '<a id="preview-link" class="link">link</a>';
+        const link = document.getElementById("preview-link");
+
+        link.dispatchEvent(new CustomEvent("turbo:click", { bubbles: true }));
+
+        expect(pushOfType("turbo:click").targetId).toBe("preview-link");
+      });
+
+      it("falls back to a stable generated key when the element has no id", () => {
+        document.body.innerHTML = '<a class="link">link</a>';
+        const link = document.querySelector(".link");
+
+        link.dispatchEvent(new CustomEvent("turbo:click", { bubbles: true }));
+
+        const firstId = pushOfType("turbo:click").targetId;
+        expect(firstId).toMatch(new RegExp(`^${ID_PREFIX}-`));
+
+        const generatedKey = firstId;
+        link.dispatchEvent(new CustomEvent("turbo:click", { bubbles: true }));
+
+        expect(pushOfType("turbo:click").targetId).toBe(generatedKey);
+      });
+
+      it("records targetId as null when the event was dispatched on document", () => {
+        document.dispatchEvent(new Event("turbo:load"));
+
+        expect(pushOfType("turbo:load").targetId).toBeNull();
+      });
+
+      it("records targetId as null when the event's target lives in another document", () => {
+        document.body.innerHTML = '<a id="preview-link">link</a>';
+        const link = document.getElementById("preview-link");
+
+        const foreignDocument = document.implementation.createHTMLDocument();
+        Object.defineProperty(link, "ownerDocument", {
+          configurable: true,
+          value: foreignDocument,
+        });
+
+        link.dispatchEvent(new CustomEvent("turbo:click", { bubbles: true }));
+
+        expect(pushOfType("turbo:click").targetId).toBeNull();
+      });
+
+      it("records targetId as null when the event's target is not an element", () => {
+        document.body.innerHTML = "<p>just text</p>";
+        const textNode = document.querySelector("p").firstChild;
+
+        textNode.dispatchEvent(
+          new CustomEvent("turbo:click", { bubbles: true }),
+        );
+
+        expect(pushOfType("turbo:click").targetId).toBeNull();
+      });
     });
   });
 

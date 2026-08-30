@@ -2,7 +2,10 @@
 
 import { Application } from "@hotwired/stimulus";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PANEL_BRIDGE_PROPERTY } from "../../lib/constants.js";
+import {
+  PANEL_BRIDGE_PROPERTY,
+  TURBO_EVENT_PUSH_TYPE,
+} from "../../lib/constants.js";
 import { TurboEventsController } from "../../lib/panel/controllers/turbo-events-controller.js";
 
 const MAX_EVENTS_DEFAULT = 500;
@@ -209,7 +212,12 @@ describe("TurboEventsController", () => {
   it("hides the empty placeholder when the first event arrives", async () => {
     expect(getComputedStyle(elements.empty).display).toBe("flex");
 
-    controller.addEvent("turbo:load");
+    controller.addEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:load",
+      timestamp: 1700000000000,
+      targetId: null,
+    });
     await flushTargetLifecycle();
 
     expect(controller.eventTargets).toHaveLength(1);
@@ -218,7 +226,12 @@ describe("TurboEventsController", () => {
   });
 
   it("marks each event box as an `event` target", async () => {
-    controller.addEvent("turbo:load");
+    controller.addEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:load",
+      timestamp: 1700000000000,
+      targetId: null,
+    });
     await flushTargetLifecycle();
 
     for (const target of controller.eventTargets) {
@@ -251,7 +264,12 @@ describe("TurboEventsController", () => {
     setScrollMetrics(elements.list, { scrollHeight: 100, clientHeight: 100 });
 
     const newBox = /** @type {HTMLElement} */ (
-      controller.createEventBox("turbo:load")
+      controller.createEventBox({
+        type: TURBO_EVENT_PUSH_TYPE,
+        name: "turbo:load",
+        timestamp: 1700000000000,
+        targetId: null,
+      })
     );
     stubRectBottom(newBox, 100);
 
@@ -269,7 +287,12 @@ describe("TurboEventsController", () => {
 
     // event bottom = 98 → distance = 2 (≤ 4 threshold).
     const newBox = /** @type {HTMLElement} */ (
-      controller.createEventBox("turbo:click")
+      controller.createEventBox({
+        type: TURBO_EVENT_PUSH_TYPE,
+        name: "turbo:click",
+        timestamp: 1700000000000,
+        targetId: null,
+      })
     );
     stubRectBottom(newBox, 98);
 
@@ -287,7 +310,12 @@ describe("TurboEventsController", () => {
 
     // distance = -20 (|distance| > 4) — user has scrolled up.
     const newBox = /** @type {HTMLElement} */ (
-      controller.createEventBox("turbo:visit")
+      controller.createEventBox({
+        type: TURBO_EVENT_PUSH_TYPE,
+        name: "turbo:visit",
+        timestamp: 1700000000000,
+        targetId: null,
+      })
     );
     stubRectBottom(newBox, 120);
 
@@ -305,7 +333,12 @@ describe("TurboEventsController", () => {
 
     // 0 initial + 505 added = 505 → trim 5 at cap 500.
     for (let i = 0; i < MAX_EVENTS_DEFAULT + 5; i += 1) {
-      const box = controller.createEventBox(`turbo:event-${i}`);
+      const box = controller.createEventBox({
+        type: TURBO_EVENT_PUSH_TYPE,
+        name: `turbo:event-${i}`,
+        timestamp: i,
+        targetId: null,
+      });
       stubRectBottom(box, 1000);
       controller.listTarget.appendChild(box);
     }
@@ -330,7 +363,12 @@ describe("TurboEventsController", () => {
 
     // 0 + 502 = 502 → trim 2.
     for (let i = 0; i < MAX_EVENTS_DEFAULT + 2; i += 1) {
-      const box = controller.createEventBox(`turbo:event-${i}`);
+      const box = controller.createEventBox({
+        type: TURBO_EVENT_PUSH_TYPE,
+        name: `turbo:event-${i}`,
+        timestamp: i,
+        targetId: null,
+      });
       stubRectBottom(box, 1000);
       controller.listTarget.appendChild(box);
     }
@@ -350,7 +388,12 @@ describe("TurboEventsController", () => {
     stubRectBottom(elements.list, 100);
     setScrollMetrics(elements.list, { scrollHeight: 100, clientHeight: 100 });
 
-    controller.addEvent("turbo:load");
+    controller.addEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:load",
+      timestamp: 1700000000000,
+      targetId: null,
+    });
     await flushTargetLifecycle();
 
     expect(controller.droppedCountValue).toBe(1);
@@ -365,8 +408,18 @@ describe("TurboEventsController", () => {
   });
 
   it("shows the empty placeholder again after replaceChildren empties the list", async () => {
-    controller.addEvent("turbo:load");
-    controller.addEvent("turbo:visit");
+    controller.addEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:load",
+      timestamp: 1700000000000,
+      targetId: null,
+    });
+    controller.addEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:visit",
+      timestamp: 1700000000000,
+      targetId: null,
+    });
     await flushTargetLifecycle();
     expect(getComputedStyle(elements.empty).display).toBe("none");
 
@@ -386,7 +439,12 @@ describe("TurboEventsController", () => {
     setScrollMetrics(elements.list, { scrollHeight: 1000, clientHeight: 100 });
 
     // Elements tab is the default; events tab is unchecked.
-    const newBox = controller.createEventBox("turbo:visit");
+    const newBox = controller.createEventBox({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:visit",
+      timestamp: 1700000000000,
+      targetId: null,
+    });
     stubRectBottom(newBox, 120);
     controller.listTarget.appendChild(newBox);
 
@@ -417,13 +475,23 @@ describe("TurboEventsController", () => {
   });
 
   it("does not render events dispatched after disconnect", async () => {
-    controller.addEvent("turbo:load");
+    controller.addEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:load",
+      timestamp: 0,
+      targetId: null,
+    });
     await flushTargetLifecycle();
     const countBeforeDisconnect = controller.eventTargets.length;
 
     controller.disconnect();
     expect(() =>
-      bridge._onTurboEvent?.({ name: "turbo:render", timestamp: 0 }),
+      bridge._onTurboEvent?.({
+        type: TURBO_EVENT_PUSH_TYPE,
+        name: "turbo:render",
+        timestamp: 0,
+        targetId: null,
+      }),
     ).not.toThrow();
 
     await flushTargetLifecycle();
@@ -433,7 +501,12 @@ describe("TurboEventsController", () => {
   it("appends an event box from a bridge push payload", async () => {
     expect(controller.eventTargets).toHaveLength(0);
 
-    bridge._onTurboEvent({ name: "turbo:load", timestamp: 1700000000000 });
+    bridge._onTurboEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:load",
+      timestamp: 1700000000000,
+      targetId: null,
+    });
     await flushTargetLifecycle();
 
     expect(controller.eventTargets).toHaveLength(1);
@@ -444,7 +517,12 @@ describe("TurboEventsController", () => {
 
   it("renders the push timestamp as a localised time-of-day string", async () => {
     const timestamp = 1700000000000;
-    bridge._onTurboEvent({ name: "turbo:load", timestamp });
+    bridge._onTurboEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:load",
+      timestamp,
+      targetId: null,
+    });
     await flushTargetLifecycle();
 
     const [box] = controller.eventTargets;
@@ -454,11 +532,16 @@ describe("TurboEventsController", () => {
     expect(box.querySelector(".event-time").textContent).toBe(expected);
   });
 
-  it("createEventBox(name, timestamp) carries the formatted capture time", () => {
+  it("createEventBox renders the formatted capture time from the push", () => {
     const timestamp = 1700000000000;
     vi.spyOn(Date, "now").mockReturnValue(timestamp);
 
-    const box = controller.createEventBox("turbo:load", timestamp);
+    const box = controller.createEventBox({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:load",
+      timestamp,
+      targetId: null,
+    });
 
     expect(box.querySelector(".event-name").textContent).toBe("turbo:load");
     const expected = new Intl.DateTimeFormat(undefined, {
@@ -473,7 +556,12 @@ describe("TurboEventsController", () => {
     setScrollMetrics(elements.list, { scrollHeight: 1000, clientHeight: 100 });
 
     for (let i = 0; i < 5; i += 1) {
-      bridge._onTurboEvent({ name: `turbo:event-${i}`, timestamp: i });
+      bridge._onTurboEvent({
+        type: TURBO_EVENT_PUSH_TYPE,
+        name: `turbo:event-${i}`,
+        timestamp: i,
+        targetId: null,
+      });
     }
     await flushTargetLifecycle();
 
@@ -498,8 +586,21 @@ describe("TurboEventsController", () => {
 
     // 0 initial + 505 pushes = 505 → trim 5 at cap 500.
     for (let i = 0; i < MAX_EVENTS_DEFAULT + 5; i += 1) {
-      stubRectBottom(controller.createEventBox(`turbo:event-${i}`), 1000);
-      bridge._onTurboEvent({ name: `turbo:event-${i}`, timestamp: i });
+      stubRectBottom(
+        controller.createEventBox({
+          type: TURBO_EVENT_PUSH_TYPE,
+          name: `turbo:event-${i}`,
+          timestamp: i,
+          targetId: null,
+        }),
+        1000,
+      );
+      bridge._onTurboEvent({
+        type: TURBO_EVENT_PUSH_TYPE,
+        name: `turbo:event-${i}`,
+        timestamp: i,
+        targetId: null,
+      });
     }
     await flushTargetLifecycle();
 
@@ -530,6 +631,65 @@ describe("TurboEventsController", () => {
     );
 
     expect(resetBridge._onTurboEvent).toBeTypeOf("function");
+  });
+
+  it("renders a reveal icon when the push carries a targetId", async () => {
+    bridge._onTurboEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:render",
+      timestamp: 1700000000000,
+      targetId: "frame-id",
+    });
+    await flushTargetLifecycle();
+
+    const [box] = controller.eventTargets;
+    const reveal = box.querySelector(".event-reveal");
+    expect(reveal).not.toBeNull();
+    expect(reveal.getAttribute("data-controller")).toBe("event-box");
+    expect(reveal.getAttribute("data-event-box-target-id-value")).toBe(
+      "frame-id",
+    );
+    expect(reveal.getAttribute("data-action")).toBe("click->event-box#inspect");
+    expect(reveal.getAttribute("src")).toBe("/icons/reveal-in-elements.svg");
+  });
+
+  it("does not render a reveal icon when the push omits targetId", async () => {
+    bridge._onTurboEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:render",
+      timestamp: 1700000000000,
+      targetId: null,
+    });
+    await flushTargetLifecycle();
+
+    const [box] = controller.eventTargets;
+    expect(box.querySelector(".event-reveal")).toBeNull();
+  });
+
+  it("createEventBox with a targetId produces a reveal icon with the configured target id", () => {
+    const box = controller.createEventBox({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:render",
+      timestamp: 1700000000000,
+      targetId: "main-frame",
+    });
+
+    const reveal = box.querySelector(".event-reveal");
+    expect(reveal).not.toBeNull();
+    expect(reveal.getAttribute("data-event-box-target-id-value")).toBe(
+      "main-frame",
+    );
+  });
+
+  it("createEventBox without a targetId omits the reveal icon", () => {
+    const box = controller.createEventBox({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:render",
+      timestamp: 1700000000000,
+      targetId: null,
+    });
+
+    expect(box.querySelector(".event-reveal")).toBeNull();
   });
 });
 

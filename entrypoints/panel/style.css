@@ -17,6 +17,7 @@
   --lch-accent: 54% 0.19 255;
   --lch-accent-contrast: 100% 0 0;
   --lch-positive: 58% 0.16 155;
+  --lch-warning: 70% 0.16 60;
   --color-canvas: oklch(var(--lch-canvas));
   --color-surface: oklch(var(--lch-surface));
   --color-surface-elevated: oklch(var(--lch-surface-elevated));
@@ -34,6 +35,8 @@
     var(--color-positive) 14%,
     white
   );
+  --color-warning: oklch(var(--lch-warning));
+  --color-warning-surface: color-mix(in srgb, var(--color-warning) 14%, white);
   --space-inline: 1ch;
   --space-block: 1rem;
   --radius-sm: 0.25rem;
@@ -55,6 +58,7 @@
     --lch-accent: 70% 0.16 255;
     --lch-accent-contrast: 16% 0.035 255;
     --lch-positive: 78% 0.14 155;
+    --lch-warning: 80% 0.16 60;
   }
 }
 
@@ -70,6 +74,7 @@
   --lch-accent: 54% 0.19 255;
   --lch-accent-contrast: 100% 0 0;
   --lch-positive: 58% 0.16 155;
+  --lch-warning: 70% 0.16 60;
 }
 
 :root[data-theme="dark"] {
@@ -84,6 +89,7 @@
   --lch-accent: 70% 0.16 255;
   --lch-accent-contrast: 16% 0.035 255;
   --lch-positive: 78% 0.14 155;
+  --lch-warning: 80% 0.16 60;
 }
 
 * {
@@ -154,6 +160,12 @@ select {
   text-align: center;
   font-size: 0.875rem;
   border-bottom: 1px solid var(--color-positive);
+}
+
+.status-notice[data-status-tone-value="warning"] {
+  background: var(--color-warning-surface);
+  color: var(--color-warning);
+  border-bottom-color: var(--color-warning);
 }
 
 .toolbar-actions {
@@ -350,6 +362,10 @@ main:has(#tab-events:checked) #panel-events {
   font-family: inherit;
   font-variant-numeric: tabular-nums;
   color: var(--color-ink-muted);
+}
+
+.event-box .event-reveal {
+  align-self: center;
 }
 
 .empty-state {

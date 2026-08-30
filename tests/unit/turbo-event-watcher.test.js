@@ -109,7 +109,8 @@ describe("TurboEventWatcher", () => {
     });
 
     watcher.start();
-    spy.addCalls[0].handler({ type: "turbo:load", timeStamp: 12345 });
+    const event = { type: "turbo:load", timeStamp: 12345 };
+    spy.addCalls[0].handler(event);
 
     expect(received).toEqual([
       { name: "turbo:load", timestamp: 1700000000000 },
@@ -135,6 +136,22 @@ describe("TurboEventWatcher", () => {
     expect(payload.name).toBe("turbo:load");
     expect(payload.timestamp).toBe(1700000000000);
     expect(nowSpy).toHaveBeenCalled();
+  });
+
+  it("forwards the original Event reference as the second argument to onEvent", () => {
+    const spy = createDocumentSpy();
+    const onEvent = vi.fn();
+    const watcher = new TurboEventWatcher({
+      document: spy.document,
+      eventNames: ["turbo:load"],
+      onEvent,
+    });
+
+    watcher.start();
+    const event = { type: "turbo:load", timeStamp: 12345 };
+    spy.addCalls[0].handler(event);
+
+    expect(onEvent).toHaveBeenCalledWith(expect.any(Object), event);
   });
 
   it("start is safe when the supplied document is null", () => {
