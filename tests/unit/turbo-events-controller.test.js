@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { Application } from "@hotwired/stimulus";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PANEL_BRIDGE_PROPERTY } from "../../lib/constants.js";
 import { TurboEventsController } from "../../lib/panel/controllers/turbo-events-controller.js";
 
@@ -193,6 +193,7 @@ describe("TurboEventsController", () => {
     document.head.innerHTML = "";
     document.body.innerHTML = "";
     delete document[PANEL_BRIDGE_PROPERTY];
+    vi.restoreAllMocks();
   });
 
   it("starts with an empty list and shows the empty placeholder", () => {
@@ -432,14 +433,38 @@ describe("TurboEventsController", () => {
   it("appends an event box from a bridge push payload", async () => {
     expect(controller.eventTargets).toHaveLength(0);
 
-    bridge._onTurboEvent({ name: "turbo:load", timestamp: 1000 });
+    bridge._onTurboEvent({ name: "turbo:load", timestamp: 1700000000000 });
     await flushTargetLifecycle();
 
     expect(controller.eventTargets).toHaveLength(1);
-    expect(controller.eventTargets[0].textContent).toBe("turbo:load");
-    expect(
-      controller.eventTargets[0].getAttribute("data-turbo-events-target"),
-    ).toBe("event");
+    const [box] = controller.eventTargets;
+    expect(box.getAttribute("data-turbo-events-target")).toBe("event");
+    expect(box.querySelector(".event-name").textContent).toBe("turbo:load");
+  });
+
+  it("renders the push timestamp as a localised time-of-day string", async () => {
+    const timestamp = 1700000000000;
+    bridge._onTurboEvent({ name: "turbo:load", timestamp });
+    await flushTargetLifecycle();
+
+    const [box] = controller.eventTargets;
+    const expected = new Intl.DateTimeFormat(undefined, {
+      timeStyle: "medium",
+    }).format(new Date(timestamp));
+    expect(box.querySelector(".event-time").textContent).toBe(expected);
+  });
+
+  it("createEventBox(name, timestamp) carries the formatted capture time", () => {
+    const timestamp = 1700000000000;
+    vi.spyOn(Date, "now").mockReturnValue(timestamp);
+
+    const box = controller.createEventBox("turbo:load", timestamp);
+
+    expect(box.querySelector(".event-name").textContent).toBe("turbo:load");
+    const expected = new Intl.DateTimeFormat(undefined, {
+      timeStyle: "medium",
+    }).format(new Date(timestamp));
+    expect(box.querySelector(".event-time").textContent).toBe(expected);
   });
 
   it("continues appending events across many bridge pushes", async () => {
@@ -453,15 +478,17 @@ describe("TurboEventsController", () => {
     await flushTargetLifecycle();
 
     expect(controller.eventTargets).toHaveLength(5);
-    expect(controller.eventTargets.map((target) => target.textContent)).toEqual(
-      [
-        "turbo:event-0",
-        "turbo:event-1",
-        "turbo:event-2",
-        "turbo:event-3",
-        "turbo:event-4",
-      ],
-    );
+    expect(
+      controller.eventTargets.map(
+        (target) => target.querySelector(".event-name").textContent,
+      ),
+    ).toEqual([
+      "turbo:event-0",
+      "turbo:event-1",
+      "turbo:event-2",
+      "turbo:event-3",
+      "turbo:event-4",
+    ]);
   });
 
   it("respects the cap and dropped notice under push bursts", async () => {
@@ -536,6 +563,7 @@ describe("TurboEventsController without tab radio wiring", () => {
     if (app) app.stop();
     document.body.innerHTML = "";
     delete document[PANEL_BRIDGE_PROPERTY];
+    vi.restoreAllMocks();
   });
 
   it("connects and disconnects cleanly when no radios exist", async () => {

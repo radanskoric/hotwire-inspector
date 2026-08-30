@@ -97,8 +97,9 @@ describe("TurboEventWatcher", () => {
     expect(spy.addCalls).toHaveLength(1);
   });
 
-  it("forwards the event name and timeStamp from a captured event", () => {
+  it("forwards the event name with Date.now() as the capture timestamp", () => {
     const spy = createDocumentSpy();
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1700000000000);
     /** @type {{ name: string, timestamp: number }[]} */
     const received = [];
     const watcher = new TurboEventWatcher({
@@ -110,11 +111,15 @@ describe("TurboEventWatcher", () => {
     watcher.start();
     spy.addCalls[0].handler({ type: "turbo:load", timeStamp: 12345 });
 
-    expect(received).toEqual([{ name: "turbo:load", timestamp: 12345 }]);
+    expect(received).toEqual([
+      { name: "turbo:load", timestamp: 1700000000000 },
+    ]);
+    expect(nowSpy).toHaveBeenCalled();
   });
 
-  it("falls back to Date.now() when the event has no timeStamp", () => {
+  it("uses Date.now() even when the captured event has no timeStamp", () => {
     const spy = createDocumentSpy();
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1700000000000);
     const onEvent = vi.fn();
     const watcher = new TurboEventWatcher({
       document: spy.document,
@@ -123,13 +128,13 @@ describe("TurboEventWatcher", () => {
     });
 
     watcher.start();
-    const fallback = Date.now();
     spy.addCalls[0].handler({ type: "turbo:load", timeStamp: undefined });
 
     expect(onEvent).toHaveBeenCalledTimes(1);
     const payload = onEvent.mock.calls[0][0];
     expect(payload.name).toBe("turbo:load");
-    expect(payload.timestamp).toBeGreaterThanOrEqual(fallback);
+    expect(payload.timestamp).toBe(1700000000000);
+    expect(nowSpy).toHaveBeenCalled();
   });
 
   it("start is safe when the supplied document is null", () => {

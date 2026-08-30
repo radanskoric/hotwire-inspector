@@ -1269,6 +1269,7 @@ describe("ContentInspector", () => {
   describe("turboEventWatcher", () => {
     it("startTurboEventWatcher posts TURBO_EVENT_PUSH_TYPE on document turbo events", () => {
       const fakePort = createFakeExtensionPort();
+      vi.spyOn(Date, "now").mockReturnValue(1700000000000);
       const inspector = new ContentInspector({
         document,
         cssEscape,
@@ -1284,7 +1285,7 @@ describe("ContentInspector", () => {
       expect(fakePort.postMessage).toHaveBeenCalledWith({
         type: TURBO_EVENT_PUSH_TYPE,
         name: "turbo:load",
-        timestamp: 12345,
+        timestamp: 1700000000000,
       });
     });
 
