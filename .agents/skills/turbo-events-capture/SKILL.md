@@ -217,7 +217,7 @@ E2E (`tests/e2e/content-script.spec.js` via `withPanelMessagesListener`):
 
 For richer drill-downs (e.g. JSON view of full detail, payload diffs across pushes of the same name):
 
-- **Keep the timeline cheap.** A timeline row is always one row, always one target. The current `<details>` block is meant for *one-line* read-only fields, not nested JSON.
+- **Keep the timeline cheap.** A timeline row is always one row, always one target. The current `<details>` block is meant for _one-line_ read-only fields, not nested JSON.
 - **Use the details panel.** The existing slide-over (see `details-panel` skill) is the right home for "inspect this event". Dispatch a typed CustomEvent on `document` (e.g. `SHOW_TURBO_EVENT_DETAILS_EVENT`) with a payload identifying the row index / push; subscribe from `DetailsPanelController`. The row acts as a button (Stimulus action click → dispatch event); the panel renders the rich view. This split keeps the timeline rendering simple and the detail surface mature.
 - **Don't auto-open the panel on push.** A timeline that auto-pops on every event is unusable. Render rows; surface "view details" affordance per row; let the user opt in.
 

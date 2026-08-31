@@ -716,4 +716,36 @@ test.describe("Content Script", () => {
       });
     });
   });
+
+  test("turbo:submit-end details (success + error) propagate through the content→panel port", async ({
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium");
+
+    await withFixturePage(async ({ page, context }) => {
+      const frame = await getExtensionDevtoolsFrame(context);
+
+      await withPanelMessagesListener(frame, async ({ readMessages }) => {
+        await page.evaluate(() => {
+          document.dispatchEvent(
+            new CustomEvent("turbo:submit-end", {
+              bubbles: true,
+              detail: {
+                success: false,
+                error: new Error("network unreachable"),
+              },
+            }),
+          );
+        });
+
+        await expect.poll(readMessages).toContainEqual(
+          expect.objectContaining({
+            type: TURBO_EVENT_PUSH_TYPE,
+            name: "turbo:submit-end",
+            details: { success: "false", error: "network unreachable" },
+          }),
+        );
+      });
+    });
+  });
 });

@@ -848,7 +848,7 @@ test.describe("Panel UI", () => {
         );
         await expect(notice).toBeVisible();
         await expect(notice).toHaveText(
-          "Element no longer exists — cannot reveal it.",
+          "Element no longer exists so it can't be revealed.",
         );
       },
     );
