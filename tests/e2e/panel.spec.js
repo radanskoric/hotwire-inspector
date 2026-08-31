@@ -910,4 +910,46 @@ test.describe("Panel UI", () => {
       },
     );
   });
+
+  test("clearing turbo events empties the list and reveals the placeholder", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        await panelPage.locator("label.tab[for='tab-events']").click();
+
+        await simulateTurboEvent(panelPage, turboEventsFixturePush);
+        await simulateTurboEvent(panelPage, {
+          ...turboEventsFixturePush,
+          name: "turbo:visit",
+        });
+
+        await expect(panelPage.locator("#panel-events .event-box")).toHaveCount(
+          2,
+        );
+
+        await panelPage.locator("#panel-events .events-clear").click();
+
+        await expect(panelPage.locator("#panel-events .event-box")).toHaveCount(
+          0,
+        );
+        await expect(
+          panelPage.locator("#panel-events .events-list"),
+        ).toBeHidden();
+        await expect(
+          panelPage.locator("#panel-events .events-empty"),
+        ).toBeVisible();
+        await expect(
+          panelPage.locator("#panel-events .events-empty"),
+        ).toHaveText("No Turbo events yet");
+      },
+    );
+  });
 });

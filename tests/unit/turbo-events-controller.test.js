@@ -57,6 +57,14 @@ function mountDom() {
       class="tab-panel"
       data-controller="turbo-events"
     >
+      <div class="events-header">
+        <a
+          href="#"
+          class="events-clear"
+          data-turbo-events-target="clear"
+          data-action="click->turbo-events#clear:prevent"
+        >Clear</a>
+      </div>
       <p
         class="events-dropped-notice"
         data-turbo-events-target="droppedNotice"
@@ -80,6 +88,7 @@ function mountDom() {
     list: document.querySelector(".events-list"),
     notice: document.querySelector(".events-dropped-notice"),
     empty: document.querySelector(".events-empty"),
+    clear: document.querySelector(".events-clear"),
   };
 }
 
@@ -782,6 +791,90 @@ describe("TurboEventsController", () => {
       "https://app.test/x",
     );
   });
+
+  it("exposes the clear target so a click handler can be wired to it", () => {
+    expect(controller.clearTarget).toBe(elements.clear);
+  });
+
+  it("clear() empties the events list without affecting a separate droppedCount", async () => {
+    controller.addEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:load",
+      timestamp: 1700000000000,
+      targetId: null,
+    });
+    controller.addEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:visit",
+      timestamp: 1700000000000,
+      targetId: null,
+    });
+    await flushTargetLifecycle();
+
+    expect(controller.eventTargets).toHaveLength(2);
+    expect(getComputedStyle(elements.empty).display).toBe("none");
+
+    controller.clear();
+
+    expect(controller.eventTargets).toHaveLength(0);
+    expect(elements.list.children).toHaveLength(0);
+    // Manual teardown isn't a "drop" — the count only ticks when the
+    // cap causes `eventTargetConnected` to evict older events.
+    expect(controller.droppedCountValue).toBe(0);
+    expect(elements.notice.hidden).toBe(true);
+    // CSS-driven visibility: an emptied list shows the placeholder again.
+    expect(getComputedStyle(elements.empty).display).toBe("flex");
+    expect(getComputedStyle(elements.list).display).toBe("none");
+  });
+
+  it("clear() resets a non-zero droppedCountValue and hides the dropped notice", async () => {
+    activateEventsTab();
+    stubRectBottom(elements.list, 100);
+    setScrollMetrics(elements.list, { scrollHeight: 100, clientHeight: 100 });
+
+    // Cap of 0 evicts every event on arrival → droppedCountValue = 1.
+    controller.maxEventsValue = 0;
+    controller.addEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:load",
+      timestamp: 1700000000000,
+      targetId: null,
+    });
+    await flushTargetLifecycle();
+    expect(controller.droppedCountValue).toBe(1);
+    expect(elements.notice.hidden).toBe(false);
+
+    controller.clear();
+    await flushTargetLifecycle();
+
+    expect(controller.droppedCountValue).toBe(0);
+    expect(elements.notice.hidden).toBe(true);
+  });
+
+  it("clicking the clear link empties the events list through the Stimulus action", async () => {
+    controller.addEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:load",
+      timestamp: 1700000000000,
+      targetId: null,
+    });
+    controller.addEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:visit",
+      timestamp: 1700000000000,
+      targetId: null,
+    });
+    await flushTargetLifecycle();
+    expect(controller.eventTargets).toHaveLength(2);
+
+    elements.clear.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushTargetLifecycle();
+
+    expect(controller.eventTargets).toHaveLength(0);
+    expect(elements.list.children).toHaveLength(0);
+    expect(controller.droppedCountValue).toBe(0);
+    expect(getComputedStyle(elements.empty).display).toBe("flex");
+  });
 });
 
 describe("TurboEventsController without tab radio wiring", () => {
@@ -794,6 +887,14 @@ describe("TurboEventsController without tab radio wiring", () => {
       class="tab-panel"
       data-controller="turbo-events"
     >
+      <div class="events-header">
+        <a
+          href="#"
+          class="events-clear"
+          data-turbo-events-target="clear"
+          data-action="click->turbo-events#clear:prevent"
+        >Clear</a>
+      </div>
       <p
         class="events-dropped-notice"
         data-turbo-events-target="droppedNotice"

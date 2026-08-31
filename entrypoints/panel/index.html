@@ -70,6 +70,15 @@
             class="tab-panel"
             data-controller="turbo-events"
           >
+            <div class="events-header">
+              <a
+                href="#"
+                class="events-clear"
+                data-turbo-events-target="clear"
+                data-action="click->turbo-events#clear:prevent"
+                >Clear</a
+              >
+            </div>
             <p
               class="events-dropped-notice"
               data-turbo-events-target="droppedNotice"

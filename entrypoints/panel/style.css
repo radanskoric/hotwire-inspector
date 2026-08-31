@@ -312,6 +312,17 @@ main:has(#tab-events:checked) #panel-events {
   color: var(--color-ink-muted);
 }
 
+.events-header {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.25rem 0.75rem;
+}
+
+.events-clear {
+  padding: 0.25rem 0.5rem;
+}
+
 .events-list:not(:empty) {
   flex: 1;
   min-block-size: 0;
