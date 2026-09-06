@@ -232,4 +232,16 @@ describe("ValueWatcher", () => {
 
     expect(push).not.toHaveBeenCalled();
   });
+
+  it("stop() is safe before start() creates an observer", () => {
+    const watcher = new ValueWatcher({
+      element: createElement(),
+      definitions,
+      push,
+      observerClass: fake.FakeObserver,
+    });
+
+    expect(() => watcher.stop()).not.toThrow();
+    expect(fake.disconnect).not.toHaveBeenCalled();
+  });
 });

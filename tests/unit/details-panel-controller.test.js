@@ -339,6 +339,16 @@ describe("DetailsPanelController", () => {
     expect(calls).toContainEqual(["unwatchControllerValues"]);
   });
 
+  it("silently tolerates an unwatch failure during disconnect", async () => {
+    document[PANEL_BRIDGE_PROPERTY].unwatchControllerValues = () =>
+      Promise.reject(new Error("Disconnected"));
+
+    panel.remove();
+    await Promise.resolve();
+
+    expect(panel.isConnected).toBe(false);
+  });
+
   describe("values section", () => {
     function valuesContent() {
       return panel.querySelector("[data-details-panel-target='values']");

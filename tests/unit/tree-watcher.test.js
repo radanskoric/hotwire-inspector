@@ -239,6 +239,26 @@ describe("TreeWatcher", () => {
     expect(scan).toHaveBeenCalledTimes(1);
   });
 
+  it("ignores mutation record types that do not affect the tree", () => {
+    const scan = vi.fn(() => []);
+    const onChange = vi.fn();
+    const FakeObserver = createFakeObserverClass();
+    const watcher = new TreeWatcher({
+      scan,
+      onChange,
+      document,
+      observerClass: FakeObserver,
+      debounceMs: 100,
+    });
+
+    watcher.start();
+    FakeObserver._lastInstance()._callback([{ type: "characterData" }]);
+    vi.advanceTimersByTime(100);
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(scan).toHaveBeenCalledTimes(1);
+  });
+
   it("treats changes to tracked target attributes as relevant", () => {
     const scan = vi.fn(() => [
       { id: "1", parentId: null, tagName: "div", controllers: ["modal"] },

@@ -4,6 +4,9 @@
   "version": "0.0.3",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox --mv3",
@@ -31,22 +34,23 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.49.1",
-    "@vitest/coverage-v8": "^2.1.9",
+    "@playwright/test": "^1.62.1",
+    "@vitest/coverage-v8": "^4.1.11",
     "@vitest/eslint-plugin": "^1.6.27",
-    "@vitest/ui": "^2.1.8",
-    "eslint": "^10.8.1",
+    "@vitest/ui": "^4.1.11",
+    "eslint": "^10.9.1",
     "eslint-plugin-playwright": "^2.11.0",
-    "globals": "^17.11.0",
-    "happy-dom": "^20.9.0",
-    "playwright": "^1.49.1",
+    "globals": "^17.12.0",
+    "happy-dom": "^20.13.2",
+    "playwright": "^1.62.1",
     "prettier": "^3.9.6",
     "stylelint": "^17.14.1",
     "stylelint-config-standard": "^40.0.0",
     "typescript": "^6.0.3",
-    "vite": "^5.4.14",
-    "vitest": "^2.1.8",
-    "wxt": "^0.20.27"
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11",
+    "web-ext": "^10.6.0",
+    "wxt": "^0.21.4"
   },
   "dependencies": {
     "@hotwired/stimulus": "^3.2.2"

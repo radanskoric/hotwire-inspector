@@ -48,6 +48,15 @@ describe("showNotice", () => {
     expect(document.body.children).toHaveLength(0);
   });
 
+  it("renders a notice when its template has no text slot", () => {
+    document.body.innerHTML =
+      '<template id="notice-template"><div class="status-notice"></div></template>';
+
+    showNotice(document, "No slot");
+
+    expect(document.querySelector(".status-notice")).not.toBeNull();
+  });
+
   it("renders each call as a separate notice", () => {
     buildNoticeTemplate();
 

@@ -512,6 +512,20 @@ describe("PanelApp", () => {
     });
   });
 
+  it("ends the refresh cooldown when no trailing refresh is pending", async () => {
+    await withFakeTimers(async () => {
+      const app = createPanelApp();
+      app.refreshTree = async () => {};
+
+      app.throttledRefreshTree();
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(50);
+
+      expect(app.refreshCooldown).toBe(false);
+      expect(app.refreshPending).toBe(false);
+    });
+  });
+
   it("performs a trailing refresh when a push arrives during the cooldown window", async () => {
     await withFakeTimers(async () => {
       const { bridge, sendToInspectedTab, pushTreeChanged, resolveNext } =
