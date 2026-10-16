@@ -83,3 +83,17 @@ This allows shared panel UI behavior assertions to run in Firefox while keeping 
 - **Firefox**: shared panel UI coverage plus a focused smoke check of the built Firefox panel bundle with mocked APIs.
 
 Future Firefox work can add content-script coverage only after extension loading and DevTools/content-script messaging are reliable in Playwright Firefox.
+
+## Installed MAIN-world boundary tests
+
+`main-world-gate.spec.js` builds a separate instrumented WXT extension and installs
+it in Chromium. It verifies both startup orders, scalar extraction from a
+page-owned object through the isolated client, and no script insertion or added
+globals during requests. The test handler is absent from production builds.
+
+Run `node tests/e2e/run-firefox-main-world-gate.js` for the separate installed
+Firefox test. It uses `web-ext` and a fresh temporary profile, with a localhost
+fixture reporting results, rather than the mocked Firefox panel adapter. Set
+`FIREFOX_BINARY` when Firefox is not at the default macOS path. The runner closes
+its browser after checking both startup orders. See [ADR 5](../docs/decisions/5%20-%20shared%20MAIN%20world.md)
+for exact browser evidence and the unresolved installed Safari gate.

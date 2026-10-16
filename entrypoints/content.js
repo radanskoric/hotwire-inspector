@@ -17,6 +17,7 @@ import { ContentInspector } from "../lib/content-inspector.js";
 
 export default defineContentScript({
   matches: ["http://*/*", "https://*/*"],
+  runAt: "document_start",
   main() {
     const inspector = new ContentInspector({
       injectScript,
@@ -24,7 +25,7 @@ export default defineContentScript({
         browser.runtime.connect({ name: CONTENT_EVENTS_PORT_NAME }),
     });
 
-    inspector.startTreeWatcher();
+    inspector.startTreeWatcherWhenReady();
     inspector.startPageLifecycleWatcher();
     inspector.startTurboEventWatcher();
 

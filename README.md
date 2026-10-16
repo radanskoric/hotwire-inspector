@@ -14,14 +14,19 @@ An important goal of the project is to inspect the page without disturbing it. H
 
 1. Tracking the elements on the page inside the extension rather than writing tracking attributes into the target DOM. This requires never holding a strong reference to the elements, so they can be garbage collected. Element's ID is used when possible and [WeakMap](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WeakMap) and [WeakRef](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WeakRef) are used whenever a direct reference to the element object is needed.
 2. Highlighting is done by inserting absolutely positioned elements into the root of the DOM rather than modifying the target elements directly. This is the minimal possible intrusion into the DOM that allows visual highlighting.
-3. Controller instance storage uses a WXT-injected page script element to find and track controller instances. The script listens only on its own element. The only writes to the page's global scope are `window.tempN` variables that are only set after a user requests it. This approach is selected because the only alternative is eval-ing code in the context of the page. A single isolated script is a cleaner approach.
+3. Controller storage and value/outlet definitions still use a lazily WXT-injected page script, listening on its own element. Storage deliberately creates `window.tempN` after a valid request. Page-context RPC is not authenticated: page code can forge requests, so this is not a user-gesture guarantee.
 4. Turbo event capture uses capture-phase listeners in the content scripts which exists outside the page's context, not in the injected script.
+5. A shared browser-registered MAIN bootstrap installs the document RPC infrastructure without inserting script elements. Its production feature list is empty. Equivalent code in MAIN and a script tag has comparable runtime effects; browser registration removes script-element mutation, while eager listeners add an idle footprint.
 
 This approach helps reduce debugging noise, avoids surprising side effects, and keeps the inspected page behavior as close as possible to its normal runtime behavior.
 
 ## Architecture
 
 Hotwire Inspector is split across the extension's DevTools panel, background script, content script, and a small injected page-context script. Most communication uses a one-shot request/response relay through the background script. For live updates, a second channel uses long-lived ports so the content script can push changes to the panel as they happen.
+
+`entrypoints/main-world.content.js` is the sole MAIN registration: HTTP/HTTPS, `document_start`, anonymous bundle. It delegates to `lib/main_world/runtime.js`; features belong in that directory and register operations only after successful startup. `rpc-server.js` and `protocol.js` provide validated JSON document RPC. The isolated `lib/main-world-client.js` installs its response listener synchronously, shares readiness probes only while requests wait, and gives each request five seconds total. Neither endpoint authenticates page code or exposes extension privileges.
+
+The isolated content script also starts at `document_start`, with tree observation deferred until DOMContentLoaded during parsing. MAIN listeners survive BFCache restores with the document. Controller storage, value/outlet definitions, and Turbo capture have **not migrated**. Further migrations remain blocked pending the installed-browser gate in [ADR 5](docs/decisions/5%20-%20shared%20MAIN%20world.md), including Safari runtime verification.
 
 ```text
 ┌──────────────────────────────┐
@@ -64,6 +69,8 @@ Hotwire Inspector is split across the extension's DevTools panel, background scr
 │ - infer values configuration |
 └──────────────────────────────┘
 ```
+
+Alongside the lazy script path shown above, the isolated client communicates directly with the shared MAIN runtime using non-bubbling `hotwire-inspector:main-world-rpc-request` / `hotwire-inspector:main-world-rpc-response` events on `document`. The only production operation currently available is `bridgeStatus`.
 
 ## Local development with hot reloading
 
