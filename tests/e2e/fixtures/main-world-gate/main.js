@@ -1,5 +1,6 @@
-export function startGate(document, Runtime) {
+export function startGate(document, Runtime, features) {
   const runtime = new Runtime(document, [
+    ...features,
     () => ({
       start() {},
       stop() {},

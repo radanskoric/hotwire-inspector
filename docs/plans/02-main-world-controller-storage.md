@@ -99,3 +99,36 @@ unavailable. Do not infer runtime support from a valid manifest.
 Complete when storage uses MAIN exclusively, its public behavior is preserved,
 values/outlets still work through injection, and no unsolicited page work is
 introduced. This result is the required starting point for plan 3.
+
+## Implementation Status: 2026-10-16
+
+Controller storage now uses the shared MAIN runtime exclusively. The lookup
+helper is shared with the remaining lazy injected value/outlet operations.
+Legacy storage events and types were removed. Storage preserves exact controller
+identity and the first-unused-temp-name rule, with no script insertion or
+tracking mutations. Successful responses are validated against the pending
+identifier. Requests are never retried, including when storage succeeds but its
+reply is lost.
+
+The user directed implementation of this step while Safari investigation is
+paused. This is an exception to the prerequisite above, not evidence that the
+Safari gate has passed. Installed Safari storage remains unverified; later
+migrations must not treat the Safari build as runtime validation.
+
+Verification on macOS 26.6.2 (25G83), Apple Silicon:
+
+- Lint, CSS lint, formatting, typecheck, and the skill validator pass.
+- All 480 unit tests pass, with 100% statements, branches, functions, and lines
+  under the unchanged library coverage configuration, including both new modules.
+- Chrome MV3, Firefox MV3, and configured Safari MV2 builds pass. Each has one
+  anonymous MAIN entrypoint; the injected script no longer contains storage.
+- Chromium 151.0.7922.34: full E2E suite passes 65 tests with one pre-existing
+  exploratory test skipped. Real extension-relay storage tests cover all three
+  Stimulus globals, occupied temp names, missing controllers, and no DOM/script
+  mutation before and after lazy values/outlets lookup.
+- Firefox 156.0.1: the separate installed-extension runner passes all three
+  Stimulus globals in both startup orders. It verifies exact stored instance
+  identity and no added scripts or globals beyond the requested temp variable.
+  This exercises the isolated client and real MAIN service; Firefox panel APIs
+  are not involved. The separate mocked-panel smoke suite passes its one test.
+- Safari installed-extension testing was not resumed, per the user's request.

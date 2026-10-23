@@ -10,8 +10,6 @@ import {
   CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
   CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT,
   ID_PREFIX,
-  STORE_CONTROLLER_REQUEST_EVENT,
-  STORE_CONTROLLER_RESPONSE_EVENT,
   TREE_CHANGED_PUSH_TYPE,
   TURBO_EVENT_PUSH_TYPE,
   VALUES_CHANGED_PUSH_TYPE,
@@ -378,199 +376,31 @@ describe("ContentInspector", () => {
     expect(setAttributeSpy).not.toHaveBeenCalled();
   });
 
-  it("round-trips controller storage via JSON stringified event details (Firefox compartment)", async () => {
-    document.body.innerHTML =
-      '<div id="modal-controller" data-controller="modal"></div>';
-    const script = new EventTarget();
-    const injectScript = () => Promise.resolve({ script });
-    const inspector = new ContentInspector({
-      document,
-      cssEscape,
-      injectScript,
-    });
-
-    script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
-      const detail = JSON.parse(event.detail);
-
-      script.dispatchEvent(
-        new CustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
-          detail: JSON.stringify({
-            requestId: detail.requestId,
-            success: true,
-            name: "temp1",
-            identifier: "modal",
-          }),
-        }),
-      );
-    });
-
-    inspector.scan();
-
-    await expect(
-      inspector.storeController("modal-controller", "modal"),
-    ).resolves.toEqual({
-      requestId: expect.any(String),
-      success: true,
-      name: "temp1",
-      identifier: "modal",
-    });
-  });
-
   it("returns an error when storing a controller for a missing element", async () => {
     const inspector = new ContentInspector({ document, cssEscape });
-
     await expect(
       inspector.storeController("missing", "modal"),
     ).resolves.toEqual({
       success: false,
       error: "Element not found",
     });
+    inspector.disconnect();
   });
 
-  it("stores a controller through the injected page script", async () => {
-    document.body.innerHTML =
-      '<div id="modal-controller" data-controller="modal"></div>';
-    const script = new EventTarget();
-    const injectScript = () => Promise.resolve({ script });
-    const inspector = new ContentInspector({
-      document,
-      cssEscape,
-      injectScript,
-    });
-
-    script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
-      const detail = JSON.parse(event.detail);
-
-      script.dispatchEvent(
-        new CustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
-          detail: JSON.stringify({
-            requestId: "unrelated-request",
-            success: false,
-          }),
-        }),
-      );
-      script.dispatchEvent(
-        new CustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
-          detail: JSON.stringify({
-            requestId: detail.requestId,
-            success: true,
-            name: "temp1",
-            identifier: "modal",
-          }),
-        }),
-      );
-    });
-
-    inspector.scan();
-
-    await expect(
-      inspector.storeController("modal-controller", "modal"),
-    ).resolves.toEqual({
-      requestId: expect.any(String),
-      success: true,
-      name: "temp1",
-      identifier: "modal",
-    });
-  });
-
-  it("returns injected script loader failures as controller storage errors", async () => {
+  it("uses fallback storage error text when a MAIN request fails without a message", async () => {
     document.body.innerHTML =
       '<div id="modal-controller" data-controller="modal"></div>';
     const inspector = new ContentInspector({ document, cssEscape });
-
-    inspector.scan();
-
-    await expect(
-      inspector.storeController("modal-controller", "modal"),
-    ).resolves.toEqual({
-      success: false,
-      error: "Injected page script loader unavailable",
-    });
-  });
-
-  it("uses fallback storage error text and global CustomEvent when needed", async () => {
-    document.body.innerHTML =
-      '<div id="modal-controller" data-controller="modal"></div>';
-    const script = new EventTarget();
-    const injectScript = () => Promise.resolve({ script });
-    const inspector = new ContentInspector({
-      document,
-      cssEscape,
-      injectScript,
-    });
-
-    vi.spyOn(document, "defaultView", "get").mockReturnValue(null);
     inspector.sendStoreControllerRequest = async () => {
       throw new Error();
     };
-    inspector.scan();
-
     await expect(
       inspector.storeController("modal-controller", "modal"),
     ).resolves.toEqual({
       success: false,
       error: "Controller storage failed",
     });
-
-    inspector.sendStoreControllerRequest =
-      ContentInspector.prototype.sendStoreControllerRequest;
-    script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
-      const detail = JSON.parse(event.detail);
-
-      script.dispatchEvent(
-        new CustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
-          detail: JSON.stringify({
-            requestId: detail.requestId,
-            success: true,
-          }),
-        }),
-      );
-    });
-
-    await expect(
-      inspector.storeController("modal-controller", "modal"),
-    ).resolves.toEqual({
-      requestId: expect.any(String),
-      success: true,
-    });
-  });
-
-  it("reuses the injected script for subsequent controller storage requests", async () => {
-    document.body.innerHTML =
-      '<div id="modal-controller" data-controller="modal"></div>';
-    const script = new EventTarget();
-    let injectionCount = 0;
-    const injectScript = () => {
-      injectionCount += 1;
-      return Promise.resolve(script);
-    };
-    const inspector = new ContentInspector({
-      document,
-      cssEscape,
-      injectScript,
-    });
-
-    script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
-      const detail = JSON.parse(event.detail);
-
-      script.dispatchEvent(
-        new CustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
-          detail: JSON.stringify({
-            requestId: detail.requestId,
-            success: true,
-            name: `temp${injectionCount}`,
-            identifier: "modal",
-          }),
-        }),
-      );
-    });
-
-    inspector.scan();
-
-    await inspector.storeController("modal-controller", "modal");
-    await inspector.storeController("modal-controller", "modal");
-
-    expect(injectionCount).toBe(1);
+    inspector.disconnect();
   });
 
   describe("controllerValues", () => {
@@ -733,7 +563,8 @@ describe("ContentInspector", () => {
       });
     });
 
-    it("reuses the injected script for subsequent values requests", async () => {
+    it("reuses the injected script and global CustomEvent for subsequent values requests", async () => {
+      vi.spyOn(document, "defaultView", "get").mockReturnValue(null);
       document.body.innerHTML =
         '<div id="modal-controller" data-controller="modal"></div>';
       const script = new EventTarget();

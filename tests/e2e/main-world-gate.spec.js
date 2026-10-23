@@ -40,6 +40,8 @@ for (const order of ["main-first", "client-first"]) {
             addedGlobals: [],
             insertedScripts: 0,
             scriptsUnchanged: true,
+            storedControllerMatches: true,
+            storage: { success: true, name: "temp1", identifier: "fixture" },
           });
           test.info().annotations.push({
             type: "browser-gate",

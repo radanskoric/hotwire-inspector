@@ -1,4 +1,5 @@
 import { MainWorldRuntime } from "../lib/main_world/runtime.js";
+import { createControllerStorage } from "../lib/main_world/controller-storage.js";
 
 export default defineContentScript({
   matches: ["http://*/*", "https://*/*"],
@@ -6,6 +7,6 @@ export default defineContentScript({
   runAt: "document_start",
   globalName: false,
   main() {
-    new MainWorldRuntime(document, []).start();
+    new MainWorldRuntime(document, [createControllerStorage]).start();
   },
 });

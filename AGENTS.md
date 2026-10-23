@@ -28,13 +28,17 @@ Core tooling currently includes:
   - content script logic for scanning, element lookup, highlighting, and inspect support
   - starts at document_start, installs the MAIN client before watchers/ports, and defers tree observation until DOMContentLoaded while parsing
 - `entrypoints/main-world.content.js`
-  - the single anonymous browser-registered MAIN bootstrap, delegating to `lib/main_world/runtime.js` with an empty production feature list
+  - the single anonymous browser-registered MAIN bootstrap, delegating to `lib/main_world/runtime.js` with the controller-storage feature
 - `lib/main_world/`
   - shared feature lifecycle, RPC server, and pure wire validation; add future MAIN features here
 - `lib/main-world-client.js`
   - isolated JSON document RPC client, with shared readiness probing and independent five-second deadlines
 - `entrypoints/inspected-page-inject.js`
-  - still lazily injected for all Stimulus storage and value/outlet definition requests; none have migrated to MAIN
+  - still lazily injected for value/outlet definition requests; storage uses MAIN exclusively
+- `lib/main_world/controller-lookup.js`
+  - request-time Stimulus application/controller lookup, shared by MAIN storage and legacy injected definition queries; never caches controllers
+- `lib/main_world/controller-storage.js`
+  - request-driven storage into the first unused `window.tempN` and success validation against the pending identifier
 - `entrypoints/devtools/`
   - DevTools page entrypoint that registers the Hotwire Inspector panel via WXT's `browser.devtools.panels.create`
 - `entrypoints/panel/`
@@ -74,9 +78,9 @@ Core tooling currently includes:
 
 ### Messaging architecture
 
-The shared MAIN foundation uses distinct non-bubbling JSON-string request/response events directly on document. It currently advertises no feature operations; `bridgeStatus` is reserved. Imports/factories have no page effects, startup failures are contained per feature, and explicit teardown removes exact listeners even if feature cleanup throws. BFCache keeps MAIN listeners alive. Do not add another MAIN entrypoint, script insertion, eval, or page-global sentinel.
+The shared MAIN foundation uses distinct non-bubbling JSON-string request/response events directly on document. It advertises `storeController`; `bridgeStatus` is reserved. Imports/factories have no page effects, startup failures are contained per feature, and explicit teardown removes exact listeners even if feature cleanup throws. BFCache keeps MAIN listeners alive. Do not add another MAIN entrypoint, script insertion, eval, or page-global sentinel.
 
-Document RPC is compatibility transport, not authentication. Page scripts can spoof requests/responses. MAIN has no extension privileges. Future controller storage is allowed only upon a valid request, but that does not authenticate a panel click. Equivalent code in MAIN and a script tag has comparable runtime effects; browser registration removes script-element mutation while eager listeners add idle footprint. See [ADR 5](docs/decisions/5%20-%20shared%20MAIN%20world.md) and the [main-world skill](.agents/skills/main-world/SKILL.md). Later migrations remain blocked until the actual-browser gate is complete.
+Document RPC is compatibility transport, not authentication. Page scripts can spoof requests/responses. MAIN has no extension privileges. Controller storage is allowed only upon a valid request, but that does not authenticate a panel click. Framework lookup calls page-owned methods and can invoke getters; it is not wholly passive. Equivalent code in MAIN and a script tag has comparable runtime effects; browser registration removes script-element mutation while eager listeners add idle footprint. See [ADR 5](docs/decisions/5%20-%20shared%20MAIN%20world.md) and the [main-world skill](.agents/skills/main-world/SKILL.md). 
 
 The extension uses two messaging channels between the panel and the content script:
 
@@ -90,7 +94,7 @@ The extension uses two messaging channels between the panel and the content scri
 ### Turbo Events capture
 
 - **What is captured**: a curated list of Turbo 8.x DOM events (`lib/turbo-event-watcher.js` exports `TURBO_EVENT_NAMES`). The list is the single source of truth — both the watcher and any tests that need to assert coverage import it from this module. Add a new event by adding a string to that array; nothing else needs to change.
-- **What is read from each event**: the watcher captures `event.type`, an epoch `Date.now()` timestamp, and curated details via `turboEventDetailsFor`. The content inspector adds `targetId` using existing in-memory identity. 
+- **What is read from each event**: the watcher captures `event.type`, an epoch `Date.now()` timestamp, and curated details via `turboEventDetailsFor`. The content inspector adds `targetId` using existing in-memory identity.
 - **How capture is wired**: `TurboEventWatcher.start()` registers capture-phase (`useCapture: true`) listeners on `document` for each name in the list. `start()` is idempotent; calling it twice is a no-op. `stop()` removes exactly the listeners registered by `start()`. The class treats `document` opaquely — anything with `addEventListener`/`removeEventListener` (including a fake `EventTarget` in unit tests) works.
 - **Capture is eager and ungated**: once the content script starts up, the watcher is running for the lifetime of the content script. There is no `watchTurboEvents`/`unwatchTurboEvents` one-shot handshake. This is a deliberate design choice — gating is a future optimization, not a v1 requirement. If you add a handshake, also wire matching cleanup in `ContentInspector.disconnect()`.
 - **Push shape**: `{ type: TURBO_EVENT_PUSH_TYPE, name, timestamp, details, targetId }`. `TURBO_EVENT_PUSH_TYPE` lives in `lib/constants.js`; the `TurboEventPush` typedef lives in `lib/types.js`. The push rides the existing content→background→panel port pipeline.

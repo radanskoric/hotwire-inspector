@@ -37,6 +37,38 @@ async function withFixturePage(testBody) {
   });
 }
 
+async function observeStorage(page) {
+  return page.evaluate(() => {
+    window.__storageRecords = [];
+    window.__storageObserver = new MutationObserver((records) =>
+      window.__storageRecords.push(...records),
+    );
+    window.__storageObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+    });
+    return document.documentElement.outerHTML;
+  });
+}
+
+async function expectStorageDidNotMutateDOM(page, html) {
+  const snapshot = await page.evaluate(() => {
+    const records = [
+      ...window.__storageRecords,
+      ...window.__storageObserver.takeRecords(),
+    ];
+    window.__storageObserver.disconnect();
+    delete window.__storageObserver;
+    delete window.__storageRecords;
+    return {
+      html: document.documentElement.outerHTML,
+      mutations: records.length,
+    };
+  });
+  expect(snapshot).toEqual({ html, mutations: 0 });
+}
+
 test.describe("Content Script", () => {
   test("registers the DevTools panel", async ({ browserName }) => {
     test.skip(browserName !== "chromium");
@@ -184,6 +216,7 @@ test.describe("Content Script", () => {
       const modalController = scanResult.items.find((item) =>
         item.controllers?.includes("modal"),
       );
+      const html = await observeStorage(page);
       const result = await sendToContentScript(frame, {
         type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
         id: modalController.id,
@@ -191,19 +224,92 @@ test.describe("Content Script", () => {
       });
 
       expect(result).toEqual({
-        requestId: expect.any(String),
         success: true,
         name: "temp1",
         identifier: "modal",
       });
+      await expectStorageDidNotMutateDOM(page, html);
       await expect(page.locator("body > div")).toHaveCount(1);
       await expect
         .poll(() =>
           page.evaluate(() => window.temp1 === window.modalController),
         )
         .toBe(true);
+      const consoleResult = await frame.evaluate(
+        () =>
+          new Promise((resolve, reject) => {
+            chrome.devtools.inspectedWindow.eval(
+              "({ type: typeof temp1, matches: temp1 === window.modalController })",
+              (result, exception) => {
+                if (exception) reject(new Error(JSON.stringify(exception)));
+                else resolve(result);
+              },
+            );
+          }),
+      );
+      expect(consoleResult).toEqual({ type: "object", matches: true });
     });
   });
+
+  for (const [label, type] of [
+    ["values", CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE],
+    ["outlets", CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE],
+  ]) {
+    test(`stores before and after lazy ${label} lookup without extra script insertion`, async () => {
+      await withFixturePage(async ({ page, context }) => {
+        const frame = await getExtensionDevtoolsFrame(context);
+        const { items } = await sendToContentScript(frame, {
+          type: CONTENT_SCAN_MESSAGE_TYPE,
+        });
+        const { id } = items.find((item) => item.controllers.includes("modal"));
+        await page.evaluate(() => {
+          window.temp1 = "occupied";
+        });
+        const html = await observeStorage(page);
+        expect(
+          await sendToContentScript(frame, {
+            type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+            id,
+            identifier: "modal",
+          }),
+        ).toEqual({ success: true, name: "temp2", identifier: "modal" });
+        await expectStorageDidNotMutateDOM(page, html);
+        expect(
+          await page.evaluate(
+            () =>
+              window.temp1 === "occupied" &&
+              window.temp2 === window.modalController,
+          ),
+        ).toBe(true);
+        const scriptsBefore = await page.locator("script").count();
+        expect(
+          (await sendToContentScript(frame, { type, id, identifier: "modal" }))
+            .success,
+        ).toBe(true);
+        await expect(page.locator("script")).toHaveCount(scriptsBefore + 1);
+        const afterLookup = await observeStorage(page);
+        expect(
+          await sendToContentScript(frame, {
+            type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+            id,
+            identifier: "modal",
+          }),
+        ).toEqual({ success: true, name: "temp3", identifier: "modal" });
+        expect(
+          await page.evaluate(() => window.temp3 === window.modalController),
+        ).toBe(true);
+        expect(
+          await sendToContentScript(frame, {
+            type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+            id,
+            identifier: "missing",
+          }),
+        ).toEqual({ success: false, error: "Controller not found" });
+        expect(await page.evaluate(() => "temp4" in window)).toBe(false);
+        await expectStorageDidNotMutateDOM(page, afterLookup);
+      });
+    });
+  }
 
   test("reports Stimulus controller values", async ({ browserName }) => {
     test.skip(browserName !== "chromium");
@@ -420,7 +526,6 @@ test.describe("Content Script", () => {
         });
 
         expect(result).toEqual({
-          requestId: expect.any(String),
           success: true,
           name: "temp1",
           identifier: "modal",
@@ -457,7 +562,6 @@ test.describe("Content Script", () => {
         });
 
         expect(result).toEqual({
-          requestId: expect.any(String),
           success: true,
           name: "temp1",
           identifier: "modal",

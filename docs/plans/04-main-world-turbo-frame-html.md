@@ -4,11 +4,18 @@
 
 Execute after plans 1, 2, and 3 on main. Read AGENTS.md, the main-world and
 turbo-events-capture skills, and the foundation ADR. The single MAIN entrypoint
-starts isolated feature modules under `lib/main_world/`; controller storage and
+starts independent MAIN feature modules under `lib/main_world/`; controller storage and
 definitions use document RPC and no injected script remains. Turbo capture is
 still the baseline isolated watcher. The discarded spike's
 `turbo-event-capture.content.js` and bridge helpers are not prerequisites and must
 not be recreated as an additional entrypoint.
+
+At this plan's latest revision, plan 2 is implemented and plan 3 remains future
+work; the definition migration above is a prerequisite, not a shipped fact.
+Installed Chromium and Firefox storage tests exist, but Safari investigation is
+paused and installed Safari execution remains unverified. Carry that gap forward
+unless actual browser evidence closes it; the plan 2 exception is not a passed
+Safari gate.
 
 Capture the actual `detail.newFrame.outerHTML` from
 `turbo:before-frame-render` using a real page-owned Element. Preserve src, ID,
@@ -29,6 +36,9 @@ semantics before implementation, revise this contract and tests explicitly.
 - Add a Turbo capture feature in `lib/main_world/turbo-events.js` and start it
   through the existing runtime. Reuse `TurboEventWatcher` and its canonical
   `turboEventDetailsFor` extractor. Do not copy the frame extractor into MAIN.
+  Append its factory without replacing the storage or definition factories.
+  As a capture-only feature it has an empty operation map; do not add a Turbo
+  RPC operation, readiness handshake, or replacement MAIN client.
 - Keep `TURBO_EVENT_NAMES` as the full registry. Export frozen
   `MAIN_WORLD_TURBO_EVENT_NAMES = ["turbo:before-frame-render"]` and derive
   `ISOLATED_WORLD_TURBO_EVENT_NAMES` by exclusion. Allow readonly lists in watcher
@@ -88,7 +98,10 @@ foreign-document, or disconnected targets yield null. Do not create MAIN identit
 state or page tracking attributes. Missing ports must not throw.
 
 Register the isolated capture-phase bridge listener synchronously at document
-start. Disconnect removes it and clears its reference. Keep runtime MAIN feature
+start, alongside the existing synchronous MAIN client setup and before ports
+and watchers. Tree observation must still wait for DOM readiness while parsing;
+neither bridge may wait for it. Disconnect removes the Turbo listener and clears
+its reference while retaining the existing RPC-client teardown. Keep runtime MAIN feature
 start/stop symmetric, with no special BFCache restart. There is no Turbo readiness
 RPC or replay queue: events before a panel port exists are not retained. Verify
 that both world listeners start before ordinary fixture scripts; a bridge that
@@ -139,13 +152,26 @@ row cap and verify clearing releases rows. Do not add a separate full-HTML cache
 8. Test panel rendering of full HTML and omission errors as inert text, including
    script/image markup, event bursts, clear, and no unexpected resource requests.
    Re-run controller storage and definitions to prove the shared runtime still
-   starts and serves all features.
+   starts and serves all features. Preserve storage's pending-identifier
+   validation, no-retry-on-lost-reply behavior, and the Chromium Console-context
+   assertion using `chrome.devtools.inspectedWindow.eval`. A reload clears old
+   temp globals; BFCache retains the document without restarting MAIN.
 
 ## Browser validation, docs, and acceptance
 
 Run the cross-world tests with actual installed extensions in Chromium and
 Firefox, using the browser harness established in plan 1 or documented manual
 steps where needed. Firefox's mocked panel smoke cannot validate JSON bridging.
+Extend `tests/main-world-gate.config.js` when changing the production factory
+list: its bootstrap transform must preserve every production feature while
+adding the test-only reader. Extend the existing Chromium gate and
+`tests/e2e/run-firefox-main-world-gate.js` to cover Turbo transport and source
+event safety; their storage results alone prove neither. Preserve their checks
+for no script insertion and no globals beyond explicitly requested temp storage.
+The Firefox runner exercises the real isolated/MAIN boundary, not panel APIs.
+Use normal document-start registration for the early inline-script fixture:
+the gate's intentionally delayed client-first variant cannot prove early capture.
+
 Build and manually exercise Safari if automated extension execution is unavailable.
 Record versions/results, including early capture and source-event preservation;
 do not treat successful builds as runtime proof.
@@ -153,7 +179,10 @@ do not treat successful builds as runtime proof.
 Update AGENTS.md and README to show one MAIN runtime with Turbo capture and
 Stimulus RPC features, exclusive event ownership, epoch timestamps, HTML limits,
 and the unchanged isolated identity/port pipeline. Update the main-world and
-turbo-events-capture skills and the ADR. Remove obsolete advice that event
+turbo-events-capture skills and, where needed, the short architectural record in
+ADR 5. Keep Decision 2 unchanged; ADR 5 expands it. Record browser evidence and
+blockers in implementation notes rather than technical detail in the ADR.
+Remove obsolete advice that event
 capture never reads details or target, while preserving the prohibition on
 arbitrary payload dumping and source-event modification. The historical spike
 plan may remain, clearly superseded by this four-plan sequence.

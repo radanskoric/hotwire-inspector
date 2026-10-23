@@ -36,6 +36,6 @@ export default defineConfig({
     ],
   },
   webExt: {
-    startUrls: ["http://localhost:3000"],
+    startUrls: [process.env.WXT_DEV_START_PAGE || "http://localhost:3000"],
   },
 });

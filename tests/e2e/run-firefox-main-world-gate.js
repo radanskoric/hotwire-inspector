@@ -11,6 +11,11 @@ execFileSync(
   { stdio: "inherit" },
 );
 const results = [];
+const cases = ["main-first", "client-first"].flatMap((order) =>
+  ["Stimulus", "stimulusApp", "StimulusApp"].map(
+    (application) => `?${order}&application=${application}`,
+  ),
+);
 let complete;
 const finished = new Promise((resolve) => {
   complete = resolve;
@@ -23,7 +28,7 @@ const server = createServer(async (request, response) => {
     for await (const chunk of request) raw += chunk;
     results.push(JSON.parse(raw));
     response.end("ok");
-    if (results.length === 2) complete();
+    if (results.length === cases.length) complete();
   } else if (["/page.html", "/page.js"].includes(url.pathname)) {
     response.setHeader(
       "Content-Type",
@@ -48,10 +53,7 @@ try {
       noReload: true,
       noInput: true,
       args: ["-headless"],
-      startUrl: [
-        `${origin}/page.html?main-first`,
-        `${origin}/page.html?client-first`,
-      ],
+      startUrl: cases.map((query) => `${origin}/page.html${query}`),
     },
     { shouldExitProgram: false },
   );
@@ -72,11 +74,14 @@ try {
     assert.deepEqual(result.addedGlobals, []);
     assert.equal(result.insertedScripts, 0);
     assert.equal(result.scriptsUnchanged, true);
+    assert.equal(result.storedControllerMatches, true);
+    assert.deepEqual(result.storage, {
+      success: true,
+      name: "temp1",
+      identifier: "fixture",
+    });
   }
-  assert.deepEqual(results.map((result) => result.order).sort(), [
-    "?client-first",
-    "?main-first",
-  ]);
+  assert.deepEqual(results.map((result) => result.order).sort(), cases.sort());
 } finally {
   clearTimeout(timer);
   await runner?.exit();

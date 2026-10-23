@@ -1,4 +1,15 @@
-window.mainWorldFixture = { value: "page-owned-value" };
+window.mainWorldFixture = {
+  value: "page-owned-value",
+  controller: { identifier: "fixture" },
+};
+window[new URL(location.href).searchParams.get("application") || "Stimulus"] = {
+  getControllerForElementAndIdentifier(element, identifier) {
+    return element === document.getElementById("result") &&
+      identifier === "fixture"
+      ? window.mainWorldFixture.controller
+      : null;
+  },
+};
 (() => {
   const globals = Object.getOwnPropertyNames(window);
   const scripts = [...document.scripts];
@@ -16,10 +27,13 @@ window.mainWorldFixture = { value: "page-owned-value" };
   document.addEventListener(
     "gate:result",
     (event) => {
+      const response = JSON.parse(event.detail);
       const result = {
-        ...JSON.parse(event.detail),
+        ...response,
+        storedControllerMatches:
+          window[response.storage?.name] === window.mainWorldFixture.controller,
         addedGlobals: Object.getOwnPropertyNames(window).filter(
-          (name) => !globals.includes(name),
+          (name) => !globals.includes(name) && name !== response.storage?.name,
         ),
         insertedScripts,
         scriptsUnchanged: scripts.length === document.scripts.length,

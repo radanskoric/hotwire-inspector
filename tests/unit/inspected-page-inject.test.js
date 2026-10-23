@@ -2,8 +2,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  STORE_CONTROLLER_REQUEST_EVENT,
-  STORE_CONTROLLER_RESPONSE_EVENT,
+  CONTROLLER_OUTLET_DEFINITIONS_REQUEST_EVENT,
+  CONTROLLER_OUTLET_DEFINITIONS_RESPONSE_EVENT,
+  CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
+  CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT,
 } from "../../lib/constants.js";
 
 const flushMicrotasks = async () => {
@@ -57,12 +59,15 @@ describe("inspected-page-inject", () => {
     });
 
     let responseDetail = null;
-    script.addEventListener(STORE_CONTROLLER_RESPONSE_EVENT, (event) => {
-      responseDetail = JSON.parse(event.detail);
-    });
+    script.addEventListener(
+      CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT,
+      (event) => {
+        responseDetail = JSON.parse(event.detail);
+      },
+    );
 
     script.dispatchEvent(
-      new CustomEvent(STORE_CONTROLLER_REQUEST_EVENT, {
+      new CustomEvent(CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT, {
         detail: JSON.stringify({
           selector: "#modal-controller",
           identifier: "modal",
@@ -89,12 +94,15 @@ describe("inspected-page-inject", () => {
     });
 
     let responseDetail = null;
-    script.addEventListener(STORE_CONTROLLER_RESPONSE_EVENT, (event) => {
-      responseDetail = JSON.parse(event.detail);
-    });
+    script.addEventListener(
+      CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT,
+      (event) => {
+        responseDetail = JSON.parse(event.detail);
+      },
+    );
 
     script.dispatchEvent(
-      new CustomEvent(STORE_CONTROLLER_REQUEST_EVENT, {
+      new CustomEvent(CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT, {
         detail: "not-json-and-not-an-object",
       }),
     );
@@ -107,41 +115,60 @@ describe("inspected-page-inject", () => {
     expect(typeof responseDetail.error).toBe("string");
   });
 
-  it("answers with a success response on the happy path", async () => {
-    const controller = { identifier: "modal" };
-    let storedAs = null;
-
+  it("answers value and outlet definition requests without storing a controller", async () => {
+    class Controller {
+      static outlets = ["preview"];
+    }
     await loadInjectScript({
       stimulus: {
-        getControllerForElementAndIdentifier: () => controller,
+        getControllerForElementAndIdentifier: () => new Controller(),
       },
     });
-
-    let responseDetail = null;
-    script.addEventListener(STORE_CONTROLLER_RESPONSE_EVENT, (event) => {
-      responseDetail = JSON.parse(event.detail);
-    });
-
-    script.addEventListener(STORE_CONTROLLER_REQUEST_EVENT, (event) => {
-      const detail = JSON.parse(event.detail);
-      let index = 1;
-      while (`temp${index}` in window) index += 1;
-      storedAs = `temp${index}`;
-      window[storedAs] = controller;
+    for (const [requestEvent, responseEvent, result] of [
+      [
+        CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
+        CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT,
+        { definitions: [] },
+      ],
+      [
+        CONTROLLER_OUTLET_DEFINITIONS_REQUEST_EVENT,
+        CONTROLLER_OUTLET_DEFINITIONS_RESPONSE_EVENT,
+        { outlets: ["preview"] },
+      ],
+    ]) {
+      let response;
+      script.addEventListener(
+        responseEvent,
+        (event) => {
+          response = JSON.parse(event.detail);
+        },
+        { once: true },
+      );
       script.dispatchEvent(
-        new CustomEvent(STORE_CONTROLLER_RESPONSE_EVENT, {
+        new CustomEvent(requestEvent, {
           detail: JSON.stringify({
-            requestId: detail.requestId,
-            success: true,
-            name: storedAs,
+            selector: "#modal-controller",
             identifier: "modal",
+            requestId: "req-1",
           }),
         }),
       );
-    });
+      expect(response).toEqual({
+        requestId: "req-1",
+        success: true,
+        ...result,
+      });
+    }
+    expect("temp1" in window).toBe(false);
+  });
 
+  it("ignores the removed legacy storage protocol", async () => {
+    const lookup = vi.fn();
+    await loadInjectScript({
+      stimulus: { getControllerForElementAndIdentifier: lookup },
+    });
     script.dispatchEvent(
-      new CustomEvent(STORE_CONTROLLER_REQUEST_EVENT, {
+      new CustomEvent("hotwire-inspector:store-controller-request", {
         detail: JSON.stringify({
           selector: "#modal-controller",
           identifier: "modal",
@@ -149,17 +176,8 @@ describe("inspected-page-inject", () => {
         }),
       }),
     );
-
-    await flushMicrotasks();
-
-    expect(responseDetail).not.toBeNull();
-    expect(responseDetail.requestId).toBe("req-1");
-    expect(responseDetail).toMatchObject({
-      success: true,
-      identifier: "modal",
-      name: storedAs,
-    });
-    expect(window[storedAs]).toBe(controller);
+    expect(lookup).not.toHaveBeenCalled();
+    expect("temp1" in window).toBe(false);
   });
 
   it("does nothing when the script element is missing", async () => {
