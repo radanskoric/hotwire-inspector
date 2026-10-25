@@ -28,15 +28,15 @@ Core tooling currently includes:
   - content script logic for scanning, element lookup, highlighting, and inspect support
   - starts at document_start, installs the MAIN client before watchers/ports, and defers tree observation until DOMContentLoaded while parsing
 - `entrypoints/main-world.content.js`
-  - the single anonymous browser-registered MAIN bootstrap, delegating to `lib/main_world/runtime.js` with the controller-storage feature
+  - the single anonymous browser-registered MAIN bootstrap, delegating to `lib/main_world/runtime.js` with the controller-storage and controller-definitions features
 - `lib/main_world/`
   - shared feature lifecycle, RPC server, and pure wire validation; add future MAIN features here
 - `lib/main-world-client.js`
   - isolated JSON document RPC client, with shared readiness probing and independent five-second deadlines
-- `entrypoints/inspected-page-inject.js`
-  - still lazily injected for value/outlet definition requests; storage uses MAIN exclusively
+- `lib/main_world/controller-definitions.js`
+  - request-driven value/outlet metadata extraction and bounded success validators shared with the isolated client
 - `lib/main_world/controller-lookup.js`
-  - request-time Stimulus application/controller lookup, shared by MAIN storage and legacy injected definition queries; never caches controllers
+  - request-time Stimulus application/controller lookup, shared by MAIN storage and definition queries; never caches controllers
 - `lib/main_world/controller-storage.js`
   - request-driven storage into the first unused `window.tempN` and success validation against the pending identifier
 - `entrypoints/devtools/`
@@ -47,7 +47,7 @@ Core tooling currently includes:
 - `lib/tree-builder.js`
   - pure tree-building logic used by the panel
 - `lib/controller-values.js`
-  - pure Stimulus value logic; used by the injected page script (definition extraction), the content script (attribute resolution), and the panel (formatting)
+  - pure Stimulus value logic; used by MAIN (definition extraction), the content script (attribute resolution), and the panel (formatting)
 - `lib/value-watcher.js`
   - MutationObserver-based Stimulus value watcher; used by the content script for live value streaming
 - `lib/turbo-event-watcher.js`
@@ -78,9 +78,9 @@ Core tooling currently includes:
 
 ### Messaging architecture
 
-The shared MAIN foundation uses distinct non-bubbling JSON-string request/response events directly on document. It advertises `storeController`; `bridgeStatus` is reserved. Imports/factories have no page effects, startup failures are contained per feature, and explicit teardown removes exact listeners even if feature cleanup throws. BFCache keeps MAIN listeners alive. Do not add another MAIN entrypoint, script insertion, eval, or page-global sentinel.
+The shared MAIN foundation uses distinct non-bubbling JSON-string request/response events directly on document. It advertises `storeController`, `controllerValueDefinitions`, and `controllerOutletDefinitions`; `bridgeStatus` is reserved. Imports/factories have no page effects, startup failures are contained per feature, and explicit teardown removes exact listeners even if feature cleanup throws. BFCache keeps MAIN listeners alive. Eager startup registers services without framework lookup; only requests access controllers or metadata. Definitions create no globals; storage alone writes an explicitly requested temp variable. Live attributes and their MutationObserver stay isolated. Definition validators reconstruct JSON defaults with a 32-level nesting limit, reject dangerous object keys and unsupported defaults, and bound descriptor/outlet arrays and strings. The server and client enforce the 1 Mi-code-unit serialized response limit. Do not add another MAIN entrypoint, script insertion, eval, or page-global sentinel.
 
-Document RPC is compatibility transport, not authentication. Page scripts can spoof requests/responses. MAIN has no extension privileges. Controller storage is allowed only upon a valid request, but that does not authenticate a panel click. Framework lookup calls page-owned methods and can invoke getters; it is not wholly passive. Equivalent code in MAIN and a script tag has comparable runtime effects; browser registration removes script-element mutation while eager listeners add idle footprint. See [ADR 5](docs/decisions/5%20-%20shared%20MAIN%20world.md) and the [main-world skill](.agents/skills/main-world/SKILL.md). 
+Document RPC is compatibility transport, not authentication. Page scripts can spoof requests/responses. MAIN has no extension privileges. Controller storage is allowed only upon a valid request, but that does not authenticate a panel click. Framework lookup calls page-owned methods and can invoke getters; it is not wholly passive. Equivalent code in MAIN and a script tag has comparable runtime effects; browser registration removes script-element mutation while eager listeners add idle footprint. See [ADR 5](docs/decisions/5%20-%20shared%20MAIN%20world.md) and the [main-world skill](.agents/skills/main-world/SKILL.md).
 
 The extension uses two messaging channels between the panel and the content script:
 

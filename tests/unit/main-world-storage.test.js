@@ -11,15 +11,15 @@ import {
   MAIN_WORLD_RPC_RESPONSE_EVENT as RESPONSE,
 } from "../../lib/constants.js";
 
-let runtime, inspector, injectScript;
+let runtime, inspector, createElement;
 const controller = { identifier: "modal" };
 beforeEach(() => {
   vi.useFakeTimers();
   document.body.innerHTML = '<div id="host" data-controller="modal"></div>';
   vi.spyOn(console, "info").mockImplementation(() => {});
   runtime = new MainWorldRuntime(document, [createControllerStorage]);
-  injectScript = vi.fn();
-  inspector = new ContentInspector({ document, injectScript });
+  createElement = vi.spyOn(document, "createElement");
+  inspector = new ContentInspector({ document });
 });
 afterEach(() => {
   inspector.disconnect();
@@ -67,7 +67,7 @@ it("stores once after delayed readiness and late framework initialization, witho
   expect(
     window.Stimulus.getControllerForElementAndIdentifier,
   ).toHaveBeenCalledTimes(1);
-  expect(injectScript).not.toHaveBeenCalled();
+  expect(createElement).not.toHaveBeenCalled();
   expect(vi.getTimerCount()).toBe(0);
 });
 
@@ -129,7 +129,7 @@ it("times out without injection or storage when MAIN is unavailable", async () =
     success: false,
     error: "MAIN-world request timed out",
   });
-  expect(injectScript).not.toHaveBeenCalled();
+  expect(createElement).not.toHaveBeenCalled();
   expect("temp1" in window).toBe(false);
 });
 

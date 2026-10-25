@@ -5,10 +5,6 @@ import { ContentInspector } from "../../lib/content-inspector.js";
 import { createReconnectingPort } from "../../lib/port-reconnect.js";
 import { TreeWatcher } from "../../lib/tree-watcher.js";
 import {
-  CONTROLLER_OUTLET_DEFINITIONS_REQUEST_EVENT,
-  CONTROLLER_OUTLET_DEFINITIONS_RESPONSE_EVENT,
-  CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
-  CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT,
   ID_PREFIX,
   TREE_CHANGED_PUSH_TYPE,
   TURBO_EVENT_PUSH_TYPE,
@@ -404,69 +400,35 @@ describe("ContentInspector", () => {
   });
 
   describe("controllerValues", () => {
-    const definitions = [
-      {
-        name: "title",
-        type: "string",
-        defaultValue: "",
-        attributeName: "data-modal-title-value",
-      },
-      {
-        name: "enabled",
-        type: "boolean",
-        defaultValue: false,
-        attributeName: "data-modal-enabled-value",
-      },
-    ];
-
-    it("resolves values from definitions and element attributes", async () => {
+    it("resolves validated definitions against isolated DOM attributes", async () => {
       document.body.innerHTML =
-        '<div id="modal-controller" data-controller="modal" data-modal-title-value="Greeting"></div>';
-      const script = new EventTarget();
-      const injectScript = () => Promise.resolve({ script });
-      const inspector = new ContentInspector({
-        document,
-        cssEscape,
-        injectScript,
+        '<div id="host" data-modal-title-value="Hello"></div>';
+      const inspector = new ContentInspector({ document, cssEscape });
+      vi.spyOn(inspector, "sendValueDefinitionsRequest").mockResolvedValue({
+        success: true,
+        definitions: [
+          {
+            name: "title",
+            type: "string",
+            defaultValue: "",
+            attributeName: "data-modal-title-value",
+          },
+          {
+            name: "enabled",
+            type: "boolean",
+            defaultValue: false,
+            attributeName: "data-modal-enabled-value",
+          },
+        ],
       });
-
-      script.addEventListener(
-        CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
-        (event) => {
-          const detail = JSON.parse(event.detail);
-
-          script.dispatchEvent(
-            new CustomEvent(CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT, {
-              detail: JSON.stringify({
-                requestId: "unrelated-request",
-                success: false,
-              }),
-            }),
-          );
-          script.dispatchEvent(
-            new CustomEvent(CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT, {
-              detail: JSON.stringify({
-                requestId: detail.requestId,
-                success: true,
-                definitions,
-              }),
-            }),
-          );
-        },
-      );
-
-      inspector.scan();
-
-      await expect(
-        inspector.controllerValues("modal-controller", "modal"),
-      ).resolves.toEqual({
+      expect(await inspector.controllerValues("host", "modal")).toEqual({
         success: true,
         values: [
           {
             name: "title",
             type: "string",
             defaultValue: "",
-            value: "Greeting",
+            value: "Hello",
             hasValue: true,
           },
           {
@@ -478,233 +440,33 @@ describe("ContentInspector", () => {
           },
         ],
       });
+      inspector.disconnect();
     });
-
-    it("returns injected script errors unchanged", async () => {
-      document.body.innerHTML =
-        '<div id="modal-controller" data-controller="modal"></div>';
-      const script = new EventTarget();
-      const injectScript = () => Promise.resolve({ script });
-      const inspector = new ContentInspector({
-        document,
-        cssEscape,
-        injectScript,
-      });
-
-      script.addEventListener(
-        CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
-        (event) => {
-          const detail = JSON.parse(event.detail);
-
-          script.dispatchEvent(
-            new CustomEvent(CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT, {
-              detail: JSON.stringify({
-                requestId: detail.requestId,
-                success: false,
-                error: "Controller not found",
-              }),
-            }),
-          );
-        },
-      );
-
-      inspector.scan();
-
-      await expect(
-        inspector.controllerValues("modal-controller", "modal"),
-      ).resolves.toEqual({
-        requestId: expect.any(String),
-        success: false,
-        error: "Controller not found",
-      });
-    });
-
-    it("returns an error when reading values for a missing element", async () => {
+    it("returns missing-element and MAIN service errors", async () => {
       const inspector = new ContentInspector({ document, cssEscape });
-
-      await expect(
-        inspector.controllerValues("missing", "modal"),
-      ).resolves.toEqual({
+      expect(await inspector.controllerValues("missing", "modal")).toEqual({
         success: false,
         error: "Element not found",
       });
-    });
-
-    it("returns injected script loader failures as value errors", async () => {
-      document.body.innerHTML =
-        '<div id="modal-controller" data-controller="modal"></div>';
-      const inspector = new ContentInspector({ document, cssEscape });
-
-      inspector.scan();
-
-      await expect(
-        inspector.controllerValues("modal-controller", "modal"),
-      ).resolves.toEqual({
+      document.body.innerHTML = '<div id="host"></div>';
+      vi.spyOn(inspector, "sendValueDefinitionsRequest").mockResolvedValue({
         success: false,
-        error: "Injected page script loader unavailable",
+        error: "Controller not found",
       });
-    });
-
-    it("uses fallback values error text when the request fails without a message", async () => {
-      document.body.innerHTML =
-        '<div id="modal-controller" data-controller="modal"></div>';
-      const inspector = new ContentInspector({ document, cssEscape });
-
-      inspector.sendValueDefinitionsRequest = async () => {
-        throw new Error();
-      };
-      inspector.scan();
-
-      await expect(
-        inspector.controllerValues("modal-controller", "modal"),
-      ).resolves.toEqual({
+      expect(await inspector.controllerValues("host", "modal")).toEqual({
         success: false,
-        error: "Controller values failed",
+        error: "Controller not found",
       });
-    });
-
-    it("reuses the injected script and global CustomEvent for subsequent values requests", async () => {
-      vi.spyOn(document, "defaultView", "get").mockReturnValue(null);
-      document.body.innerHTML =
-        '<div id="modal-controller" data-controller="modal"></div>';
-      const script = new EventTarget();
-      let injectionCount = 0;
-      const injectScript = () => {
-        injectionCount += 1;
-        return Promise.resolve(script);
-      };
-      const inspector = new ContentInspector({
-        document,
-        cssEscape,
-        injectScript,
-      });
-
-      script.addEventListener(
-        CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
-        (event) => {
-          const detail = JSON.parse(event.detail);
-
-          script.dispatchEvent(
-            new CustomEvent(CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT, {
-              detail: JSON.stringify({
-                requestId: detail.requestId,
-                success: true,
-                definitions: [],
-              }),
-            }),
-          );
-        },
+      inspector.sendValueDefinitionsRequest
+        .mockRejectedValueOnce(new Error("MAIN unavailable"))
+        .mockRejectedValueOnce(new Error());
+      expect((await inspector.controllerValues("host", "modal")).error).toBe(
+        "MAIN unavailable",
       );
-
-      inspector.scan();
-
-      await inspector.controllerValues("modal-controller", "modal");
-      await inspector.controllerValues("modal-controller", "modal");
-
-      expect(injectionCount).toBe(1);
-    });
-
-    function setupTimeoutInspector({ respondImmediately = false } = {}) {
-      document.body.innerHTML =
-        '<div id="modal-controller" data-controller="modal"></div>';
-      const script = new EventTarget();
-      const inspector = new ContentInspector({
-        document,
-        cssEscape,
-        injectScript: () => Promise.resolve({ script }),
-        requestTimeoutMs: 100,
-      });
-
-      if (respondImmediately) {
-        script.addEventListener(
-          CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
-          (event) => {
-            const detail = JSON.parse(event.detail);
-            script.dispatchEvent(
-              new CustomEvent(CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT, {
-                detail: JSON.stringify({
-                  requestId: detail.requestId,
-                  success: true,
-                  definitions: [],
-                }),
-              }),
-            );
-          },
-        );
-      }
-
-      inspector.scan();
-      return { script, inspector };
-    }
-
-    it("settles with an error response when the injected page script never answers", async () => {
-      await withFakeTimers(async () => {
-        const { inspector } = setupTimeoutInspector();
-
-        const neverSettled = Symbol("never-settled");
-        const result = await Promise.race([
-          inspector.controllerValues("modal-controller", "modal"),
-          vi.advanceTimersByTimeAsync(60_000).then(() => neverSettled),
-        ]);
-
-        expect(result).not.toBe(neverSettled);
-        expect(result).toEqual(
-          expect.objectContaining({
-            success: false,
-            error: expect.any(String),
-          }),
-        );
-        expect(result.error.toLowerCase()).toContain("respond");
-      });
-    });
-
-    it("does not double-settle when a late response arrives after the timeout", async () => {
-      await withFakeTimers(async () => {
-        const { inspector, script } = setupTimeoutInspector();
-
-        const result = await Promise.race([
-          inspector.controllerValues("modal-controller", "modal"),
-          vi.advanceTimersByTimeAsync(60_000).then(() => Symbol("never")),
-        ]);
-
-        expect(result).toEqual(
-          expect.objectContaining({
-            success: false,
-          }),
-        );
-
-        const list = script.eventNames?.() ?? [];
-        // No leftover listeners after the timeout fired.
-        expect(list).not.toContain(CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT);
-
-        // Dispatching a stale response event must not throw.
-        expect(() =>
-          script.dispatchEvent(
-            new CustomEvent(CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT, {
-              detail: JSON.stringify({
-                requestId: "stale",
-                success: true,
-                definitions: [],
-              }),
-            }),
-          ),
-        ).not.toThrow();
-      });
-    });
-
-    it("clears the timeout when the injected page script answers in time", async () => {
-      await withFakeTimers(async () => {
-        const { inspector } = setupTimeoutInspector({
-          respondImmediately: true,
-        });
-
-        await expect(
-          inspector.controllerValues("modal-controller", "modal"),
-        ).resolves.toEqual(expect.objectContaining({ success: true }));
-
-        // No leftover timer for the request we just settled.
-        expect(vi.getTimerCount()).toBe(0);
-      });
+      expect((await inspector.controllerValues("host", "modal")).error).toBe(
+        "Controller values failed",
+      );
+      inspector.disconnect();
     });
   });
 
@@ -753,204 +515,52 @@ describe("ContentInspector", () => {
   });
 
   describe("controllerOutlets", () => {
-    function makeOutletDefinitionsScript(script, names) {
-      script.addEventListener(
-        CONTROLLER_OUTLET_DEFINITIONS_REQUEST_EVENT,
-        (event) => {
-          const detail = JSON.parse(event.detail);
-
-          script.dispatchEvent(
-            new CustomEvent(CONTROLLER_OUTLET_DEFINITIONS_RESPONSE_EVENT, {
-              detail: JSON.stringify({
-                requestId: detail.requestId,
-                success: true,
-                outlets: names,
-              }),
-            }),
-          );
-        },
-      );
-    }
-
-    it("resolves outlets using the default selector when no explicit attribute is set", async () => {
-      document.body.innerHTML = `
-        <div id="host" data-controller="host">
-          <div id="status-el" data-controller="user-status"></div>
-          <div id="menu-el" data-controller="menu"></div>
-        </div>
-      `;
-      const script = new EventTarget();
-      makeOutletDefinitionsScript(script, ["user-status", "menu"]);
-      const inspector = new ContentInspector({
-        document,
-        cssEscape,
-        injectScript: () => Promise.resolve({ script }),
-      });
-
-      inspector.scan();
-
-      await expect(
-        inspector.controllerOutlets("host", "host"),
-      ).resolves.toEqual({
-        success: true,
-        outlets: [
-          { id: "status-el", tagName: "div", name: "user-status" },
-          { id: "menu-el", tagName: "div", name: "menu" },
-        ],
-      });
-    });
-
-    it("uses an explicit outlet selector when the data-attribute is set", async () => {
-      document.body.innerHTML = `
-        <div
-          id="host"
-          data-controller="host"
-          data-host-user-status-outlet="#status-via-id"
-        >
-          <div data-user-status data-controller="user-status"></div>
-          <div id="status-via-id" data-controller="user-status-old"></div>
-        </div>
-      `;
-      const script = new EventTarget();
-      makeOutletDefinitionsScript(script, ["user-status"]);
-      const inspector = new ContentInspector({
-        document,
-        cssEscape,
-        injectScript: () => Promise.resolve({ script }),
-      });
-
-      inspector.scan();
-
-      const response = await inspector.controllerOutlets("host", "host");
-
-      expect(response).toEqual({
-        success: true,
-        outlets: [{ id: "status-via-id", tagName: "div", name: "user-status" }],
-      });
-    });
-
-    it("returns an error when the element is not found", async () => {
+    it.each([null, "", "#menu"])(
+      "resolves default and explicit outlet selectors: %s",
+      async (selector) => {
+        document.body.innerHTML =
+          '<div id="host"><nav id="menu" data-controller="menu"></nav></div>';
+        if (selector !== null)
+          document
+            .querySelector("#host")
+            .setAttribute("data-modal-menu-outlet", selector);
+        const inspector = new ContentInspector({ document, cssEscape });
+        vi.spyOn(inspector, "sendOutletDefinitionsRequest").mockResolvedValue({
+          success: true,
+          outlets: ["menu", "missing"],
+        });
+        expect(await inspector.controllerOutlets("host", "modal")).toEqual({
+          success: true,
+          outlets: [{ id: "menu", tagName: "nav", name: "menu" }],
+        });
+        inspector.disconnect();
+      },
+    );
+    it("returns missing-element and MAIN service errors", async () => {
       const inspector = new ContentInspector({ document, cssEscape });
-
-      await expect(
-        inspector.controllerOutlets("missing", "host"),
-      ).resolves.toEqual({
+      expect(await inspector.controllerOutlets("missing", "modal")).toEqual({
         success: false,
         error: "Element not found",
       });
-    });
-
-    it("propagates request errors from the injected script", async () => {
-      document.body.innerHTML = '<div id="host" data-controller="host"></div>';
-      const script = new EventTarget();
-      script.addEventListener(
-        CONTROLLER_OUTLET_DEFINITIONS_REQUEST_EVENT,
-        (event) => {
-          const detail = JSON.parse(event.detail);
-
-          script.dispatchEvent(
-            new CustomEvent(CONTROLLER_OUTLET_DEFINITIONS_RESPONSE_EVENT, {
-              detail: JSON.stringify({
-                requestId: detail.requestId,
-                success: false,
-                error: "Controller not found",
-              }),
-            }),
-          );
-        },
-      );
-      const inspector = new ContentInspector({
-        document,
-        cssEscape,
-        injectScript: () => Promise.resolve({ script }),
-      });
-
-      inspector.scan();
-
-      await expect(
-        inspector.controllerOutlets("host", "host"),
-      ).resolves.toEqual({
-        requestId: expect.any(String),
+      document.body.innerHTML = '<div id="host"></div>';
+      vi.spyOn(inspector, "sendOutletDefinitionsRequest").mockResolvedValue({
         success: false,
         error: "Controller not found",
       });
-    });
-
-    it("uses fallback error text when the request rejects without a message", async () => {
-      document.body.innerHTML = '<div id="host" data-controller="host"></div>';
-      const inspector = new ContentInspector({ document, cssEscape });
-
-      inspector.sendOutletDefinitionsRequest = async () => {
-        throw new Error();
-      };
-      inspector.scan();
-
-      await expect(
-        inspector.controllerOutlets("host", "host"),
-      ).resolves.toEqual({
+      expect(await inspector.controllerOutlets("host", "modal")).toEqual({
         success: false,
-        error: "Controller outlets failed",
+        error: "Controller not found",
       });
-    });
-
-    it("handles empty outlet attribute by falling back to default selector", async () => {
-      document.body.innerHTML = `
-        <div
-          id="host"
-          data-controller="host"
-          data-host-menu-outlet=""
-        >
-          <nav data-controller="menu">Menu</nav>
-        </div>
-      `;
-      const script = new EventTarget();
-      makeOutletDefinitionsScript(script, ["menu"]);
-      const inspector = new ContentInspector({
-        document,
-        cssEscape,
-        injectScript: () => Promise.resolve({ script }),
-      });
-
-      inspector.scan();
-
-      await expect(
-        inspector.controllerOutlets("host", "host"),
-      ).resolves.toEqual({
-        success: true,
-        outlets: [
-          {
-            id: expect.stringMatching(/^hotwire-inspector-/),
-            tagName: "nav",
-            name: "menu",
-          },
-        ],
-      });
-    });
-
-    it("skips outlets whose default selector finds no matches", async () => {
-      document.body.innerHTML = `
-        <div
-          id="host"
-          data-controller="host"
-          data-host-menu-outlet=""
-        ></div>
-      `;
-      const script = new EventTarget();
-      makeOutletDefinitionsScript(script, ["menu"]);
-      const inspector = new ContentInspector({
-        document,
-        cssEscape,
-        injectScript: () => Promise.resolve({ script }),
-      });
-
-      inspector.scan();
-
-      await expect(
-        inspector.controllerOutlets("host", "host"),
-      ).resolves.toEqual({
-        success: true,
-        outlets: [],
-      });
+      inspector.sendOutletDefinitionsRequest
+        .mockRejectedValueOnce(new Error("MAIN unavailable"))
+        .mockRejectedValueOnce(new Error());
+      expect((await inspector.controllerOutlets("host", "modal")).error).toBe(
+        "MAIN unavailable",
+      );
+      expect((await inspector.controllerOutlets("host", "modal")).error).toBe(
+        "Controller outlets failed",
+      );
+      inspector.disconnect();
     });
   });
 
@@ -1294,6 +904,20 @@ describe("ContentInspector", () => {
   });
 
   describe("watchValues", () => {
+    function mockValueDefinitions(inspector) {
+      vi.spyOn(inspector, "sendValueDefinitionsRequest").mockResolvedValue({
+        success: true,
+        definitions: [
+          {
+            name: "title",
+            type: "string",
+            defaultValue: "",
+            attributeName: "data-modal-title-value",
+          },
+        ],
+      });
+    }
+
     function createFakeTimeout() {
       /** @type {Array<{ fn: () => void, delay: number, cleared: boolean }>} */
       const pending = [];
@@ -1321,64 +945,18 @@ describe("ContentInspector", () => {
       };
     }
 
-    function makeDefinitionsScript(script) {
-      script.addEventListener(
-        CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
-        (event) => {
-          const detail = JSON.parse(event.detail);
-          script.dispatchEvent(
-            new CustomEvent(CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT, {
-              detail: JSON.stringify({
-                requestId: detail.requestId,
-                success: true,
-                definitions: [
-                  {
-                    name: "title",
-                    type: "string",
-                    defaultValue: "",
-                    attributeName: "data-modal-title-value",
-                  },
-                ],
-              }),
-            }),
-          );
-        },
-      );
-    }
-
-    function makeErrorDefinitionsScript(script, errorMessage) {
-      script.addEventListener(
-        CONTROLLER_VALUE_DEFINITIONS_REQUEST_EVENT,
-        (event) => {
-          const detail = JSON.parse(event.detail);
-          script.dispatchEvent(
-            new CustomEvent(CONTROLLER_VALUE_DEFINITIONS_RESPONSE_EVENT, {
-              detail: JSON.stringify({
-                requestId: detail.requestId,
-                success: false,
-                error: errorMessage,
-              }),
-            }),
-          );
-        },
-      );
-    }
-
     it("returns success and starts observing when element and definitions exist", async () => {
       document.body.innerHTML =
         '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
-      const script = new EventTarget();
-      makeDefinitionsScript(script);
-      const injectScript = () => Promise.resolve({ script });
       const fakePort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
         cssEscape,
-        injectScript,
         connectPort: () => fakePort,
         observerClass: FakeObserver,
       });
+      mockValueDefinitions(inspector);
 
       inspector.scan();
 
@@ -1403,13 +981,13 @@ describe("ContentInspector", () => {
     it("returns error when definitions request fails", async () => {
       document.body.innerHTML =
         '<div id="modal-controller" data-controller="modal"></div>';
-      const script = new EventTarget();
-      makeErrorDefinitionsScript(script, "Controller not found");
-      const injectScript = () => Promise.resolve({ script });
       const inspector = new ContentInspector({
         document,
         cssEscape,
-        injectScript,
+      });
+      vi.spyOn(inspector, "sendValueDefinitionsRequest").mockResolvedValue({
+        success: false,
+        error: "Controller not found",
       });
 
       inspector.scan();
@@ -1417,7 +995,6 @@ describe("ContentInspector", () => {
       const result = await inspector.watchValues("modal-controller", "modal");
 
       expect(result).toEqual({
-        requestId: expect.any(String),
         success: false,
         error: "Controller not found",
       });
@@ -1429,7 +1006,7 @@ describe("ContentInspector", () => {
       const inspector = new ContentInspector({ document, cssEscape });
 
       inspector.sendValueDefinitionsRequest = async () => {
-        throw new Error("Injected page script loader unavailable");
+        throw new Error("MAIN-world client disconnected");
       };
       inspector.scan();
 
@@ -1437,7 +1014,7 @@ describe("ContentInspector", () => {
 
       expect(result).toEqual({
         success: false,
-        error: "Injected page script loader unavailable",
+        error: "MAIN-world client disconnected",
       });
     });
 
@@ -1462,16 +1039,13 @@ describe("ContentInspector", () => {
     it("skips port connection when connectPort is not provided", async () => {
       document.body.innerHTML =
         '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
-      const script = new EventTarget();
-      makeDefinitionsScript(script);
-      const injectScript = () => Promise.resolve({ script });
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
         cssEscape,
-        injectScript,
         observerClass: FakeObserver,
       });
+      mockValueDefinitions(inspector);
 
       inspector.scan();
 
@@ -1484,18 +1058,15 @@ describe("ContentInspector", () => {
     it("replaces existing watch when called again", async () => {
       document.body.innerHTML =
         '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
-      const script = new EventTarget();
-      makeDefinitionsScript(script);
-      const injectScript = () => Promise.resolve({ script });
       const fakePort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
         cssEscape,
-        injectScript,
         connectPort: () => fakePort,
         observerClass: FakeObserver,
       });
+      mockValueDefinitions(inspector);
 
       inspector.scan();
       await inspector.watchValues("modal-controller", "modal");
@@ -1512,18 +1083,15 @@ describe("ContentInspector", () => {
     it("pushes values-changed message on attribute mutation", async () => {
       document.body.innerHTML =
         '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
-      const script = new EventTarget();
-      makeDefinitionsScript(script);
-      const injectScript = () => Promise.resolve({ script });
       const fakePort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
         cssEscape,
-        injectScript,
         connectPort: () => fakePort,
         observerClass: FakeObserver,
       });
+      mockValueDefinitions(inspector);
 
       inspector.scan();
       await inspector.watchValues("modal-controller", "modal");
@@ -1553,18 +1121,15 @@ describe("ContentInspector", () => {
     it("suppresses push when values unchanged", async () => {
       document.body.innerHTML =
         '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
-      const script = new EventTarget();
-      makeDefinitionsScript(script);
-      const injectScript = () => Promise.resolve({ script });
       const fakePort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
         cssEscape,
-        injectScript,
         connectPort: () => fakePort,
         observerClass: FakeObserver,
       });
+      mockValueDefinitions(inspector);
 
       inspector.scan();
       await inspector.watchValues("modal-controller", "modal");
@@ -1580,18 +1145,15 @@ describe("ContentInspector", () => {
     it("unwatchValues stops watcher but keeps port alive", async () => {
       document.body.innerHTML =
         '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
-      const script = new EventTarget();
-      makeDefinitionsScript(script);
-      const injectScript = () => Promise.resolve({ script });
       const fakePort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
         cssEscape,
-        injectScript,
         connectPort: () => fakePort,
         observerClass: FakeObserver,
       });
+      mockValueDefinitions(inspector);
 
       inspector.scan();
       await inspector.watchValues("modal-controller", "modal");
@@ -1643,18 +1205,15 @@ describe("ContentInspector", () => {
     it("disconnect() tears down the events port", async () => {
       document.body.innerHTML =
         '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
-      const script = new EventTarget();
-      makeDefinitionsScript(script);
-      const injectScript = () => Promise.resolve({ script });
       const fakePort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
       const inspector = new ContentInspector({
         document,
         cssEscape,
-        injectScript,
         connectPort: () => fakePort,
         observerClass: FakeObserver,
       });
+      mockValueDefinitions(inspector);
 
       inspector.scan();
       await inspector.watchValues("modal-controller", "modal");
@@ -1668,9 +1227,6 @@ describe("ContentInspector", () => {
     it("port reconnects with backoff and re-pushes when watch is active", async () => {
       document.body.innerHTML =
         '<div id="modal-controller" data-controller="modal" data-modal-title-value="Hello"></div>';
-      const script = new EventTarget();
-      makeDefinitionsScript(script);
-      const injectScript = () => Promise.resolve({ script });
       const firstPort = createFakeExtensionPort();
       const secondPort = createFakeExtensionPort();
       const FakeObserver = createFakeObserverClass();
@@ -1679,7 +1235,6 @@ describe("ContentInspector", () => {
       const inspector = new ContentInspector({
         document,
         cssEscape,
-        injectScript,
         connectPort: () =>
           connectPortCallCount++ === 0 ? firstPort : secondPort,
         observerClass: FakeObserver,
@@ -1690,6 +1245,7 @@ describe("ContentInspector", () => {
             clearTimeoutImpl: timeout.fakeClearTimeout,
           }),
       });
+      mockValueDefinitions(inspector);
 
       inspector.scan();
       await inspector.watchValues("modal-controller", "modal");

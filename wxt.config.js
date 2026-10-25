@@ -28,12 +28,6 @@ export default defineConfig({
     },
     permissions: ["activeTab", "scripting", "tabs"],
     devtools_page: "devtools.html",
-    web_accessible_resources: [
-      {
-        resources: ["inspected-page-inject.js"],
-        matches: ["http://*/*", "https://*/*"],
-      },
-    ],
   },
   webExt: {
     startUrls: [process.env.WXT_DEV_START_PAGE || "http://localhost:3000"],

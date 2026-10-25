@@ -1,5 +1,4 @@
 import { browser } from "wxt/browser";
-import { injectScript } from "wxt/utils/inject-script";
 import {
   CONTENT_CLEAR_HIGHLIGHT_MESSAGE_TYPE,
   CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE,
@@ -20,7 +19,6 @@ export default defineContentScript({
   runAt: "document_start",
   main() {
     const inspector = new ContentInspector({
-      injectScript,
       connectPort: () =>
         browser.runtime.connect({ name: CONTENT_EVENTS_PORT_NAME }),
     });

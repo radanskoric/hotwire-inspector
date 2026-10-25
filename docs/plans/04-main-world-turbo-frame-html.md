@@ -10,12 +10,23 @@ still the baseline isolated watcher. The discarded spike's
 `turbo-event-capture.content.js` and bridge helpers are not prerequisites and must
 not be recreated as an additional entrypoint.
 
-At this plan's latest revision, plan 2 is implemented and plan 3 remains future
-work; the definition migration above is a prerequisite, not a shipped fact.
-Installed Chromium and Firefox storage tests exist, but Safari investigation is
-paused and installed Safari execution remains unverified. Carry that gap forward
-unless actual browser evidence closes it; the plan 2 exception is not a passed
-Safari gate.
+Plans 2 and 3 are implemented in the preceding work. Confirm those changes are
+integrated on main before starting this plan; implementation does not establish
+merge status. The production factories are `createControllerStorage` and
+`createControllerDefinitions`. All three Stimulus operations use the existing
+`ContentInspector.mainWorldClient`, and the injected entrypoint, loader, legacy
+events/types, timeout option, and web-accessible resource registration are gone.
+Do not reintroduce them for Turbo capture or fallback behavior.
+
+The [plan 3 implementation notes](03-main-world-stimulus-rpc.md#implementation-status-2026-10-23)
+record 519 passing unit tests with 100% library coverage, installed Chromium and
+Firefox definition/storage checks, real Chromium live-value pushes, reload and
+navigation checks, and actual BFCache restoration. These are the regression
+baseline, not evidence that the Turbo migration works. Chromium panel tests
+still use mocked browser APIs; actual DevTools-panel clicks were not manually
+verified. Safari investigation remains paused at the user's request and installed
+Safari execution remains unverified. Carry both limitations forward; neither a
+successful Safari build nor permission for an earlier migration closes its gate.
 
 Capture the actual `detail.newFrame.outerHTML` from
 `turbo:before-frame-render` using a real page-owned Element. Preserve src, ID,
@@ -75,7 +86,11 @@ serialize arbitrary event.detail, callbacks, DOM nodes, request bodies, or the
 source event. An event with empty details must still emit one bridge event.
 
 Implement a pure parser in `lib/turbo-event-bridge.js`. Treat the bridge as
-untrusted, checking these limits before forwarding:
+untrusted, checking these limits before forwarding. Reuse the exported
+`isPlainObject` guard in `lib/main_world/protocol.js`, already shared by Stimulus
+validators. Keep Turbo's one-way record and limits separate from RPC envelopes
+and definition validation; do not route capture through `parseResponse` or add
+an operation/result validator to `MainWorldClient`:
 
 - Raw JSON detail must be a string no longer than 524,288 code units. This
   accommodates JSON escaping for the supported HTML/src/ID limits; test heavily
@@ -88,6 +103,11 @@ untrusted, checking these limits before forwarding:
   8,192 for src/ID, 65,536 for html, and 256 for error strings. html and htmlError
   are mutually exclusive. Reject unknown/prototype keys, nested values, arrays,
   and invalid types. Reconstruct a fresh extension-owned record.
+
+These checks establish the expected shape and bounds, not authenticity. Page
+scripts can forge correctly shaped bridge events. Invalid payloads must be
+ignored without forwarding; they must not trigger fallback capture or affect
+the independent Stimulus services.
 
 Add an idempotent `ContentInspector.startMainWorldTurboEventListener()` that
 retains its exact listener, validates the detail, computes targetId, and posts
@@ -155,30 +175,55 @@ row cap and verify clearing releases rows. Do not add a separate full-HTML cache
    starts and serves all features. Preserve storage's pending-identifier
    validation, no-retry-on-lost-reply behavior, and the Chromium Console-context
    assertion using `chrome.devtools.inspectedWindow.eval`. A reload clears old
-   temp globals; BFCache retains the document without restarting MAIN.
+   temp globals; BFCache retains the document without restarting MAIN. Extend
+   the existing BFCache gate's post-restore checks for Turbo rather than replacing
+   its retained-controller and definition-query assertions. Preserve the
+   definition validators' exact bounds, JSON-default reconstruction, error
+   containment, and independent request deadlines.
 
 ## Browser validation, docs, and acceptance
 
 Run the cross-world tests with actual installed extensions in Chromium and
 Firefox, using the browser harness established in plan 1 or documented manual
 steps where needed. Firefox's mocked panel smoke cannot validate JSON bridging.
-Extend `tests/main-world-gate.config.js` when changing the production factory
-list: its bootstrap transform must preserve every production feature while
-adding the test-only reader. Extend the existing Chromium gate and
+`tests/main-world-gate.config.js` now captures the production factory list and
+passes it to `startGate(document, MainWorldRuntime, features)`, which appends the
+test-only reader. It skips WXT's metadata-only discovery module and fails if the
+runtime startup expression cannot be found. Adding a factory should already
+preserve every production feature; adjust the transform only if startup syntax
+changes, and verify the instrumented build actually includes the new feature.
+Do not replace the list with a storage-only or test-owned list.
+
+The gate client already registers both definition validators, exercises a
+throwing metadata getter followed by successful storage, and supports definition
+queries after BFCache restoration. The Chromium gate explicitly removes
+Playwright's default `--disable-back-forward-cache` argument. The Firefox runner
+already covers both startup orders across all three supported Stimulus globals.
+Extend the existing Chromium gate and
 `tests/e2e/run-firefox-main-world-gate.js` to cover Turbo transport and source
-event safety; their storage results alone prove neither. Preserve their checks
+event safety; their Stimulus results alone prove neither. Exercise the production
+Turbo feature and isolated receiver rather than a test-only replacement bridge.
+Preserve their checks
 for no script insertion and no globals beyond explicitly requested temp storage.
 The Firefox runner exercises the real isolated/MAIN boundary, not panel APIs.
 Use normal document-start registration for the early inline-script fixture:
 the gate's intentionally delayed client-first variant cannot prove early capture.
 
-Build and manually exercise Safari if automated extension execution is unavailable.
-Record versions/results, including early capture and source-event preservation;
-do not treat successful builds as runtime proof.
+Continue building Safari, but do not resume installed Safari investigation while
+the user's pause remains in effect. When the user resumes it, use automated
+extension execution or documented manual steps and record browser version,
+early capture, and source-event preservation. Until then, record the Safari gate
+as outstanding; do not treat successful builds as runtime proof or declare full
+browser acceptance. Likewise, distinguish mocked panel-rendering coverage from
+actual native DevTools-panel interaction.
 
 Update AGENTS.md and README to show one MAIN runtime with Turbo capture and
-Stimulus RPC features, exclusive event ownership, epoch timestamps, HTML limits,
-and the unchanged isolated identity/port pipeline. Update the main-world and
+Stimulus RPC features, exclusive event ownership, epoch timestamps, the HTML
+snapshot/omission behavior, and the unchanged isolated identity/port pipeline.
+Preserve README's human-oriented architecture diagram and explanation of each
+part's responsibilities. Keep exact protocol names, validation limits and browser
+evidence in implementation notes or linked technical documentation rather than
+repeating them throughout README. Update the main-world and
 turbo-events-capture skills and, where needed, the short architectural record in
 ADR 5. Keep Decision 2 unchanged; ADR 5 expands it. Record browser evidence and
 blockers in implementation notes rather than technical detail in the ADR.
@@ -193,5 +238,8 @@ Run `npm run lint`, `npm run lint:css`, `npm run format:check`,
 `npm run test:e2e`, and `npm run test:e2e:firefox`. Inspect coverage membership
 and retain 100% statements/branches/functions/lines for all application lib code.
 Inspect manifests for exactly one MAIN entrypoint and both worlds at document
-start. Complete only with the full-frame contract, single-push/source safety,
-all previous migrations, and actual browser validation passing.
+start. Audit clean production outputs for no legacy injected asset/resource
+registration and no test-only reader or gate instrumentation. Complete only with
+the full-frame contract, single-push/source safety, all previous migrations, and
+actual browser validation passing. If Safari remains paused, report the
+implementation and completed checks separately from the outstanding browser gate.

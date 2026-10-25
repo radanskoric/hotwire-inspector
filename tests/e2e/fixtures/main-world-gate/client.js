@@ -1,9 +1,16 @@
 import { MainWorldClient } from "../../../../lib/main-world-client.js";
 import { validateStoredController } from "../../../../lib/main_world/controller-storage.js";
+import {
+  validateValueDefinitions,
+  validateOutletDefinitions,
+} from "../../../../lib/main_world/controller-definitions.js";
 
 export function startGateClient(document) {
+  const fields = { selector: "#result", identifier: "fixture" };
   const client = new MainWorldClient(document, {
     storeController: validateStoredController,
+    controllerValueDefinitions: validateValueDefinitions,
+    controllerOutletDefinitions: validateOutletDefinitions,
     fixtureRead: (value) =>
       value?.success === true && value.value === "page-owned-value"
         ? { success: true, value: value.value }
@@ -20,10 +27,16 @@ export function startGateClient(document) {
         });
         result = {
           ...result,
-          storage: await client.request("storeController", {
-            selector: "#result",
-            identifier: "fixture",
+          definitions: await client.request(
+            "controllerValueDefinitions",
+            fields,
+          ),
+          outlets: await client.request("controllerOutletDefinitions", fields),
+          failure: await client.request("controllerValueDefinitions", {
+            ...fields,
+            identifier: "broken",
           }),
+          storage: await client.request("storeController", fields),
         };
       } catch (error) {
         result = { success: false, error: error.message };
@@ -36,8 +49,19 @@ export function startGateClient(document) {
           }),
         }),
       );
-      client.disconnect();
     },
     { once: true },
   );
+  document.addEventListener("gate:recheck", async () => {
+    const definitions = await client.request(
+      "controllerValueDefinitions",
+      fields,
+    );
+    const outlets = await client.request("controllerOutletDefinitions", fields);
+    document.dispatchEvent(
+      new CustomEvent("gate:rechecked", {
+        detail: JSON.stringify({ definitions, outlets }),
+      }),
+    );
+  });
 }

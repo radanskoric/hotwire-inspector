@@ -8,6 +8,9 @@ import {
   CONTENT_INSPECT_MESSAGE_TYPE,
   CONTENT_SCAN_MESSAGE_TYPE,
   CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+  CONTENT_WATCH_VALUES_MESSAGE_TYPE,
+  CONTENT_UNWATCH_VALUES_MESSAGE_TYPE,
+  VALUES_CHANGED_PUSH_TYPE,
   TURBO_EVENT_PUSH_TYPE,
 } from "../../lib/constants.js";
 import {
@@ -32,7 +35,7 @@ async function withFixturePage(testBody) {
   await withStaticServer(fixturesRoot, async (origin) => {
     await withChromiumExtension(async ({ page, context }) => {
       await gotoFixture(page, origin);
-      await testBody({ page, context });
+      await testBody({ page, context, origin });
     });
   });
 }
@@ -255,7 +258,7 @@ test.describe("Content Script", () => {
     ["values", CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE],
     ["outlets", CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE],
   ]) {
-    test(`stores before and after lazy ${label} lookup without extra script insertion`, async () => {
+    test(`stores before and after MAIN ${label} lookup without extra script insertion`, async () => {
       await withFixturePage(async ({ page, context }) => {
         const frame = await getExtensionDevtoolsFrame(context);
         const { items } = await sendToContentScript(frame, {
@@ -282,11 +285,13 @@ test.describe("Content Script", () => {
           ),
         ).toBe(true);
         const scriptsBefore = await page.locator("script").count();
+        const lookupHtml = await observeStorage(page);
         expect(
           (await sendToContentScript(frame, { type, id, identifier: "modal" }))
             .success,
         ).toBe(true);
-        await expect(page.locator("script")).toHaveCount(scriptsBefore + 1);
+        await expect(page.locator("script")).toHaveCount(scriptsBefore);
+        await expectStorageDidNotMutateDOM(page, lookupHtml);
         const afterLookup = await observeStorage(page);
         expect(
           await sendToContentScript(frame, {
@@ -310,6 +315,88 @@ test.describe("Content Script", () => {
       });
     });
   }
+
+  test("keeps real live values and definition requests working through reload and navigation", async () => {
+    await withFixturePage(async ({ page, context, origin }) => {
+      const frame = await getExtensionDevtoolsFrame(context);
+      const scan = await sendToContentScript(frame, {
+        type: CONTENT_SCAN_MESSAGE_TYPE,
+      });
+      const { id } = scan.items.find((item) =>
+        item.controllers.includes("modal"),
+      );
+      const scripts = await page.locator("script").count();
+      await withPanelMessagesListener(frame, async ({ readMessages }) => {
+        expect(
+          await sendToContentScript(frame, {
+            type: CONTENT_WATCH_VALUES_MESSAGE_TYPE,
+            id,
+            identifier: "modal",
+          }),
+        ).toEqual({ success: true });
+        await page
+          .locator('[data-controller~="modal"]')
+          .evaluate((element) =>
+            element.setAttribute("data-modal-title-value", "Changed live"),
+          );
+        await expect
+          .poll(
+            async () =>
+              (await readMessages())
+                .filter((message) => message.type === VALUES_CHANGED_PUSH_TYPE)
+                .at(-1)
+                ?.values.find((value) => value.name === "title")?.value,
+          )
+          .toBe("Changed live");
+        expect(
+          await sendToContentScript(frame, {
+            type: CONTENT_UNWATCH_VALUES_MESSAGE_TYPE,
+          }),
+        ).toEqual({ success: true });
+      });
+      expect(
+        (
+          await sendToContentScript(frame, {
+            type: CONTENT_STORE_CONTROLLER_MESSAGE_TYPE,
+            id,
+            identifier: "modal",
+          })
+        ).success,
+      ).toBe(true);
+      expect(
+        await page.evaluate(() => window.temp1 === window.modalController),
+      ).toBe(true);
+      await expect(page.locator("script")).toHaveCount(scripts);
+      await page.reload();
+      expect(await page.evaluate(() => "temp1" in window)).toBe(false);
+      for (const url of [null, outletsFixtureUrl(origin), fixtureUrl(origin)]) {
+        if (url) await page.goto(url);
+        const currentFrame = await getExtensionDevtoolsFrame(context);
+        const currentScan = await sendToContentScript(currentFrame, {
+          type: CONTENT_SCAN_MESSAGE_TYPE,
+        });
+        const host = currentScan.items.find((item) =>
+          item.controllers.includes("modal"),
+        );
+        const scriptsBefore = await page.locator("script").count();
+        for (const type of [
+          CONTENT_CONTROLLER_VALUES_MESSAGE_TYPE,
+          CONTENT_CONTROLLER_OUTLETS_MESSAGE_TYPE,
+        ]) {
+          expect(
+            (
+              await sendToContentScript(currentFrame, {
+                type,
+                id: host.id,
+                identifier: "modal",
+              })
+            ).success,
+          ).toBe(true);
+        }
+        await expect(page.locator("script")).toHaveCount(scriptsBefore);
+      }
+    });
+  });
 
   test("reports Stimulus controller values", async ({ browserName }) => {
     test.skip(browserName !== "chromium");

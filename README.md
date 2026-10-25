@@ -1,90 +1,88 @@
 # Hotwire Inspector
 
-Cross-browser DevTools extension for working with Hotwire powered applications. Built with WXT and Vite, and Vitest and Playwright for testing.
+Cross-browser DevTools extension for inspecting Hotwire applications. Built with WXT and Vite, with Vitest and Playwright for testing.
 
 ## Why Hotwire Inspector?
 
 Hotwire Inspector exists to make it easier to understand the structure of Hotwire-powered pages, especially Turbo Frames and Stimulus controllers, directly from the browser's DevTools.
 
-There are existing tools but I wanted a cross browser extension that integrates into the browser's DevTools panel rather than opening a separate window.
+There are existing tools, but I wanted a cross-browser extension that integrates into DevTools rather than opening a separate window.
 
 ### Hotwire Inspector works hard to not interfere with your application
 
-An important goal of the project is to inspect the page without disturbing it. Hotwire Inspector works hard to avoid interfering with the page by:
+The inspector aims to keep the page close to its normal runtime behavior:
 
-1. Tracking the elements on the page inside the extension rather than writing tracking attributes into the target DOM. This requires never holding a strong reference to the elements, so they can be garbage collected. Element's ID is used when possible and [WeakMap](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WeakMap) and [WeakRef](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WeakRef) are used whenever a direct reference to the element object is needed.
-2. Highlighting is done by inserting absolutely positioned elements into the root of the DOM rather than modifying the target elements directly. This is the minimal possible intrusion into the DOM that allows visual highlighting.
-3. Controller storage uses the shared MAIN service and deliberately creates the first unused `window.tempN` after a valid request. Lookup happens only on request and calls a page-owned framework method, which may invoke getters or other application code. Value/outlet definitions still use a lazily WXT-injected page script. Page-context RPC is not authenticated: page code can forge requests, so this is not a user-gesture guarantee.
-4. Turbo event capture uses capture-phase listeners in the content scripts which exists outside the page's context, not in the injected script.
-5. A shared browser-registered MAIN bootstrap installs document RPC without inserting script elements. Equivalent code in MAIN and a script tag has comparable runtime effects; browser registration removes script-element mutation, while eager listeners add an idle footprint.
+- Element tracking uses existing IDs and weak references, without adding tracking attributes to the DOM. The tracking maps do not keep detached elements alive.
+- Highlighting adds a temporary, fixed-position overlay rather than changing the inspected element's styles.
+- Turbo events are observed through capture-phase listeners in the isolated content script.
+- Access to Stimulus controllers and their definitions happens on request. These queries create no page globals; The only globals created are those storing a controller in a `window.tempN` variable, at explicit user request.
+- The browser loads the MAIN script directly, without inserting a script element into the page.
 
-This approach helps reduce debugging noise, avoids surprising side effects, and keeps the inspected page behavior as close as possible to its normal runtime behavior.
+Inspection still runs code in the page's environment. Looking up controllers and reading metadata can invoke page-owned methods or getters.
 
 ## Architecture
 
-Hotwire Inspector is split across the extension's DevTools panel, background script, content script, and a small injected page-context script. Most communication uses a one-shot request/response relay through the background script. For live updates, a second channel uses long-lived ports so the content script can push changes to the panel as they happen.
+The extension separates DOM inspection from access to the page's JavaScript objects. The isolated content script can read the DOM, but it cannot directly access the page's Stimulus application. A small runtime in the page's **MAIN world** handles that access.
 
-`entrypoints/main-world.content.js` is the sole MAIN registration: HTTP/HTTPS, `document_start`, anonymous bundle. It delegates to `lib/main_world/runtime.js`; features belong in that directory and register operations only after successful startup. `rpc-server.js` and `protocol.js` provide validated JSON document RPC. The isolated `lib/main-world-client.js` installs its response listener synchronously, shares readiness probes only while requests wait, and gives each request five seconds total. Neither endpoint authenticates page code or exposes extension privileges.
+```mermaid
+flowchart TD
+    subgraph devtools[Browser Devtools]
+      panel["`**Hotwire Inspector Panel** 
 
-The isolated content script also starts at `document_start`, with tree observation deferred until DOMContentLoaded during parsing. MAIN listeners survive BFCache restores with the document. Controller storage now runs through `lib/main_world/controller-storage.js`; value/outlet definitions remain lazy injected RPC, and Turbo capture remains isolated. Storage never retries or falls back to injection; a timeout does not prove that no write occurred. Implementation proceeded at the user's request while Safari verification is paused; installed Safari support remains unverified.
+        entrypoints/panel/main.js
 
-```text
-┌──────────────────────────────┐
-│ Browser DevTools             │
-│  ┌─────────────────────────┐ │
-│  │ Hotwire Inspector Panel │ │
-│  │                         │ │
-│  │ entrypoints/panel/      │ │
-│  └───────────┬─────────────┘ │
-└──────────────▲───────────────┘
-               │ one-shot relay / port events
-               ▼
-┌──────────────────────────────┐
-│ Background script            │
-│                              │
-│ entrypoints/background.js    │
-└──────────────┬───────────────┘
-               ▲
-               | one-shot relay / port events
-               ▼
-┌──────────────────────────────┐
-│ Content script               │
-│                              │
-│ entrypoints/content.js       │
-│                              │
-│ - scans Turbo Frames         │
-│ - detects Stimulus metadata  │
-│ - highlights inspected nodes │
-│ - observes live value changes│
-│ - captures Turbo DOM events  │
-└──────────────┬───────────────┘
-               │ injects page-context script, listen to events it emits
-               ▼
-┌──────────────────────────────┐
-│ Inspected page context       │
-│                              │
-│ inspected-page-inject.js     │
-│                              │
-│ - read controller definitions|
-│ - infer values configuration |
-└──────────────────────────────┘
+        - Hotwire page tree structure
+        - Stimulus controller details
+        - Turbo event timeline
+      `"]
+    end
+    background["`**Background script**
+
+      entrypoints/background.js  
+
+      Routes requests and live updates
+    `"]
+    subgraph page[Inspected page]
+        content["`**Isolated content script**
+
+          entrypoints/content.js
+        
+          - scans Turbo Frames         
+          - detects Stimulus metadata  
+          - highlights inspected nodes 
+          - observes live value changes
+          - captures Turbo DOM events  
+        `"]
+        main["`**MAIN runtime**
+
+          entrypoints/main-world.content.js
+
+          - track controller instances 
+          - infer values configuration
+          - controller storage
+        `"]
+    end
+    panel <-->|Extension messages and ports| background
+    background <-->|Extension messages and ports| content
+    content <-->|JSON requests and replies on document| main
 ```
 
-Alongside the lazy script path shown above, the isolated client communicates directly with the shared MAIN runtime using non-bubbling `hotwire-inspector:main-world-rpc-request` / `hotwire-inspector:main-world-rpc-response` events on `document`. Production operations are `bridgeStatus` and `storeController`. Both the MAIN storage service and the remaining injected definition queries share request-time lookup in `lib/main_world/controller-lookup.js`.
+Panel actions travel through the background script to the content script as individual requests and replies. Live tree changes, value updates, and Turbo events travel back over long-lived ports. The content script asks MAIN for controller definitions or storage; current value attributes, target and outlet element matching, and live observation stay in the isolated script.
+
+[The MAIN entrypoint](entrypoints/main-world.content.js) starts one runtime on HTTP/HTTPS pages at `document_start`. Its [storage](lib/main_world/controller-storage.js) and [definition](lib/main_world/controller-definitions.js) features look up the current Stimulus controller for each request. Startup registers services; framework access happens only when a request arrives. The isolated script also starts early, but defers tree observation until the DOM is ready. MAIN services survive back/forward cache (BFCache) restores with the document.
+
+The [isolated client](lib/main-world-client.js) and MAIN communicate using JSON strings in custom events on `document`. The client waits for MAIN to become available. Both sides validate replies and enforce limits on size and nesting, so unsupported defaults or oversized metadata fail instead of being silently changed or partially returned.
+
+This bridge is not authenticated: page scripts can forge requests and replies, and validation does not prove a user clicked the panel. MAIN has no extension privileges. Controller storage deliberately writes the first unused `window.tempN` and never retries a request, because a timeout can occur after a successful write.
+
+See [ADR 5](docs/decisions/5%20-%20shared%20MAIN%20world.md) for the architectural rationale and [the implementation notes](docs/plans/03-main-world-stimulus-rpc.md#implementation-status-2026-10-23) for exact validation limits and browser verification status.
 
 ## Local development with hot reloading
 
-To run the extension locally with hot reloading:
-
-1. Install dependencies:
+Use Node.js 22.13 or later. Install dependencies, then start WXT:
 
 ```bash
 npm install
-```
-
-2. Start the extension in development mode:
-
-```bash
 npm run dev
 ```
 
@@ -94,21 +92,7 @@ For Firefox, use:
 npm run dev:firefox
 ```
 
-WXT will build the extension in watch mode and reload it as you make changes.
-
-### Testing in the browser
-
-- Chrome
-  - run `npm run dev`
-  - open the browser instance started by WXT
-  - open DevTools on a page you want to inspect
-  - open the `Hotwire Inspector` panel
-
-- Firefox
-  - run `npm run dev:firefox`
-  - open the Firefox instance started by WXT
-  - open DevTools on a page you want to inspect
-  - open the `Hotwire Inspector` panel
+WXT opens the browser, rebuilds the extension, and reloads it as you make changes. Navigate to an HTTP/HTTPS page, open DevTools, and select the `Hotwire Inspector` panel.
 
 ### Panel appearance
 
@@ -118,54 +102,32 @@ The selected mode is saved locally for the extension panel. It only changes Hotw
 
 ### Testing from a dev container
 
-If you are developing inside a dev container, the build and watch commands still run there, but browser launch usually does not cross from the container to the host browser automatically.
+If you are developing inside a dev container, the build and watch commands still run there, but there's no way for the script to launch a browser automatically. It's possible to develop from the devcontainer but it's less convenient than running it directly on the host machine.
 
+These are the steps for it:
 - run `npm run dev` or `npm run dev:firefox` inside the container to keep the extension rebuilding in watch mode
 - load the extension manually in the browser running on your host machine from the appropriate `output/...` directory if needed
 - expect to reload the extension manually in the host browser after changes instead of relying on full automatic hot reload
 - refresh the inspected page or reopen the DevTools panel if the updated extension state is not picked up immediately
 
-### Useful verification commands
-
-```bash
-npm test -- --run
-npm run test:e2e
-npm run build
-```
-
 ## How E2E tests work
 
-The E2E tests use Playwright to launch a real Chromium browser with the built extension loaded. They are split into two files that cover different parts of the extension.
+The default Playwright suite loads the built extension in Chromium. Because Playwright's bundled Chromium does not render custom DevTools panels, messaging and panel rendering are tested separately:
 
-### Content-script tests (`content-script.spec.js`)
+- [Content-script tests](tests/e2e/content-script.spec.js) send requests through the extension's DevTools frame and verify real scanning, highlighting, controller storage, definitions, and live updates.
+- [Panel tests](tests/e2e/panel.spec.js) load `panel.html` as a standalone extension page with mocked browser APIs and assert on rendering and interaction.
+- [MAIN boundary tests](tests/e2e/main-world-gate.spec.js) install a separate instrumented build to check communication across JavaScript worlds, both startup orders, BFCache restoration, and the absence of added scripts or unexpected globals.
 
-Because Playwright's bundled Chromium does not visually render custom DevTools panels, these tests verify the content-script pipeline by messaging through the extension's devtools frame — the same way the real panel communicates:
+These tests cover the UI and its underlying messaging, but do not automate a complete interaction through the browser's native DevTools panel. On Linux, the helpers start `Xvfb` when no display is available; the `Xvfb` executable must be installed.
 
-1. Launches Chromium with the extension and auto-opens DevTools
-2. Navigates to a fixture page containing Turbo Frames and Stimulus controllers
-3. Finds the extension's `devtools.html` frame inside the DevTools window
-4. Sends messages (scan, highlight, inspect, etc.) to the content script through that frame
-5. Asserts on the content script responses and on visible page-side effects like highlight styles
-
-### Panel UI tests (`panel.spec.js`)
-
-These test the panel rendering by loading `panel.html` directly as a standalone extension page:
-
-1. Launches Chromium with the extension loaded
-2. Injects mocked extension APIs before the panel script runs
-3. Navigates to the panel page — it renders against the mock data
-4. Asserts on the rendered DOM: tree nodes, badges, summary text, empty and error states, refresh behavior
-
-Together, the two files exercise the full extension pipeline end-to-end: extension loading, DevTools registration, content script injection, DOM scanning, highlighting, element inspection, and panel rendering.
-
-A virtual display server (`Xvfb`) is started automatically on Linux when no display is available, so the tests work inside dev containers without extra setup.
-
-To run the E2E tests:
+Run unit tests with `npm test -- --run`. For E2E tests, build the extension first:
 
 ```bash
 npm run build
 npm run test:e2e
 ```
+
+Firefox has a separate mocked-panel smoke test and an installed-extension MAIN boundary runner. See [tests/README.md](tests/README.md) for commands and browser-specific setup.
 
 ## Acknowledgements
 

@@ -88,10 +88,10 @@ Future Firefox work can add content-script coverage only after extension loading
 
 `main-world-gate.spec.js` builds a separate instrumented WXT extension and installs
 it in Chromium. It verifies both startup orders, scalar extraction from a
-page-owned object through the isolated client, controller storage with exact
+page-owned object through the isolated client, value/outlet definitions, contained metadata failures, controller storage with exact
 instance identity, and no script insertion or unexpected globals during requests.
 Only the requested temp variable is allowed. The test-only reader is absent from
-production builds; the storage service is the real production feature.
+production builds; the storage and definition services are the real production features. Chromium additionally verifies definition queries after BFCache restoration without repeated storage.
 
 Run `node tests/e2e/run-firefox-main-world-gate.js` for the separate installed
 Firefox test. It uses `web-ext` and a fresh temporary profile, with a localhost
@@ -100,5 +100,5 @@ fixture reporting results, rather than the mocked Firefox panel adapter. Set
 its browser after checking all three supported Stimulus globals in both startup
 orders. The Chromium content-script suite also tests storage through the real
 extension relay, occupied temp names, missing controllers, and no script/DOM
-mutation before and after lazy value/outlet lookup. See [plan 2](../docs/plans/02-main-world-controller-storage.md)
+mutation before and after MAIN value/outlet lookup, real live-value pushes, reloads, and navigation. See [plan 3](../docs/plans/03-main-world-stimulus-rpc.md)
 for implementation status and the unresolved installed Safari gate.

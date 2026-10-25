@@ -75,6 +75,26 @@ try {
     assert.equal(result.insertedScripts, 0);
     assert.equal(result.scriptsUnchanged, true);
     assert.equal(result.storedControllerMatches, true);
+    assert.equal(result.oneResponsePerRequest, true);
+    assert.deepEqual(result.definitions, {
+      success: true,
+      definitions: [
+        {
+          name: "options",
+          type: "object",
+          attributeName: "data-fixture-options-value",
+          defaultValue: { enabled: true, items: [1, null] },
+        },
+      ],
+    });
+    assert.deepEqual(result.outlets, {
+      success: true,
+      outlets: ["menu", "status"],
+    });
+    assert.deepEqual(result.failure, {
+      success: false,
+      error: "fixture getter failed",
+    });
     assert.deepEqual(result.storage, {
       success: true,
       name: "temp1",

@@ -17,8 +17,14 @@ export default defineConfig({
               "export const MAIN_WORLD_OPERATIONS = [",
               'export const MAIN_WORLD_OPERATIONS = ["fixtureRead",',
             );
-          if (id.endsWith("/entrypoints/main-world.content.js"))
-            return `import { startGate } from "../tests/e2e/fixtures/main-world-gate/main.js";\n${code.replace("new MainWorldRuntime(document, [createControllerStorage]).start();", "startGate(document, MainWorldRuntime, [createControllerStorage]);")}`;
+          if (id.endsWith("/entrypoints/main-world.content.js")) {
+            // WXT also loads a metadata-only version while discovering entrypoints.
+            if (!code.includes("MainWorldRuntime")) return;
+            const startup =
+              /new MainWorldRuntime\(document, (\[[\s\S]*?\])\)\.start\(\);/;
+            if (!startup.test(code)) throw new Error("MAIN startup not found");
+            return `import { startGate } from "../tests/e2e/fixtures/main-world-gate/main.js";\n${code.replace(startup, "startGate(document, MainWorldRuntime, $1);")}`;
+          }
           if (id.endsWith("/entrypoints/content.js"))
             return `import { startGateClient } from "../tests/e2e/fixtures/main-world-gate/client.js";\n${code.replace("main() {", "main() { startGateClient(document);")}`;
         },

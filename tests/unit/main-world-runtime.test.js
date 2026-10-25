@@ -3,6 +3,8 @@ import { afterEach, expect, it, vi } from "vitest";
 import { MainWorldRuntime } from "../../lib/main_world/runtime.js";
 import { createControllerStorage } from "../../lib/main_world/controller-storage.js";
 
+import { createControllerDefinitions } from "../../lib/main_world/controller-definitions.js";
+
 const runtimes = [];
 afterEach(() => {
   runtimes.forEach((runtime) => runtime.stop());
@@ -150,7 +152,10 @@ it("registers one lean anonymous HTTP/HTTPS MAIN bootstrap with no unsolicited g
     });
   entrypoint.main();
   expect(start).toHaveBeenCalledTimes(1);
-  expect(start.mock.instances[0].factories).toEqual([createControllerStorage]);
+  expect(start.mock.instances[0].factories).toEqual([
+    createControllerStorage,
+    createControllerDefinitions,
+  ]);
   expect(Object.keys(window)).toEqual(globals);
   expect(document.documentElement.outerHTML).toBe(html);
 });

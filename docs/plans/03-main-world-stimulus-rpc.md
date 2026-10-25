@@ -144,3 +144,63 @@ by plan 1; manual Safari runs must record browser version and steps.
 Complete when all three Stimulus operations run through the shared MAIN runtime,
 no production injected script or loader remains, and baseline tree, details,
 live values, and storage workflows pass. Plan 4 starts from this state.
+
+## Implementation status: 2026-10-23
+
+All three Stimulus operations now use the existing MAIN runtime and isolated
+client. The new controller-definitions feature reuses request-time lookup and
+the existing extraction helpers. Startup only registers services. Definitions
+create no globals; explicit storage remains the only temp-variable write.
+Live attributes, element identity, and MutationObserver updates remain isolated.
+
+Both sides reconstruct successful definition results. Arrays and field strings
+have the specified bounds; defaults preserve JSON primitives, arrays and plain
+objects, up to 32 nested containers. Unsupported defaults (including undefined,
+non-finite numbers, sparse arrays, functions, and non-plain objects), circular
+references, dangerous keys, and properties JSON would silently discard are
+rejected. Thrown getters produce bounded failures. Tests cover the exact
+1 Mi-code-unit serialized-response boundary and the next code unit, alongside
+descriptor, outlet, string and nesting boundaries. These are deliberate new
+error cases rather than partial or truncated successes.
+
+The legacy entrypoint, loader, timeout configuration, event constants and detail
+types, and web-accessible resource registration were removed after replacement
+coverage passed. Repository searches found no legacy loader or protocol names
+in runtime or active documentation; earlier plans retain their historical
+descriptions. Existing permissions were retained; permission pruning is not
+needed for this migration. README, AGENTS, the MAIN skill and ADR 5 describe
+the final architecture; Decision 2 is unchanged.
+
+Verification on macOS 26.6.2 (25G83), Apple Silicon:
+
+- Lint, CSS lint, formatting and checkJs typechecking pass.
+- All 519 unit tests pass; unchanged library coverage thresholds report 100%
+  statements, branches, functions and lines, with no added exclusions.
+- Chrome MV3, Firefox MV3 and configured Safari MV2 builds pass. Clean build
+  outputs have exactly one anonymous MAIN registration, with no injected asset,
+  web-accessible resource registration, legacy RPC names or gate instrumentation.
+- Chromium 151.0.7922.34: the full E2E suite passes 66 tests, with the existing
+  exploratory DevTools-panel test skipped. Installed gate tests pass both
+  startup orders, JSON defaults, outlet filtering, metadata-failure containment,
+  one response per request, no added scripts and no unexpected globals. Actual
+  BFCache restores retain the exact stored instance without another temp write;
+  definition requests still succeed after restoration. The gate enables
+  BFCache explicitly because Playwright disables it by default.
+- Real Chromium relay tests cover definitions before/after storage without DOM
+  mutation, watched attribute changes reaching the panel events port, reloads
+  clearing the old temp global, and definitions after navigation. The existing
+  `chrome.devtools.inspectedWindow.eval` assertion still proves that the bare
+  stored variable resolves to the exact page controller before navigation.
+- Firefox 156.0.1: the installed-extension runner passes all six combinations
+  of startup order and application global, including definitions, a thrown
+  metadata getter followed by successful storage, response counts and no DOM
+  script insertion or unexpected globals. The separate mocked-panel baseline
+  smoke test passes. The installed runner verifies the isolated/MAIN boundary,
+  not Firefox panel APIs or the relay.
+
+Browser limitations remain explicit: Chromium panel rendering/details tests use
+mock browser APIs because the bundled browser does not render extension DevTools
+panels; actual panel clicks were not manually verified in this implementation.
+Safari investigation remains paused at the user’s request. No installed Safari
+version or manual execution steps are recorded because no Safari run was made;
+the Safari build is not runtime evidence and does not close that gate.

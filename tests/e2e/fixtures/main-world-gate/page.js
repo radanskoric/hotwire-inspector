@@ -1,9 +1,25 @@
 window.mainWorldFixture = {
   value: "page-owned-value",
-  controller: { identifier: "fixture" },
+  controller: {
+    identifier: "fixture",
+    valueDescriptorMap: {
+      "data-fixture-options-value": {
+        name: "optionsValue",
+        type: "object",
+        defaultValue: { enabled: true, items: [1, null] },
+      },
+    },
+    constructor: { outlets: ["menu", 1, "status"] },
+  },
+  broken: {
+    get valueDescriptorMap() {
+      throw new Error("fixture getter failed");
+    },
+  },
 };
 window[new URL(location.href).searchParams.get("application") || "Stimulus"] = {
   getControllerForElementAndIdentifier(element, identifier) {
+    if (identifier === "broken") return window.mainWorldFixture.broken;
     return element === document.getElementById("result") &&
       identifier === "fixture"
       ? window.mainWorldFixture.controller
@@ -11,6 +27,14 @@ window[new URL(location.href).searchParams.get("application") || "Stimulus"] = {
   },
 };
 (() => {
+  const responses = new Map();
+  document.addEventListener(
+    "hotwire-inspector:main-world-rpc-response",
+    (event) => {
+      const { requestId } = JSON.parse(event.detail);
+      responses.set(requestId, (responses.get(requestId) || 0) + 1);
+    },
+  );
   const globals = Object.getOwnPropertyNames(window);
   const scripts = [...document.scripts];
   let insertedScripts = 0;
@@ -37,6 +61,9 @@ window[new URL(location.href).searchParams.get("application") || "Stimulus"] = {
         ),
         insertedScripts,
         scriptsUnchanged: scripts.length === document.scripts.length,
+        oneResponsePerRequest: [...responses.values()].every(
+          (count) => count === 1,
+        ),
         userAgent: navigator.userAgent,
         order: location.search,
       };

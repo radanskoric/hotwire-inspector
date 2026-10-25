@@ -20,7 +20,10 @@ for (const order of ["main-first", "client-first"]) {
         const context = await chromium.launchPersistentContext("", {
           headless: true,
           channel: "chromium",
-          ignoreDefaultArgs: ["--disable-extensions"],
+          ignoreDefaultArgs: [
+            "--disable-extensions",
+            "--disable-back-forward-cache",
+          ],
           args: [
             `--disable-extensions-except=${extension}`,
             `--load-extension=${extension}`,
@@ -41,11 +44,57 @@ for (const order of ["main-first", "client-first"]) {
             insertedScripts: 0,
             scriptsUnchanged: true,
             storedControllerMatches: true,
+            oneResponsePerRequest: true,
+            definitions: {
+              success: true,
+              definitions: [
+                {
+                  name: "options",
+                  type: "object",
+                  attributeName: "data-fixture-options-value",
+                  defaultValue: { enabled: true, items: [1, null] },
+                },
+              ],
+            },
+            outlets: { success: true, outlets: ["menu", "status"] },
+            failure: { success: false, error: "fixture getter failed" },
             storage: { success: true, name: "temp1", identifier: "fixture" },
           });
           test.info().annotations.push({
             type: "browser-gate",
             description: JSON.stringify(result),
+          });
+          await page.evaluate(() => {
+            window.addEventListener("pageshow", (event) => {
+              window.mainWorldFixture.restored = event.persisted;
+            });
+          });
+          await page.goto(`${origin}/page.html?main-first&away`);
+          await expect(page.locator("#result")).not.toHaveText("pending");
+
+          await page.goBack({ waitUntil: "commit", timeout: 5000 });
+
+          expect(
+            await page.evaluate(() => ({
+              restored: window.mainWorldFixture.restored,
+              same: window.temp1 === window.mainWorldFixture.controller,
+              repeatedStorage: "temp2" in window,
+            })),
+          ).toEqual({ restored: true, same: true, repeatedStorage: false });
+          const restored = await page.evaluate(
+            () =>
+              new Promise((resolve) => {
+                document.addEventListener(
+                  "gate:rechecked",
+                  (event) => resolve(JSON.parse(event.detail)),
+                  { once: true },
+                );
+                document.dispatchEvent(new Event("gate:recheck"));
+              }),
+          );
+          expect(restored).toEqual({
+            definitions: result.definitions,
+            outlets: result.outlets,
           });
         } finally {
           await context.close();
