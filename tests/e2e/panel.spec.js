@@ -888,6 +888,65 @@ test.describe("Panel UI", () => {
     );
   });
 
+  test("full frame HTML and omission errors render as inert text through bursts and clear", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        await panelPage.locator("label.tab[for='tab-events']").click();
+        const requests = [];
+        panelPage.on("request", (request) => requests.push(request.url()));
+        const markup =
+          '<turbo-frame><script>window.capturedScriptRan=true</script><img src="https://example.invalid/captured-image">' +
+          "x".repeat(65000) +
+          "</turbo-frame>";
+        const pushDetails = (details) =>
+          simulateTurboEvent(panelPage, {
+            ...turboEventsFixturePush,
+            targetId: null,
+            details,
+          });
+        await pushDetails({ html: markup });
+        const values = panelPage.locator(
+          "#panel-events .event-box-details-value",
+        );
+        await expect(values).toHaveText([markup]);
+        await expect(
+          panelPage.locator(
+            "#panel-events .event-box-details script, #panel-events .event-box-details img",
+          ),
+        ).toHaveCount(0);
+        expect(
+          await panelPage.evaluate(() => window.capturedScriptRan),
+        ).toBeUndefined();
+        const error = "HTML omitted: exceeds 65536 code units";
+        await pushDetails({ htmlError: error });
+        await expect(values).toHaveText([markup, error]);
+        for (let index = 0; index < 500; index++) {
+          await pushDetails({ html: markup });
+        }
+        await expect(panelPage.locator("#panel-events .event-box")).toHaveCount(
+          500,
+        );
+        await expect(
+          panelPage.locator("#panel-events .events-dropped-notice"),
+        ).toContainText("2");
+        expect(requests).toEqual([]);
+        await panelPage.locator("#panel-events .events-clear").click();
+        await expect(panelPage.locator("#panel-events .event-box")).toHaveCount(
+          0,
+        );
+        await expect(values).toHaveCount(0);
+      },
+    );
+  });
+
   test("turbo event with empty details does not render a details block", async ({
     browserName,
     page,

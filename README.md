@@ -14,7 +14,7 @@ The inspector aims to keep the page close to its normal runtime behavior:
 
 - Element tracking uses existing IDs and weak references, without adding tracking attributes to the DOM. The tracking maps do not keep detached elements alive.
 - Highlighting adds a temporary, fixed-position overlay rather than changing the inspected element's styles.
-- Turbo events are observed through capture-phase listeners in the isolated content script.
+- Turbo events are observed through capture-phase listeners. MAIN captures the events that have details that are invisible to the isolated script. The isolated script owns the other events and resolves element identity.
 - Access to Stimulus controllers and their definitions happens on request. These queries create no page globals; The only globals created are those storing a controller in a `window.tempN` variable, at explicit user request.
 - The browser loads the MAIN script directly, without inserting a script element into the page.
 
@@ -22,12 +22,12 @@ Inspection still runs code in the page's environment. Looking up controllers and
 
 ## Architecture
 
-The extension separates DOM inspection from access to the page's JavaScript objects. The isolated content script can read the DOM, but it cannot directly access the page's Stimulus application. A small runtime in the page's **MAIN world** handles that access.
+The extension separates DOM inspection from access to the page's JavaScript objects. The isolated content script can read the DOM, but it cannot directly access the page's Stimulus application or live Turbo event objects. A small runtime in the page's **MAIN world** handles that access.
 
 ```mermaid
 flowchart TD
     subgraph devtools[Browser Devtools]
-      panel["`**Hotwire Inspector Panel** 
+      panel["`**Hotwire Inspector Panel**
 
         entrypoints/panel/main.js
 
@@ -38,7 +38,7 @@ flowchart TD
     end
     background["`**Background script**
 
-      entrypoints/background.js  
+      entrypoints/background.js
 
       Routes requests and live updates
     `"]
@@ -46,36 +46,37 @@ flowchart TD
         content["`**Isolated content script**
 
           entrypoints/content.js
-        
-          - scans Turbo Frames         
-          - detects Stimulus metadata  
-          - highlights inspected nodes 
+
+          - scans Turbo Frames
+          - detects Stimulus metadata
+          - highlights inspected nodes
           - observes live value changes
-          - captures Turbo DOM events  
+          - captures other Turbo events
+          - resolves event target identity
         `"]
         main["`**MAIN runtime**
 
           entrypoints/main-world.content.js
 
-          - track controller instances 
+          - looks up current controllers
           - infer values configuration
           - controller storage
+          - captures incoming frame HTML
         `"]
     end
     panel <-->|Extension messages and ports| background
     background <-->|Extension messages and ports| content
     content <-->|JSON requests and replies on document| main
+    main -->|Validated JSON frame snapshots| content
 ```
 
 Panel actions travel through the background script to the content script as individual requests and replies. Live tree changes, value updates, and Turbo events travel back over long-lived ports. The content script asks MAIN for controller definitions or storage; current value attributes, target and outlet element matching, and live observation stay in the isolated script.
 
-[The MAIN entrypoint](entrypoints/main-world.content.js) starts one runtime on HTTP/HTTPS pages at `document_start`. Its [storage](lib/main_world/controller-storage.js) and [definition](lib/main_world/controller-definitions.js) features look up the current Stimulus controller for each request. Startup registers services; framework access happens only when a request arrives. The isolated script also starts early, but defers tree observation until the DOM is ready. MAIN services survive back/forward cache (BFCache) restores with the document.
+The browser registers the [MAIN entrypoint](entrypoints/main-world.content.js) directly, without injecting script elements. It handles inspection that needs access to page-owned JavaScript objects; DOM identity and extension messaging stay isolated.
 
-The [isolated client](lib/main-world-client.js) and MAIN communicate using JSON strings in custom events on `document`. The client waits for MAIN to become available. Both sides validate replies and enforce limits on size and nesting, so unsupported defaults or oversized metadata fail instead of being silently changed or partially returned.
+Incoming frame HTML is captured as a snapshot and displayed as inert text. Oversized snapshots carry an omission message.
 
-This bridge is not authenticated: page scripts can forge requests and replies, and validation does not prove a user clicked the panel. MAIN has no extension privileges. Controller storage deliberately writes the first unused `window.tempN` and never retries a request, because a timeout can occur after a successful write.
-
-See [ADR 5](docs/decisions/5%20-%20shared%20MAIN%20world.md) for the architectural rationale and [the implementation notes](docs/plans/03-main-world-stimulus-rpc.md#implementation-status-2026-10-23) for exact validation limits and browser verification status.
+Page scripts can forge bridge messages. Validation checks their shape, not their authenticity. See [ADR 5](docs/decisions/5%20-%20shared%20MAIN%20world.md) for the rationale and tradeoffs.
 
 ## Local development with hot reloading
 
@@ -105,6 +106,7 @@ The selected mode is saved locally for the extension panel. It only changes Hotw
 If you are developing inside a dev container, the build and watch commands still run there, but there's no way for the script to launch a browser automatically. It's possible to develop from the devcontainer but it's less convenient than running it directly on the host machine.
 
 These are the steps for it:
+
 - run `npm run dev` or `npm run dev:firefox` inside the container to keep the extension rebuilding in watch mode
 - load the extension manually in the browser running on your host machine from the appropriate `output/...` directory if needed
 - expect to reload the extension manually in the host browser after changes instead of relying on full automatic hot reload

@@ -40,6 +40,29 @@ async function withFixturePage(testBody) {
   });
 }
 
+// Dispatch in the page realm so incoming frames are real page-owned Elements.
+async function dispatchFrameCaptureScenarios(page) {
+  return page.evaluate(() => {
+    const source = document.querySelector("turbo-frame");
+    const incoming = document.createElement("turbo-frame");
+    incoming.id = "incoming";
+    incoming.setAttribute("src", "/incoming");
+    incoming.innerHTML = "<p>snapshot &amp; content</p>";
+    const html = incoming.outerHTML;
+    const timestamp = Date.now();
+    const dispatch = (name, detail) =>
+      source.dispatchEvent(new CustomEvent(name, { bubbles: true, detail }));
+    dispatch("turbo:before-frame-render", { newFrame: incoming });
+    incoming.textContent = "changed after dispatch";
+    dispatch("turbo:before-frame-render");
+    incoming.textContent = "x".repeat(65536);
+    dispatch("turbo:before-frame-render", { newFrame: incoming });
+    dispatch("turbo:load", { url: "/isolated-load" });
+    dispatch("turbo:click", { url: "/isolated-click" });
+    return { html, timestamp, targetId: source.id };
+  });
+}
+
 async function observeStorage(page) {
   return page.evaluate(() => {
     window.__storageRecords = [];
@@ -788,6 +811,72 @@ test.describe("Content Script", () => {
 
         expect(result.success).toBe(true);
         expect(result.selector).toBe("#modal-close");
+      });
+    });
+  });
+
+  test("synthetic Turbo-shaped frame events snapshot real Elements exactly once", async ({
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium");
+    await withFixturePage(async ({ page, context }) => {
+      const frame = await getExtensionDevtoolsFrame(context);
+      await withPanelMessagesListener(frame, async ({ readMessages }) => {
+        const expected = await dispatchFrameCaptureScenarios(page);
+        const pushes = async () =>
+          (await readMessages()).filter(
+            (message) => message.type === TURBO_EVENT_PUSH_TYPE,
+          );
+        await expect.poll(async () => (await pushes()).length).toBe(5);
+        // Let queued relay messages settle before ruling out duplicate ownership.
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        const messages = await pushes();
+        expect(messages).toHaveLength(5);
+        expect(
+          messages.map(({ name, details, targetId }) => ({
+            name,
+            details,
+            targetId,
+          })),
+        ).toEqual([
+          {
+            name: "turbo:before-frame-render",
+            targetId: expected.targetId,
+            details: {
+              newFrameSrc: "/incoming",
+              newFrameId: "incoming",
+              html: expected.html,
+            },
+          },
+          {
+            name: "turbo:before-frame-render",
+            targetId: expected.targetId,
+            details: {},
+          },
+          {
+            name: "turbo:before-frame-render",
+            targetId: expected.targetId,
+            details: {
+              newFrameSrc: "/incoming",
+              newFrameId: "incoming",
+              htmlError: "HTML omitted: exceeds 65536 code units",
+            },
+          },
+          {
+            name: "turbo:load",
+            targetId: expected.targetId,
+            details: { url: "/isolated-load" },
+          },
+          {
+            name: "turbo:click",
+            targetId: expected.targetId,
+            details: { url: "/isolated-click" },
+          },
+        ]);
+        for (const message of messages)
+          expect(Math.abs(message.timestamp - expected.timestamp)).toBeLessThan(
+            1000,
+          );
       });
     });
   });

@@ -59,6 +59,20 @@ for (const order of ["main-first", "client-first"]) {
             outlets: { success: true, outlets: ["menu", "status"] },
             failure: { success: false, error: "fixture getter failed" },
             storage: { success: true, name: "temp1", identifier: "fixture" },
+            turbo: {
+              early:
+                order === "main-first"
+                  ? { bridges: 1, pushes: 1 }
+                  : { bridges: 0, pushes: 0 },
+              count: 4,
+              snapshot: true,
+              fields: true,
+              target: true,
+              timestamp: true,
+              empty: true,
+              oversized: true,
+              sourceSafety: true,
+            },
           });
           test.info().annotations.push({
             type: "browser-gate",
@@ -95,6 +109,29 @@ for (const order of ["main-first", "client-first"]) {
           expect(restored).toEqual({
             definitions: result.definitions,
             outlets: result.outlets,
+          });
+          const restoredTurbo = await page.evaluate(
+            () =>
+              new Promise((resolve) => {
+                document.addEventListener(
+                  "gate:turbo-push",
+                  (event) => resolve(JSON.parse(event.detail)),
+                  { once: true },
+                );
+                const incoming = document.createElement("turbo-frame");
+                incoming.textContent = "restored";
+                document.querySelector("#result").dispatchEvent(
+                  new CustomEvent("turbo:before-frame-render", {
+                    bubbles: true,
+                    detail: { newFrame: incoming },
+                  }),
+                );
+              }),
+          );
+          expect(restoredTurbo).toMatchObject({
+            name: "turbo:before-frame-render",
+            targetId: "result",
+            details: { html: "<turbo-frame>restored</turbo-frame>" },
           });
         } finally {
           await context.close();

@@ -44,7 +44,7 @@ semantics before implementation, revise this contract and tests explicitly.
 
 ## Ownership and capture
 
-- Add a Turbo capture feature in `lib/main_world/turbo-events.js` and start it
+- Add a Turbo capture feature in `lib/main_world/capture-turbo-events.js` and start it
   through the existing runtime. Reuse `TurboEventWatcher` and its canonical
   `turboEventDetailsFor` extractor. Do not copy the frame extractor into MAIN.
   Append its factory without replacing the storage or definition factories.
@@ -243,3 +243,92 @@ registration and no test-only reader or gate instrumentation. Complete only with
 the full-frame contract, single-push/source safety, all previous migrations, and
 actual browser validation passing. If Safari remains paused, report the
 implementation and completed checks separately from the outstanding browser gate.
+
+## Implementation status (2026-10-25)
+
+Implemented on `main-world` after the user explicitly overrode the requirement
+to merge plans 2 and 3 into main first. Their implementations remain the starting
+point; this work does not claim they have merged.
+
+The existing anonymous MAIN bootstrap now starts storage, definitions, and
+`captureTurboEvents`. The capture-only feature reuses the canonical watcher and
+extractor with frozen exclusive ownership lists. Only `turbo:before-frame-render`
+moved to MAIN. Incoming `newFrame.outerHTML` is an event-time snapshot retained
+whole through 65,536 UTF-16 code units, otherwise omitted with the exact htmlError
+above. Src and ID are independently limited to 8,192 units, with detailsError
+naming oversized fields. Extraction errors drop that capture without modifying
+the source event or activating fallback capture. Reading markup allocates the
+complete string before its size can be checked.
+
+The one-way bridge is `hotwire-inspector:main-world-turbo-event`, separate from
+Stimulus RPC. It carries only JSON `{ name, timestamp, details }`, dispatched on
+the connected same-document source Element or document. The isolated parser
+accepts at most 524,288 raw code units, exactly those three top-level keys,
+MAIN-owned names, finite epoch milliseconds from 1,000,000,000,000 through
+9,999,999,999,999, and only the five specified detail keys with their prescribed
+string limits. HTML and htmlError cannot coexist. Records are reconstructed;
+unknown/prototype keys, nested values, invalid types, and malformed JSON are
+rejected. Escaped-string and exact-boundary tests cover serialization expansion.
+This validates shape and bounds, not authenticity.
+
+The production isolated receiver registers in ContentInspector's constructor,
+alongside the existing client and before ports or watchers. Both capture paths
+use one private identity helper and the unchanged port push shape. Teardown
+removes the exact receiver and retains RPC teardown. No MAIN identity state,
+tracking attributes, Turbo readiness operation, replay queue, fallback, additional
+entrypoint, or HTML cache was added. The background and panel production code did
+not change. README, AGENTS, both relevant skills, and ADR 5 describe the new
+ownership; Decision 2 remains unchanged.
+
+Browser evidence on macOS:
+
+- Installed Chromium (Chrome for Testing 151.0.7922.34): both startup orders
+  passed the shared-runtime gate. Normal document-start registration captured an
+  early inline script's event through MAIN and the production isolated receiver.
+  The deliberately delayed client-first variant captured nothing early, as
+  expected. BFCache restoration retained the stored controller, did not repeat
+  storage, served both definition queries, and captured another frame event.
+- Installed Firefox 156.0: all six combinations of startup order and supported
+  Stimulus global passed using web-ext and a temporary add-on. The gate exercises
+  the production MAIN feature and ContentInspector receiver at its port boundary,
+  not mocked panel APIs. It also retains the storage, definitions, throwing-getter
+  containment, no-script-insertion, and no-unexpected-global assertions.
+- Both installed-browser gates use real page-owned incoming Elements with
+  synthetic Turbo-shaped events. They assert exact HTML/src/ID, epoch timestamps,
+  empty details, oversized omission, and exactly four captures after a 250 ms
+  settling interval. Later page capture, at-target, and bubble listeners see the
+  same original event/newFrame; dispatch return and defaultPrevented preserve
+  normal behavior and intentional page cancellation. This is synthetic event
+  validation, not a real Turbo library integration test.
+- The normal Chromium content-script suite additionally verifies exact pushes
+  through the production content→background→panel port relay. Mutation after
+  dispatch leaves the snapshot unchanged; frame, empty, oversized, isolated load,
+  and isolated click dispatches still total exactly five after 250 ms.
+- Panel rendering tests use mocked extension APIs. The large-HTML test displays
+  script/image markup and omission errors as inert text, checks no embedded DOM
+  or resource requests, pushes 502 rows with near-limit HTML, retains the 500-row
+  cap, reports two dropped events, and clears all rows/details.
+
+Unit verification: 583 tests pass across 31 files. All 31 runtime application lib
+modules are present in the coverage report at 100% statements, branches,
+functions, and lines; only the existing JSDoc-only types exclusion remains.
+Lint, CSS lint, typecheck, and formatting checks pass. Chrome, Firefox, and Safari
+production builds pass. Manifest inspection finds exactly one MAIN script and
+both worlds at document_start in all three outputs, with no web-accessible
+resources. Production content bundles contain no test-only reader/gate or legacy
+injected script. The separate instrumented build retains the production factory
+list plus the existing test reader.
+
+Final Chromium E2E run: 68 passed, with the existing native DevTools-panel
+experiment skipped. Firefox's mocked-panel smoke passes, as does the added
+large-HTML rendering/burst/clear test through its panel adapter. The separate
+installed Firefox runner passes all six cases described above. All commands
+listed in this plan's verification checklist were run; installed browser tests
+needed access outside the filesystem sandbox to start localhost servers and
+temporary browser profiles.
+
+Installed Safari investigation remains paused and its runtime gate outstanding.
+A Safari build is not runtime evidence. Native DevTools-panel clicks remain
+unverified; the direct-panel experiment stays skipped. These limitations prevent
+claiming full browser acceptance despite the completed implementation and the
+Chromium/Firefox evidence above.

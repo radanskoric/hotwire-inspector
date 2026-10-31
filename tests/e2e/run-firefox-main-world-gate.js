@@ -76,6 +76,19 @@ try {
     assert.equal(result.scriptsUnchanged, true);
     assert.equal(result.storedControllerMatches, true);
     assert.equal(result.oneResponsePerRequest, true);
+    assert.deepEqual(result.turbo, {
+      early: result.order.includes("main-first")
+        ? { bridges: 1, pushes: 1 }
+        : { bridges: 0, pushes: 0 },
+      count: 4,
+      snapshot: true,
+      fields: true,
+      target: true,
+      timestamp: true,
+      empty: true,
+      oversized: true,
+      sourceSafety: true,
+    });
     assert.deepEqual(result.definitions, {
       success: true,
       definitions: [

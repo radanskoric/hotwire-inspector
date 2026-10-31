@@ -5,11 +5,16 @@ description: Use when working on Hotwire Inspector's live Turbo event capture �
 
 # Turbo Events capture & rendering
 
-Hotwire Inspector runs a content-script watcher that subscribes to a curated list of Turbo 8.x DOM events on `document`, forwards each fire to the panel over the existing content→background→panel port pipeline, and renders a chronological timeline in the **Turbo Events** tab of the DevTools panel.
+Infer event ownership from `TURBO_EVENT_NAMES`, `MAIN_WORLD_TURBO_EVENT_NAMES`, and `ISOLATED_WORLD_TURBO_EVENT_NAMES` in `lib/turbo-event-watcher.js`. Follow their consumers in `lib/main_world/capture-turbo-events.js` and `ContentInspector.startTurboEventWatcher()` to see where capture runs. 
+
+Keep capture curated and preserve source-event behavior. Read extraction limits and omission behavior in `turboEventDetailsFor`, and wire validation in `lib/turbo-event-bridge.js`. Identity stays isolated, and bridge validation is not authentication.
 
 This skill covers the capture pipeline, the data shape that rides it, and how the panel turns pushes into `.event-box` rows — including how each row can carry an optional set of **details** (URL for `turbo:load` today, more events tomorrow) and how to extend the switch-statement helper for the next event you want enriched.
 
 ## Key files
+
+- `lib/main_world/capture-turbo-events.js` — capture-only MAIN feature under the sole bootstrap; empty RPC operation map.
+- `lib/turbo-event-bridge.js` — pure shape/size parser for one-way MAIN records; reconstructs extension-owned objects before forwarding.
 
 - `lib/turbo-event-watcher.js` — exports `TURBO_EVENT_NAMES` (the curated list) and `TurboEventWatcher` (the document-listener class). The list is the single source of truth — both the watcher and any tests that need to assert coverage import it from here. **Also** exports `turboEventDetailsFor(name, event)` — the switch-statement helper that captures per-event details. The helper is the single source of truth for "what extra fields flow on each event".
 - `lib/constants.js` — `TURBO_EVENT_PUSH_TYPE` (the push-type string `hotwire-inspector:turbo-event`).
@@ -29,6 +34,13 @@ This skill covers the capture pipeline, the data shape that rides it, and how th
 - `tests/e2e/support/panel-fixtures.js` — `turboEventsFixturePush` (no details; default fixture; carries `details: {}`) and `turboEventsWithDetailsFixturePush` (`details: { url: "https://app.test/dashboard" }`).
 
 ## Architecture
+
+For MAIN-owned events, the MAIN watcher/extractor dispatches
+`MAIN_WORLD_TURBO_EVENT_NAME` with curated JSON. ContentInspector's capture-phase
+receiver parses it and resolves identity through the same private helper used by
+the isolated watcher below. Ownership lists prevent duplicate source capture.
+The timeline renders html/htmlError with textContent, retains at most its row cap,
+and clears rows without keeping a separate HTML cache.
 
 ```
 document.dispatchEvent("turbo:load", { detail: { url: "https://app.test/" } }) / Any other turbo:* event
@@ -59,7 +71,15 @@ document.dispatchEvent("turbo:load", { detail: { url: "https://app.test/" } }) /
                                                         └─► Stimulus `eventTargetConnected` → trim + drop + autoscroll
 ```
 
-**Capture-side invariants.** The watcher treats `document` opaquely (anything with `addEventListener`/`removeEventListener` works). It still never reads `event.target` directly — the inspected page's elements remain unreachable. **The push payload is minimal by default** (`{ type, name, timestamp, details: {} }`), and a per-event-name **switch statement** (`turboEventDetailsFor`) is the **only** opt-in path for additional fields. Do not publish the full `event` object on the bus, do not stringify arbitrary `event.detail`, do not let any reader call into page JS.
+**Capture-side invariants.** The watcher treats `document` opaquely (anything with
+add/removeEventListener works). The canonical extractor reads only curated detail
+fields and, for prefetch, the target href. The MAIN bridge uses the source target
+only for dispatch; isolated code resolves identity. Never dump arbitrary detail,
+serialize callbacks or nodes, or modify/cancel source events. A narrow extraction
+catch drops that capture and leaves later captures running. No source references
+are retained after the callback. The push payload is minimal by default
+(`{ type, name, timestamp, details: {} }`); additional fields come only through
+`turboEventDetailsFor`.
 
 **Panel-side invariants.** `addEvent(push)` is the single rendering entry point, where `push` is a full `TurboEventPush`. The watcher, the bridge, the controller, and any future capture sources must all converge on it (the controller may also accept a bare `name` for tests/ergonomics, but treat the push payload as the canonical input). The Stimulus `eventTargetConnected` lifecycle is the single bookkeeping entry point for trim/drop/autoscroll; do not split it across multiple hooks (happy-dom-friendly and ensures connected/disconnected fire uniformly).
 
@@ -68,7 +88,9 @@ document.dispatchEvent("turbo:load", { detail: { url: "https://app.test/" } }) /
 1. Add the string to `TURBO_EVENT_NAMES` in `lib/turbo-event-watcher.js`. Keep the list ordered roughly by Turbo lifecycle phase (visit → fetch → render → streams → morph → submit → prefetch) — it's also the visual order the timeline ends up showing.
 2. Verify it landed: the watcher test asserts the exact list contents; the unit test will fail if you mistype.
 
-That is all. There are no other call sites to update — the watcher, the controller, the test fixtures, and the E2E synthetic dispatcher all read from the same export.
+New names default to isolated ownership through the derived exclusion list.
+Moving ownership to MAIN requires explicit bridge schema validation and real
+installed-browser tests; the watcher, controller, and tests share the registry.
 
 ## Capturing more detail
 
@@ -108,12 +130,14 @@ export function turboEventDetailsFor(name, event) {
 
 Rules for new arms:
 
-- **Pure.** Read `event.detail` only. Never call into page JS, never `JSON.stringify` the entire `detail`, never traverse `event.target` (element identity is handled separately by `ContentInspector.startTurboEventWatcher`).
+- **Curated.** Read only the fields chosen for that event. Prefetch reads target href; frame capture reads the incoming frame's serialized markup in MAIN. Getters can execute page code. Never stringify the entire detail; identity belongs to ContentInspector, separate from extraction.
 - **Defensive against missing fields.** Use optional chaining (`event?.detail?.x`) and check the field's type before assignment. Anything missing or wrong-shape ⇒ **drop the field, do not emit an empty string**. An empty `details` object means "the helper says no details worth showing" and the renderer hides the `<details>` block.
-- **Keys are lowercase.** The helper returns lowercase keys (e.g. `url`); CSS `text-transform: uppercase` on `.event-box-details-key` does the visual uppercase — no need to revisit the helper when adding a key.
+- **Keys are stable strings.** The helper uses keys such as `url`, `newFrameSrc`, and `htmlError`; CSS `text-transform: uppercase` supplies visual labels.
 - **Values are strings.** `details: Record<string, string>`. Coerce non-string values (`String(v)`) before returning, or drop them. The `<dd>` is rendered with `textContent` so markup safety is not a concern; consistency is.
 
-`handleEvent` is unchanged — every event flows through the same call: `details: turboEventDetailsFor(event.type, event)`. The payload stays minimal (`{}`) for events without a case; the renderer hides the `<details>` block in that case.
+`handleEvent` calls `turboEventDetailsFor(event.type, event)` inside a narrow
+try/catch; extraction failures drop only that capture. The payload stays minimal
+(`{}`) for events without a case; MAIN still bridges empty details exactly once.
 
 ### No typedef work required
 
@@ -146,8 +170,8 @@ You do **not** change the renderer to support new details — `TurboEventsContro
 
 ### Don't
 
-- Don't read `event.target` from the helper. Element-tree state stays in the scan pipeline, not the event bus.
-- Don't put the entire `event` object on the bus. The push contract is curated: `name`, `timestamp`, optional `details` keyed by lowercase labels.
+- Don't resolve identity or read arbitrary target properties in the helper. Prefetch's curated href read is the existing exception; identity stays isolated.
+- Don't put the entire `event` object on the bus. The push contract is curated: `name`, `timestamp`, `targetId`, and always-present string-valued `details`.
 - Don't make the helper call into the page JS (`eval`, `fetch`, `inspect`, …). Capture is read-only from the inspected page.
 - Don't stringify the entire `event.detail` "to be safe". If a reader needs raw `detail`, add an arm that picks the specific field to surface, with a typed value; do not fall back to `JSON.stringify`.
 - Don't make the helper part of the constructor signature of `TurboEventWatcher`. It is a module-level pure function; the watcher is a thin pass-through.
@@ -165,7 +189,7 @@ The Turbo event watcher is the template. To capture, say, Stimulus lifecycle eve
 
 ### Boundaries
 
-- The page side must remain untouched. Capture only — never write attributes, never call into the page JS. If the family you want to capture has interesting `event.detail`, write the choice down before encoding it: do you read it, summarize it, or skip it?
+- Capture only — never write tracking attributes or modify source events. Curated page-owned getters may execute page code. If a new family needs detail, choose its specific fields and execution world explicitly.
 - Keep gateway-free capture if you can. The current design is deliberately ungated (start once when the content script starts). A `watchX/startX` handshake is a future optimization, not a v1 requirement; if you add one, mirror its cleanup in `ContentInspector.disconnect()`.
 
 ## Rendering conventions (Turbo Events tab)
@@ -187,7 +211,7 @@ When a `TurboEventPush` carries a non-empty `details` record (see "Capturing mor
 - A native `<details>` element (collapsed by default). Keyboard disclosure (Enter on `<summary>`) is preserved for free.
 - A `<summary>Details</summary>` disclosure label, with a `▶` glyph that rotates on `[open]`.
 - A `<dl class="event-box-details-grid">` containing one `<dt>`/`<dd>` pair per `details` entry. The grid is `display: grid; grid-template-columns: max-content 1fr; gap: 0.125rem 1ch;` — a true two-column layout.
-- `<dt class="event-box-details-key">` is rendered with **lowercase** textContent (because that's what the helper emits), and CSS uppercases it via `text-transform: uppercase`. New keys inherit the styling automatically; no helper change.
+- `<dt class="event-box-details-key">` preserves the helper's key text; 
 - `<dd class="event-box-details-value">` uses `textContent`, so URLs are safe; `overflow-wrap: anywhere` lets long URLs wrap without breaking the row.
 
 **Rules for adding to the block**:
@@ -217,7 +241,7 @@ E2E (`tests/e2e/content-script.spec.js` via `withPanelMessagesListener`):
 
 For richer drill-downs (e.g. JSON view of full detail, payload diffs across pushes of the same name):
 
-- **Keep the timeline cheap.** A timeline row is always one row, always one target. The current `<details>` block is meant for _one-line_ read-only fields, not nested JSON.
+- **Keep the timeline bounded.** A timeline row is always one row, always one target. The current `<details>` block displays scalar strings and bounded frame HTML as inert text, not nested JSON.
 - **Use the details panel.** The existing slide-over (see `details-panel` skill) is the right home for "inspect this event". Dispatch a typed CustomEvent on `document` (e.g. `SHOW_TURBO_EVENT_DETAILS_EVENT`) with a payload identifying the row index / push; subscribe from `DetailsPanelController`. The row acts as a button (Stimulus action click → dispatch event); the panel renders the rich view. This split keeps the timeline rendering simple and the detail surface mature.
 - **Don't auto-open the panel on push.** A timeline that auto-pops on every event is unusable. Render rows; surface "view details" affordance per row; let the user opt in.
 
@@ -240,6 +264,6 @@ For richer drill-downs (e.g. JSON view of full detail, payload diffs across push
 
 ## Boundaries
 
-- The watcher never touches the inspected page DOM. It attaches listeners to `document` only, and only for the names on the curated list. Adding a new event name does not require any change outside `lib/turbo-event-watcher.js`. Removing an event does not require any cleanup elsewhere.
-- The push payload is **minimal by default** (`{ type, name, timestamp, details: {} }`) and grows by opt-in only via the switch statement in `turboEventDetailsFor`. Push shape stays narrow on the wire; the records in `details` are small, intentional, and string-typed.
+- The watcher attaches listeners to document for its ownership list. MAIN and isolated lists are disjoint and cover the full registry. The isolated bridge listener starts synchronously before ports and watchers; tree observation alone waits for DOM readiness. Disconnect removes the exact receiver; MAIN survives BFCache without restarting. No tracking attributes, arbitrary payload dumping, or source-event modification.
+- The push payload is **minimal by default** (`{ type, name, timestamp, details: {} }`) and grows by opt-in only via the switch statement in `turboEventDetailsFor`. Frame records are bounded and string-typed; never dump arbitrary payloads.
 - The Turbo Events tab is **a timeline, not a debugger**. Rows are uniform-one-target apiece; deeper drill-downs belong in the existing details panel, surfaced via a typed CustomEvent from a row-click action.

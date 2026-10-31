@@ -28,7 +28,7 @@ Core tooling currently includes:
   - content script logic for scanning, element lookup, highlighting, and inspect support
   - starts at document_start, installs the MAIN client before watchers/ports, and defers tree observation until DOMContentLoaded while parsing
 - `entrypoints/main-world.content.js`
-  - the single anonymous browser-registered MAIN bootstrap, delegating to `lib/main_world/runtime.js` with the controller-storage and controller-definitions features
+  - the single anonymous browser-registered MAIN bootstrap, delegating to `lib/main_world/runtime.js` with active features listed in that entrypoint
 - `lib/main_world/`
   - shared feature lifecycle, RPC server, and pure wire validation; add future MAIN features here
 - `lib/main-world-client.js`
@@ -51,7 +51,11 @@ Core tooling currently includes:
 - `lib/value-watcher.js`
   - MutationObserver-based Stimulus value watcher; used by the content script for live value streaming
 - `lib/turbo-event-watcher.js`
-  - capture-phase `document` listener for a curated set of Turbo DOM events; pushes each fire over the events port as a `TurboEventPush`
+  - shared capture-phase watcher and canonical detail extraction; exports the full registry and disjoint MAIN/isolated ownership lists
+- `lib/main_world/capture-turbo-events.js`
+  - MAIN-only frame capture, sending curated JSON snapshots through a one-way document bridge
+- `lib/turbo-event-bridge.js`
+  - pure untrusted-record parser; isolated identity and the content port remain the only route to the panel
 - `lib/port-reconnect.js`
   - port reconnection helper with exponential backoff; used by the content script for the events port
 - `lib/panel/controllers/turbo-events-controller.js`
@@ -93,12 +97,13 @@ The extension uses two messaging channels between the panel and the content scri
 
 ### Turbo Events capture
 
-- **What is captured**: a curated list of Turbo 8.x DOM events (`lib/turbo-event-watcher.js` exports `TURBO_EVENT_NAMES`). The list is the single source of truth — both the watcher and any tests that need to assert coverage import it from this module. Add a new event by adding a string to that array; nothing else needs to change.
+- **Ownership**: consult the full registry and world-specific ownership lists in `lib/turbo-event-watcher.js`; each watcher receives its corresponding list.
 - **What is read from each event**: the watcher captures `event.type`, an epoch `Date.now()` timestamp, and curated details via `turboEventDetailsFor`. The content inspector adds `targetId` using existing in-memory identity.
-- **How capture is wired**: `TurboEventWatcher.start()` registers capture-phase (`useCapture: true`) listeners on `document` for each name in the list. `start()` is idempotent; calling it twice is a no-op. `stop()` removes exactly the listeners registered by `start()`. The class treats `document` opaquely — anything with `addEventListener`/`removeEventListener` (including a fake `EventTarget` in unit tests) works.
+- **How capture is wired**: both worlds reuse `TurboEventWatcher` and `turboEventDetailsFor`. Capture uses `Date.now()` epoch milliseconds, contains extraction errors, and never cancels or modifies the source event. Watcher start/stop are idempotent and remove exact capture-phase listeners. The MAIN feature has no RPC operations. Its bubbling JSON event retains a connected source Element as dispatch target, otherwise uses document. The isolated receiver validates it before resolving identity with the existing map.
+- **Bridge lifecycle**: the isolated receiver and RPC client register synchronously before ports and watchers at document start. Tree observation alone waits for DOM readiness. Disconnect removes the exact Turbo listener and RPC client. MAIN listeners survive BFCache; no restart, readiness handshake, replay queue, or new MAIN entrypoint. Both bridges validate shape, not authenticity. See [plan 4](docs/plans/04-main-world-turbo-frame-html.md) for precise limits and browser evidence.
 - **Capture is eager and ungated**: once the content script starts up, the watcher is running for the lifetime of the content script. There is no `watchTurboEvents`/`unwatchTurboEvents` one-shot handshake. This is a deliberate design choice — gating is a future optimization, not a v1 requirement. If you add a handshake, also wire matching cleanup in `ContentInspector.disconnect()`.
 - **Push shape**: `{ type: TURBO_EVENT_PUSH_TYPE, name, timestamp, details, targetId }`. `TURBO_EVENT_PUSH_TYPE` lives in `lib/constants.js`; the `TurboEventPush` typedef lives in `lib/types.js`. The push rides the existing content→background→panel port pipeline.
-- **Panel-side subscription**: `TurboEventsController.connect()` calls `PanelBridge.onTurboEvent(callback)`; the callback drives `addEvent(name)`, which appends one `.event-box`, trims to the cap, increments the dropped-count, and triggers smart autoscroll. The controller's `disconnect()` calls `PanelBridge.offTurboEvent()` to drop further push traffic — without this, a `TURBO_EVENT_PUSH_TYPE` arriving while the controller is between disconnect and reconnect would render into a torn-down subtree.
+- **Panel-side subscription**: `TurboEventsController.connect()` calls `PanelBridge.onTurboEvent(callback)`; the callback drives `addEvent(push)`, which appends one `.event-box`, trims to the cap, increments the dropped-count, and triggers smart autoscroll. The controller's `disconnect()` calls `PanelBridge.offTurboEvent()` to drop further push traffic — without this, a `TURBO_EVENT_PUSH_TYPE` arriving while the controller is between disconnect and reconnect would render into a torn-down subtree.
 - **Rendering**: the cap (default 500), the dropped-count notice, the empty-state placeholder, and smart autoscroll all live in `lib/panel/controllers/turbo-events-controller.js`. The Stimulus target lifecycle (`eventTargetConnected`) is the single bookkeeping entry point — do not split trim/drop/autoscroll into separate hooks.
 
 ## Technical Decisions
@@ -176,3 +181,7 @@ If you change content script message types, the devtools entrypoint, or the pane
 - Prefer minimal, targeted changes.
 - Avoid introducing side effects in inspected pages.
 - Treat `docs/decisions/` as the authoritative record for architectural choices unless intentionally updating those decisions.
+
+## Documentation
+
+Treat source code as the source of truth for details that are easy to infer from it. Link to the relevant source instead of duplicating active feature lists, event ownership, constants, or implementation steps in Markdown. Document rationale, constraints, user-facing behavior, and verification evidence where they add context unavailable from the code.

@@ -4,6 +4,7 @@ import { MainWorldRuntime } from "../../lib/main_world/runtime.js";
 import { createControllerStorage } from "../../lib/main_world/controller-storage.js";
 
 import { createControllerDefinitions } from "../../lib/main_world/controller-definitions.js";
+import { captureTurboEvents } from "../../lib/main_world/capture-turbo-events.js";
 
 const runtimes = [];
 afterEach(() => {
@@ -155,6 +156,7 @@ it("registers one lean anonymous HTTP/HTTPS MAIN bootstrap with no unsolicited g
   expect(start.mock.instances[0].factories).toEqual([
     createControllerStorage,
     createControllerDefinitions,
+    captureTurboEvents,
   ]);
   expect(Object.keys(window)).toEqual(globals);
   expect(document.documentElement.outerHTML).toBe(html);

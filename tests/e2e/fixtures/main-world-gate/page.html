@@ -3,6 +3,29 @@
   <head>
     <meta charset="utf-8" />
     <title>MAIN world browser gate</title>
+    <script>
+      // Ordinary inline page code must already see both production listeners.
+      window.earlyTurboGate = { bridges: 0, pushes: 0 };
+      (() => {
+        const bridge = () => window.earlyTurboGate.bridges++;
+        const push = () => window.earlyTurboGate.pushes++;
+        document.addEventListener(
+          "hotwire-inspector:main-world-turbo-event",
+          bridge,
+        );
+        document.addEventListener("gate:turbo-push", push);
+        document.dispatchEvent(
+          new CustomEvent("turbo:before-frame-render", {
+            detail: { newFrame: document.createElement("turbo-frame") },
+          }),
+        );
+        document.removeEventListener(
+          "hotwire-inspector:main-world-turbo-event",
+          bridge,
+        );
+        document.removeEventListener("gate:turbo-push", push);
+      })();
+    </script>
   </head>
   <body>
     <output id="result">pending</output>

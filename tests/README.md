@@ -14,7 +14,7 @@ They cover pure logic and DOM-level behavior that does not need a real browser e
 
 ## Unit test coverage
 
-Vitest coverage tracks unit-test coverage for source files in `entrypoints/` and `lib/`, including line and branch coverage.
+Vitest coverage tracks all application `lib/**/*.js` files, including line and branch coverage. The JSDoc-only types module is excluded; runtime modules are not.
 
 ```bash
 npm run coverage
@@ -91,7 +91,15 @@ it in Chromium. It verifies both startup orders, scalar extraction from a
 page-owned object through the isolated client, value/outlet definitions, contained metadata failures, controller storage with exact
 instance identity, and no script insertion or unexpected globals during requests.
 Only the requested temp variable is allowed. The test-only reader is absent from
-production builds; the storage and definition services are the real production features. Chromium additionally verifies definition queries after BFCache restoration without repeated storage.
+production builds; storage, definitions, and Turbo capture use the production features.
+Both browsers verify real incoming frame Elements, exact event-time HTML, exclusive
+capture, empty/oversized details, epoch timestamps, source-event safety, and
+document-start capture from an early inline script. The isolated gate observes
+the production ContentInspector receiver at its port boundary; it does not replace
+the parser or MAIN feature. Chromium additionally verifies definition queries and
+Turbo capture after BFCache restoration without repeated storage. The normal
+Chromium content-script suite also verifies full frame pushes through the actual
+background/panel port relay.
 
 Run `node tests/e2e/run-firefox-main-world-gate.js` for the separate installed
 Firefox test. It uses `web-ext` and a fresh temporary profile, with a localhost

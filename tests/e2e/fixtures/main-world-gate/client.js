@@ -1,4 +1,5 @@
 import { MainWorldClient } from "../../../../lib/main-world-client.js";
+import { ContentInspector } from "../../../../lib/content-inspector.js";
 import { validateStoredController } from "../../../../lib/main_world/controller-storage.js";
 import {
   validateValueDefinitions,
@@ -6,6 +7,19 @@ import {
 } from "../../../../lib/main_world/controller-definitions.js";
 
 export function startGateClient(document) {
+  // Observe the production isolated receiver at its port boundary in both browsers.
+  new ContentInspector({
+    document,
+    connectPort: () => ({
+      postMessage(push) {
+        document.dispatchEvent(
+          new CustomEvent("gate:turbo-push", { detail: JSON.stringify(push) }),
+        );
+      },
+      onDisconnect: { addListener() {} },
+      disconnect() {},
+    }),
+  });
   const fields = { selector: "#result", identifier: "fixture" };
   const client = new MainWorldClient(document, {
     storeController: validateStoredController,
