@@ -8,7 +8,7 @@ import {
   SHOW_CONTROLLER_DETAILS_EVENT,
   SHOW_EVENT_ATTRIBUTE_EVENT,
 } from "../../lib/constants.js";
-import { DetailsPanelController } from "../../lib/panel/controllers/details-panel-controller.js";
+import { registerPanelControllers } from "../../lib/panel/controllers/index.js";
 
 const markup = readFileSync("entrypoints/panel/index.html", "utf8");
 const html = "<turbo-frame>\n" + "x".repeat(150) + "</turbo-frame>";
@@ -39,7 +39,8 @@ beforeEach(async () => {
   source = document.createElement("div");
   document.body.appendChild(source);
   bridge = {
-    onValuesChanged() {},
+    onValuesChanged: vi.fn(),
+    offValuesChanged: vi.fn(),
     unwatchControllerValues: vi.fn().mockResolvedValue({ success: true }),
     async controllerValues() {
       return { success: true, values: [] };
@@ -54,7 +55,7 @@ beforeEach(async () => {
   };
   document[PANEL_BRIDGE_PROPERTY] = bridge;
   app = Application.start();
-  app.register("details-panel", DetailsPanelController);
+  registerPanelControllers(app, bridge);
   await settle();
 });
 afterEach(async () => {
@@ -64,10 +65,9 @@ afterEach(async () => {
   delete document[PANEL_BRIDGE_PROPERTY];
 });
 
-describe("Details panel event attributes", () => {
+describe("Details panel payload integration", () => {
   it("opens the selected attribute as inert text with its event name", () => {
     showAttribute();
-    expect(bridge.unwatchControllerValues).toHaveBeenCalledOnce();
     expect(panel.classList.contains("open")).toBe(true);
     expect(panel.querySelector("h2").textContent).toBe(
       "turbo:frame-render — html",
@@ -132,6 +132,9 @@ describe("Details panel event attributes", () => {
     showAttribute();
     showController();
     await settle();
+    source.remove();
+    await settle();
+    expect(panel.classList.contains("open")).toBe(true);
     expect(panel.querySelector("h2").textContent).toBe("hello");
     expect(source.classList.contains("selected")).toBe(false);
     expect(panel.querySelector(".event-attribute-content").textContent).toBe(
@@ -144,6 +147,31 @@ describe("Details panel event attributes", () => {
     panel.remove();
     await settle();
     expect(source.classList.contains("selected")).toBe(false);
+  });
+
+  it("stops live updates when payload details replace controller details", async () => {
+    const receiveValues = bridge.onValuesChanged.mock.calls[0][0];
+    showController();
+    await settle();
+    expect(bridge.watchControllerValues).toHaveBeenCalledOnce();
+
+    showAttribute();
+    expect(bridge.unwatchControllerValues).toHaveBeenCalledOnce();
+    const content = panel.querySelector(
+      "[data-stimulus-controller-details-target='values']",
+    );
+    const previous = content.textContent;
+    receiveValues({
+      id: "node1",
+      identifier: "hello",
+      values: [
+        { name: "late", type: "string", hasValue: true, value: "obsolete" },
+      ],
+    });
+    expect(content.textContent).toBe(previous);
+    expect(panel.querySelector("h2").textContent).toBe(
+      "turbo:frame-render — html",
+    );
   });
 
   it("does not restart controller watches when a pending read finishes in event mode", async () => {

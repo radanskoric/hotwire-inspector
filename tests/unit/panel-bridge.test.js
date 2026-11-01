@@ -428,6 +428,26 @@ describe("PanelBridge", () => {
     expect(callback).toHaveBeenCalledWith(receivedMessage);
   });
 
+  it("offValuesChanged drops subsequent live values pushes", async () => {
+    const port = createFakeExtensionPort();
+    const bridge = new PanelBridge({
+      browserApi: createBrowserApi(
+        () => Promise.resolve({ success: true }),
+        undefined,
+        () => port,
+      ),
+    });
+    const callback = vi.fn();
+    bridge.offValuesChanged();
+    bridge.onValuesChanged(callback);
+    await bridge.watchControllerValues("ctrl-1", "counter");
+    bridge.offValuesChanged();
+    for (const listener of port._listeners.message) {
+      listener({ type: VALUES_CHANGED_PUSH_TYPE, id: "ctrl-1", values: [] });
+    }
+    expect(callback).not.toHaveBeenCalled();
+  });
+
   it("onValuesChanged callback ignores non-values-changed messages", async () => {
     const fakePort = createFakeExtensionPort();
     const browserApi = createBrowserApi(

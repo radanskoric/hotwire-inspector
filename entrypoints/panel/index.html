@@ -97,19 +97,21 @@
         <aside
           id="details-panel"
           class="details-panel"
-          data-controller="details-panel"
-          data-action="hotwire-inspector:show-event-attribute@document->details-panel#showEventAttribute hotwire-inspector:show-controller-details@document->details-panel#show hotwire-inspector:scan-refreshed@document->details-panel#refresh keydown.esc@window->details-panel#close"
+          data-controller="details-panel stimulus-controller-details large-payload-details"
+          data-details-panel-stimulus-controller-details-outlet="#details-panel"
+          data-details-panel-large-payload-details-outlet="#details-panel"
+          data-action="hotwire-inspector:show-event-attribute@document->details-panel#showEventAttribute hotwire-inspector:show-controller-details@document->details-panel#showControllerDetails hotwire-inspector:scan-refreshed@document->stimulus-controller-details#refresh details-panel:close-request->details-panel#close keydown.esc@window->details-panel#close"
           aria-label="Details"
         >
           <header class="details-panel-header">
             <h2
               class="details-panel-title"
-              data-details-panel-target="identifier"
+              data-details-panel-target="title"
             ></h2>
             <button
               type="button"
               class="details-panel-store"
-              data-action="click->details-panel#storeInConsole"
+              data-action="click->stimulus-controller-details#storeInConsole"
               title="Store as global variable"
               aria-label="Store as global variable"
             >
@@ -132,27 +134,27 @@
           <div class="details-panel-body">
             <pre
               class="event-attribute-content"
-              data-details-panel-target="eventContent"
+              data-large-payload-details-target="content"
             ></pre>
             <details class="details-panel-section" open>
               <summary>Values</summary>
               <div
                 class="details-panel-section-content"
-                data-details-panel-target="values"
+                data-stimulus-controller-details-target="values"
               ></div>
             </details>
             <details class="details-panel-section" open>
               <summary>Targets</summary>
               <div
                 class="details-panel-section-content"
-                data-details-panel-target="targets"
+                data-stimulus-controller-details-target="targets"
               ></div>
             </details>
             <details class="details-panel-section" open>
               <summary>Outlets</summary>
               <div
                 class="details-panel-section-content"
-                data-details-panel-target="outlets"
+                data-stimulus-controller-details-target="outlets"
               ></div>
             </details>
           </div>

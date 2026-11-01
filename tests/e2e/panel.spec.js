@@ -885,6 +885,59 @@ test.describe("Panel UI", () => {
     );
   });
 
+  test("switches between controller and large payload details", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        const markup = "<p>Hello</p>\n".repeat(20);
+        await panelPage.locator("label.tab[for='tab-events']").click();
+        await simulateTurboEvent(panelPage, {
+          ...turboEventsFixturePush,
+          targetId: null,
+          details: { html: markup },
+        });
+        const values = panelPage.locator(
+          "#panel-events .event-box-details-value",
+        );
+        await values.locator(".event-more").click();
+        const panel = panelPage.locator("#details-panel");
+        await expect(panel.locator(".event-attribute-content")).toHaveText(
+          markup,
+        );
+        await panelPage.locator("label.tab[for='tab-elements']").click();
+        await panelPage
+          .locator(".node-row")
+          .filter({ hasText: "modal-controller" })
+          .first()
+          .locator(".badge")
+          .filter({ hasText: "modal" })
+          .first()
+          .click();
+        await expect(panel.locator(".details-panel-title")).toHaveText("modal");
+        await expect(panel.locator(".details-panel-store")).toBeVisible();
+        await expect(panel.locator(".event-attribute-content")).toBeEmpty();
+        await expect(panelPage.locator(".event-box.selected")).toHaveCount(0);
+        await clearRecordedMessages(panelPage);
+        await panelPage.locator("label.tab[for='tab-events']").click();
+        await values.locator(".event-more").click();
+        await expect(panel.locator(".event-attribute-content")).toHaveText(
+          markup,
+        );
+        await expect(panel.locator(".details-panel-store")).toBeHidden();
+        expect(await getRecordedMessages(panelPage)).toContainEqual({
+          type: CONTENT_UNWATCH_VALUES_MESSAGE_TYPE,
+        });
+      },
+    );
+  });
+
   test("full frame HTML and omission errors render as inert text through bursts and clear", async ({
     browserName,
     page,

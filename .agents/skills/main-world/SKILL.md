@@ -19,20 +19,6 @@ Use JSON-only validated document RPC through [rpc-server.js](../../../lib/main_w
 
 One-way capture features may use their own typed events: a single entrypoint does not require a universal message bus. Neither bridge is authenticated and MAIN has no extension privileges. Browser registration avoids script-element insertion; equivalent code injected with a script tag has comparable runtime effects, and eager listeners add idle footprint.
 
-Turbo capture has an empty operation map and reuses the shared watcher/extractor
-with the frozen MAIN ownership list. Capture the incoming frame's complete
-outerHTML up to 65,536 UTF-16 units, otherwise emit the explicit omission error;
-src/ID are independently bounded to 8,192. Serialization allocates the full string
-before checking length. Never retain the source event/Element or alter source
-propagation/cancellation. Extraction exceptions drop only that capture.
-Dispatch curated JSON on the connected same-document source Element or document.
-The isolated [Turbo parser](../../../lib/turbo-event-bridge.js) validates the
-one-way record independently of RPC. Its exact listener starts before ports at
-document start and tears down alongside the RPC client; identity stays isolated.
-There is no Turbo readiness RPC, replay queue, or isolated fallback. See
-[plan 4](../../../docs/plans/04-main-world-turbo-frame-html.md) for exact protocol
-limits.
-
 Follow [ADR 5](../../../docs/decisions/5%20-%20shared%20MAIN%20world.md). Use red/green tests, accurate JSDoc, and 100% statements/branches/functions/lines for new lib code, without coverage exclusions. Definition validators reconstruct at most 1,024 entries, with descriptor strings up to 16,384 code units, outlet strings up to 1,024, and JSON defaults nested at most 32 containers. Reject dangerous keys (`__proto__`, `constructor`, `prototype`), unsupported/circular defaults and throwing getters; never silently drop defaults. Server serialization and client parsing enforce the 1 Mi-code-unit response bound. Error results use the shared bounded failure format.
 
 Run real installed-extension boundary tests, not bundle evaluation. The normal Firefox adapter/smoke suite mocks panel APIs and cannot prove MAIN execution. The separate `tests/e2e/run-firefox-main-world-gate.js` installs a temporary add-on with test-only instrumentation and verifies storage and definitions across all three supported globals and both startup orders, including failure containment, no added scripts, and no unexpected globals. Chromium's `main-world-gate.spec.js` also installs the instrumented extension; content-script E2E tests exercise storage, definitions, and live-value pushes through the real extension relay, reloads and navigation. Chromium gate tests query definitions again after BFCache restoration while retaining the exact stored controller without repeating storage. Builds, mocked smoke tests, and skipped tests do not satisfy the browser gate.

@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
 
+import { readFileSync } from "node:fs";
 import { Application } from "@hotwired/stimulus";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DetailsPanelController } from "../../lib/panel/controllers/details-panel-controller.js";
+import { StimulusControllerDetailsController } from "../../lib/panel/controllers/stimulus-controller-details-controller.js";
+import { LargePayloadDetailsController } from "../../lib/panel/controllers/large-payload-details-controller.js";
 import { PanelNodeController } from "../../lib/panel/controllers/panel-node-controller.js";
 import {
   ID_PREFIX,
@@ -12,7 +15,12 @@ import {
   VALUES_CHANGED_PUSH_TYPE,
 } from "../../lib/constants.js";
 
-describe("DetailsPanelController", () => {
+// Flush promise callbacks and Stimulus mutations before asserting on the UI.
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+const markup = readFileSync("entrypoints/panel/index.html", "utf8");
+
+describe("Details panel controller integration", () => {
   let application;
   let calls;
   let panel;
@@ -21,78 +29,27 @@ describe("DetailsPanelController", () => {
   beforeEach(async () => {
     calls = [];
     onValuesChangedCallback = null;
-    document.body.innerHTML = `
-      <template id="notice-template">
-        <div class="status-notice" data-controller="status" role="status" aria-live="polite">
-          <span slot="text"></span>
-        </div>
-      </template>
-      <template id="details-element-row-template">
-        <div class="node">
-          <div
-            class="node-row"
-            data-controller="panel-node"
-            data-panel-node-id-value=""
-            data-action="mouseenter->panel-node#highlight mouseleave->panel-node#clearHighlight"
-          >
-            <img
-              src="/icons/reveal-in-elements.svg"
-              class="icon icon-btn"
-              data-action="click->panel-node#inspect"
-              alt=""
-              aria-hidden="true"
-            />
-            <span class="node-kind"></span>
-            <span class="node-id"></span>
-            <span class="element-name"></span>
-          </div>
-        </div>
-      </template>
-      <aside
-        id="details-panel"
-        data-controller="details-panel"
-        data-action="${SHOW_CONTROLLER_DETAILS_EVENT}@document->details-panel#show ${SCAN_REFRESHED_EVENT}@document->details-panel#refresh keydown.esc@window->details-panel#close"
-        aria-label="Controller details"
-      >
-        <header class="details-panel-header">
-          <h2 class="details-panel-title" data-details-panel-target="identifier"></h2>
-          <button type="button" class="details-panel-store" data-action="click->details-panel#storeInConsole" title="Store as global variable" aria-label="Store as global variable">
-            <img src="/icons/command-line.svg" class="icon" alt="" aria-hidden="true" />
-          </button>
-          <button type="button" class="details-panel-close" data-action="click->details-panel#close" aria-label="Close details">×</button>
-        </header>
-        <div class="details-panel-body">
-          <pre class="event-attribute-content" data-details-panel-target="eventContent"></pre>
-          <details class="details-panel-section" open>
-            <summary>Values</summary>
-            <div class="details-panel-section-content" data-details-panel-target="values"></div>
-          </details>
-          <details class="details-panel-section" open>
-            <summary>Targets</summary>
-            <div class="details-panel-section-content" data-details-panel-target="targets"></div>
-          </details>
-          <details class="details-panel-section" open>
-            <summary>Outlets</summary>
-            <div class="details-panel-section-content" data-details-panel-target="outlets"></div>
-          </details>
-        </div>
-      </aside>
-    `;
+    const template = document.createElement("template");
+    template.innerHTML = markup;
+    document.body.replaceChildren(
+      ...[
+        "notice-template",
+        "details-element-row-template",
+        "details-panel",
+      ].map((id) => template.content.querySelector(`#${id}`)),
+    );
     document[PANEL_BRIDGE_PROPERTY] = {
       storeControllerNode(id, identifier) {
         calls.push(["storeControllerNode", id, identifier]);
         return Promise.resolve({ success: true, name: "temp1", identifier });
       },
-      controllerValues(id, identifier) {
-        calls.push(["controllerValues", id, identifier]);
+      controllerValues() {
         return Promise.resolve({ success: true, values: [] });
       },
-      controllerTargets(id, identifier) {
-        calls.push(["controllerTargets", id, identifier]);
+      controllerTargets() {
         return Promise.resolve({ success: true, targets: [] });
       },
-      controllerOutlets(id, identifier) {
-        calls.push(["controllerOutlets", id, identifier]);
+      controllerOutlets() {
         return Promise.resolve({ success: true, outlets: [] });
       },
       watchControllerValues(id, identifier) {
@@ -111,21 +68,33 @@ describe("DetailsPanelController", () => {
         calls.push(["inspectNode", id]);
         return Promise.resolve();
       },
+      offValuesChanged() {
+        onValuesChangedCallback = null;
+      },
       onValuesChanged(callback) {
         onValuesChangedCallback = callback;
       },
     };
     application = Application.start();
     application.register("details-panel", DetailsPanelController);
+    application.register(
+      "stimulus-controller-details",
+      StimulusControllerDetailsController,
+    );
+    application.register(
+      "large-payload-details",
+      LargePayloadDetailsController,
+    );
     application.register("panel-node", PanelNodeController);
     panel = document.getElementById("details-panel");
 
-    await Promise.resolve();
+    await settle();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    document.body.replaceChildren();
+    await settle();
     application.stop();
-    document.body.innerHTML = "";
     delete document[PANEL_BRIDGE_PROPERTY];
   });
 
@@ -141,8 +110,8 @@ describe("DetailsPanelController", () => {
     );
   }
 
-  function identifierText() {
-    return panel.querySelector("[data-details-panel-target='identifier']")
+  function titleText() {
+    return panel.querySelector("[data-details-panel-target='title']")
       .textContent;
   }
 
@@ -152,62 +121,77 @@ describe("DetailsPanelController", () => {
       .dispatchEvent(new MouseEvent("click", { bubbles: true }));
   }
 
+  it.each([
+    ["controllerValues", "values"],
+    ["controllerTargets", "targets"],
+    ["controllerOutlets", "outlets"],
+  ])(
+    "discards superseded %s responses for the same selection",
+    async (method, section) => {
+      const pending = [];
+      document[PANEL_BRIDGE_PROPERTY][method] = () =>
+        new Promise((resolve) => pending.push(resolve));
+
+      showDetails();
+      scanRefreshed([{ id: "frame-1", controllers: ["modal"] }]);
+      pending[1]({ success: true, [section]: [] });
+      await settle();
+      const container = panel.querySelector(
+        `[data-stimulus-controller-details-target='${section}']`,
+      );
+      const current = container.textContent;
+      calls.length = 0;
+
+      pending[0]({ success: false, error: "Obsolete failure" });
+      await settle();
+
+      expect(container.textContent).toBe(current);
+      expect(
+        calls.filter(([name]) => name === "watchControllerValues"),
+      ).toEqual([]);
+    },
+  );
+
   it("opens the panel with the controller details when a show event is dispatched", async () => {
     showDetails();
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
     expect(panel.classList.contains("open")).toBe(true);
-    expect(identifierText()).toBe("modal");
-    expect(panel.dataset.detailsPanelNodeIdValue).toBe("frame-1");
-    expect(panel.dataset.detailsPanelIdentifierValue).toBe("modal");
-    expect(calls).toEqual([
-      ["controllerValues", "frame-1", "modal"],
-      ["controllerTargets", "frame-1", "modal"],
-      ["controllerOutlets", "frame-1", "modal"],
-      ["watchControllerValues", "frame-1", "modal"],
-    ]);
+    expect(titleText()).toBe("modal");
   });
 
   it("closes the panel when the close button is clicked", async () => {
     showDetails();
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
+    calls.length = 0;
     panel
       .querySelector(".details-panel-close")
       .dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await Promise.resolve();
+    await settle();
 
     expect(panel.classList.contains("open")).toBe(false);
+    expect(calls).toEqual([["unwatchControllerValues"]]);
   });
 
   it("closes the panel when Escape is pressed", async () => {
     showDetails();
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    await Promise.resolve();
+    await settle();
 
     expect(panel.classList.contains("open")).toBe(false);
   });
 
   it("stores the shown controller instance when the store button is clicked", async () => {
     showDetails();
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
     clickStoreButton();
-    await Promise.resolve();
+    await settle();
 
-    expect(calls).toEqual([
-      ["controllerValues", "frame-1", "modal"],
-      ["controllerTargets", "frame-1", "modal"],
-      ["controllerOutlets", "frame-1", "modal"],
-      ["watchControllerValues", "frame-1", "modal"],
-      ["storeControllerNode", "frame-1", "modal"],
-    ]);
+    expect(calls).toContainEqual(["storeControllerNode", "frame-1", "modal"]);
 
     const statusElement = document.querySelector(".status-notice");
     expect(statusElement).not.toBeNull();
@@ -219,20 +203,13 @@ describe("DetailsPanelController", () => {
   it("stores without rendering feedback when the notice template is unavailable", async () => {
     document.getElementById("notice-template").remove();
     showDetails();
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
     clickStoreButton();
-    await Promise.resolve();
+    await settle();
 
     expect(document.querySelector(".status-notice")).toBeNull();
-    expect(calls).toEqual([
-      ["controllerValues", "frame-1", "modal"],
-      ["controllerTargets", "frame-1", "modal"],
-      ["controllerOutlets", "frame-1", "modal"],
-      ["watchControllerValues", "frame-1", "modal"],
-      ["storeControllerNode", "frame-1", "modal"],
-    ]);
+    expect(calls).toContainEqual(["storeControllerNode", "frame-1", "modal"]);
   });
 
   it("shows error feedback in status element on failed controller storage", async () => {
@@ -241,11 +218,10 @@ describe("DetailsPanelController", () => {
       return Promise.resolve({ success: false, error: "Controller not found" });
     };
     showDetails();
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
     clickStoreButton();
-    await Promise.resolve();
+    await settle();
 
     const statusElement = document.querySelector(".status-notice");
     expect(statusElement).not.toBeNull();
@@ -258,11 +234,10 @@ describe("DetailsPanelController", () => {
       return Promise.resolve({ success: false });
     };
     showDetails();
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
     clickStoreButton();
-    await Promise.resolve();
+    await settle();
 
     const statusElement = document.querySelector(".status-notice");
     expect(statusElement).not.toBeNull();
@@ -271,88 +246,87 @@ describe("DetailsPanelController", () => {
 
   it("keeps the panel open when a scan refresh still finds the controller", async () => {
     showDetails();
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
     scanRefreshed([
       { id: "frame-1", tagName: "div", controllers: ["modal", "dropdown"] },
     ]);
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
     expect(panel.classList.contains("open")).toBe(true);
-    expect(identifierText()).toBe("modal");
+    expect(titleText()).toBe("modal");
   });
 
   it("closes the panel when a scan refresh no longer contains the element", async () => {
     showDetails();
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
     scanRefreshed([]);
-    await Promise.resolve();
+    await settle();
 
     expect(panel.classList.contains("open")).toBe(false);
   });
 
   it("closes the panel when a scan refresh finds the element without the controller", async () => {
     showDetails();
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
     scanRefreshed([
       { id: "frame-1", tagName: "div", controllers: ["dropdown"] },
     ]);
-    await Promise.resolve();
+    await settle();
 
     expect(panel.classList.contains("open")).toBe(false);
   });
 
   it("closes the panel when a scan refresh finds the element without controllers", async () => {
     showDetails();
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
     scanRefreshed([{ id: "frame-1", tagName: "div" }]);
-    await Promise.resolve();
+    await settle();
 
     expect(panel.classList.contains("open")).toBe(false);
   });
 
   it("ignores scan refreshes while the panel is closed", async () => {
     scanRefreshed([{ id: "frame-1", tagName: "div", controllers: ["modal"] }]);
-    await Promise.resolve();
+    await settle();
 
     expect(panel.classList.contains("open")).toBe(false);
-    expect(identifierText()).toBe("");
+    expect(titleText()).toBe("");
     expect(calls).toEqual([]);
   });
 
   it("application disconnect calls unwatchControllerValues", async () => {
     showDetails();
-    await Promise.resolve();
-    await Promise.resolve();
+    await settle();
 
     calls.length = 0;
     panel.remove();
-    await Promise.resolve();
+    await settle();
 
     expect(calls).toContainEqual(["unwatchControllerValues"]);
+    expect(onValuesChangedCallback).toBeNull();
   });
 
   it("silently tolerates an unwatch failure during disconnect", async () => {
     document[PANEL_BRIDGE_PROPERTY].unwatchControllerValues = () =>
       Promise.reject(new Error("Disconnected"));
 
+    showDetails();
     panel.remove();
-    await Promise.resolve();
+    await settle();
 
     expect(panel.isConnected).toBe(false);
+    expect(onValuesChangedCallback).toBeNull();
   });
 
   describe("values section", () => {
     function valuesContent() {
-      return panel.querySelector("[data-details-panel-target='values']");
+      return panel.querySelector(
+        "[data-stimulus-controller-details-target='values']",
+      );
     }
 
     const sampleValues = [
@@ -387,16 +361,14 @@ describe("DetailsPanelController", () => {
     ];
 
     function mockValuesResponse(response) {
-      document[PANEL_BRIDGE_PROPERTY].controllerValues = (id, identifier) => {
-        calls.push(["controllerValues", id, identifier]);
+      document[PANEL_BRIDGE_PROPERTY].controllerValues = () => {
         return Promise.resolve(response);
       };
     }
 
     function mockValuesDeferred() {
       const pending = [];
-      document[PANEL_BRIDGE_PROPERTY].controllerValues = (id, identifier) => {
-        calls.push(["controllerValues", id, identifier]);
+      document[PANEL_BRIDGE_PROPERTY].controllerValues = () => {
         return new Promise((resolve) => pending.push(resolve));
       };
       return pending;
@@ -414,8 +386,7 @@ describe("DetailsPanelController", () => {
       mockValuesResponse({ success: true, values: sampleValues });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       const rows = valuesContent().querySelectorAll(".value-row");
       expect(rows).toHaveLength(4);
@@ -443,8 +414,7 @@ describe("DetailsPanelController", () => {
       });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(valuesContent().querySelector(".value-data").textContent).toBe(
         '{"theme":"dark"}',
@@ -455,8 +425,7 @@ describe("DetailsPanelController", () => {
       mockValuesResponse({ success: true, values: sampleValues });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       const rows = valuesContent().querySelectorAll(".value-row");
       expect(rows[2].classList.contains("value-row-unset")).toBe(true);
@@ -465,8 +434,7 @@ describe("DetailsPanelController", () => {
 
     it("shows a note when the controller declares no values", async () => {
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(valuesContent().textContent).toBe("No values declared.");
       expect(valuesContent().classList.contains("values-note")).toBe(true);
@@ -476,8 +444,7 @@ describe("DetailsPanelController", () => {
       mockValuesResponse({ success: false, error: "Controller not found" });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(valuesContent().textContent).toBe("Controller not found");
     });
@@ -486,8 +453,7 @@ describe("DetailsPanelController", () => {
       mockValuesResponse({ success: false });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(valuesContent().textContent).toBe("Controller values failed");
     });
@@ -497,8 +463,7 @@ describe("DetailsPanelController", () => {
         Promise.reject(new Error(""));
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(valuesContent().textContent).toBe("Controller values failed");
     });
@@ -508,8 +473,7 @@ describe("DetailsPanelController", () => {
         Promise.reject(new Error("Could not establish connection"));
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(valuesContent().textContent).toBe(
         "Could not establish connection",
@@ -518,14 +482,12 @@ describe("DetailsPanelController", () => {
 
     it("replaces the note styling when values render after a previous note", async () => {
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
       expect(valuesContent().classList.contains("values-note")).toBe(true);
 
       mockValuesResponse({ success: true, values: sampleValues });
       showDetails({ nodeId: "frame-1", identifier: "modal" });
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(valuesContent().classList.contains("values-note")).toBe(false);
       expect(valuesContent().querySelectorAll(".value-row")).toHaveLength(4);
@@ -538,11 +500,11 @@ describe("DetailsPanelController", () => {
       showDetails({ nodeId: "frame-2", identifier: "dropdown" });
 
       pending[1]({ success: true, values: sampleValues });
-      await Promise.resolve();
+      await settle();
       expect(valuesContent().querySelectorAll(".value-row")).toHaveLength(4);
 
       pending[0]({ success: true, values: [] });
-      await Promise.resolve();
+      await settle();
       expect(valuesContent().querySelectorAll(".value-row")).toHaveLength(4);
     });
 
@@ -555,7 +517,7 @@ describe("DetailsPanelController", () => {
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
       pending[0]({ success: true, values: sampleValues });
-      await Promise.resolve();
+      await settle();
 
       expect(valuesContent().querySelectorAll(".value-row")).toHaveLength(0);
       expect(valuesContent().textContent).toBe("Loading…");
@@ -568,57 +530,52 @@ describe("DetailsPanelController", () => {
       showDetails({ nodeId: "frame-1", identifier: "dropdown" });
 
       pending[1]({ success: true, values: [] });
-      await Promise.resolve();
+      await settle();
 
       pending[0]({ success: true, values: sampleValues });
-      await Promise.resolve();
+      await settle();
 
       expect(valuesContent().textContent).toBe("No values declared.");
     });
 
-    it("refetches values when a scan refresh still finds the controller", async () => {
-      mockValuesResponse({ success: true, values: sampleValues });
-
+    it("updates displayed values after a scan refresh", async () => {
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
+      expect(valuesContent().textContent).toBe("No values declared.");
 
-      scanRefreshed([
-        { id: "frame-1", tagName: "div", controllers: ["modal", "dropdown"] },
-      ]);
-      await Promise.resolve();
-      await Promise.resolve();
+      mockValuesResponse({ success: true, values: sampleValues });
+      scanRefreshed([{ id: "frame-1", controllers: ["modal"] }]);
+      await settle();
 
-      expect(calls).toEqual([
-        ["controllerValues", "frame-1", "modal"],
-        ["controllerTargets", "frame-1", "modal"],
-        ["controllerOutlets", "frame-1", "modal"],
-        ["watchControllerValues", "frame-1", "modal"],
-        ["controllerValues", "frame-1", "modal"],
-        ["controllerTargets", "frame-1", "modal"],
-        ["controllerOutlets", "frame-1", "modal"],
-        ["watchControllerValues", "frame-1", "modal"],
-      ]);
       expect(valuesContent().querySelectorAll(".value-row")).toHaveLength(4);
+      expect(valuesContent().querySelector(".value-data").textContent).toBe(
+        "Greeting",
+      );
     });
 
-    it("show calls watchControllerValues after loadValues completes", async () => {
+    it("starts live watching only after the initial values read completes", async () => {
+      const pending = mockValuesDeferred();
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
+      expect(calls).not.toContainEqual([
+        "watchControllerValues",
+        "frame-1",
+        "modal",
+      ]);
 
-      expect(calls).toEqual([
-        ["controllerValues", "frame-1", "modal"],
-        ["controllerTargets", "frame-1", "modal"],
-        ["controllerOutlets", "frame-1", "modal"],
-        ["watchControllerValues", "frame-1", "modal"],
+      pending[0]({ success: true, values: [] });
+      await settle();
+
+      expect(calls).toContainEqual([
+        "watchControllerValues",
+        "frame-1",
+        "modal",
       ]);
     });
 
     it("renders updated values when a values-changed push arrives with matching id/identifier", async () => {
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       onValuesChangedCallback({
         type: VALUES_CHANGED_PUSH_TYPE,
@@ -634,8 +591,7 @@ describe("DetailsPanelController", () => {
 
     it("ignores values-changed push when id does not match", async () => {
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       onValuesChangedCallback({
         type: VALUES_CHANGED_PUSH_TYPE,
@@ -650,8 +606,7 @@ describe("DetailsPanelController", () => {
 
     it("ignores values-changed push when identifier does not match", async () => {
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       onValuesChangedCallback({
         type: VALUES_CHANGED_PUSH_TYPE,
@@ -666,13 +621,12 @@ describe("DetailsPanelController", () => {
 
     it("ignores values-changed push when panel is closed", async () => {
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       panel
         .querySelector(".details-panel-close")
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      await Promise.resolve();
+      await settle();
 
       onValuesChangedCallback({
         type: VALUES_CHANGED_PUSH_TYPE,
@@ -684,42 +638,20 @@ describe("DetailsPanelController", () => {
       expect(valuesContent().querySelectorAll(".value-row")).toHaveLength(0);
     });
 
-    it("close calls unwatchControllerValues", async () => {
-      showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
-
-      calls.length = 0;
-
-      panel
-        .querySelector(".details-panel-close")
-        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      await Promise.resolve();
-
-      expect(calls).toEqual([["unwatchControllerValues"]]);
-    });
-
     it("refresh while still present re-issues watchControllerValues", async () => {
       mockValuesResponse({ success: true, values: sampleValues });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       calls.length = 0;
 
       scanRefreshed([
         { id: "frame-1", tagName: "div", controllers: ["modal", "dropdown"] },
       ]);
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
-      expect(calls).toEqual([
-        ["controllerValues", "frame-1", "modal"],
-        ["controllerTargets", "frame-1", "modal"],
-        ["controllerOutlets", "frame-1", "modal"],
-        ["watchControllerValues", "frame-1", "modal"],
-      ]);
+      expect(calls).toEqual([["watchControllerValues", "frame-1", "modal"]]);
     });
 
     it("watchControllerValues rejection is tolerated", async () => {
@@ -733,8 +665,7 @@ describe("DetailsPanelController", () => {
       };
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(valuesContent().querySelectorAll(".value-row")).toHaveLength(4);
       expect(calls).toContainEqual([
@@ -747,20 +678,20 @@ describe("DetailsPanelController", () => {
 
   describe("targets section", () => {
     function targetsContent() {
-      return panel.querySelector("[data-details-panel-target='targets']");
+      return panel.querySelector(
+        "[data-stimulus-controller-details-target='targets']",
+      );
     }
 
     function mockTargetsResponse(response) {
-      document[PANEL_BRIDGE_PROPERTY].controllerTargets = (id, identifier) => {
-        calls.push(["controllerTargets", id, identifier]);
+      document[PANEL_BRIDGE_PROPERTY].controllerTargets = () => {
         return Promise.resolve(response);
       };
     }
 
     function mockTargetsDeferred() {
       const pending = [];
-      document[PANEL_BRIDGE_PROPERTY].controllerTargets = (id, identifier) => {
-        calls.push(["controllerTargets", id, identifier]);
+      document[PANEL_BRIDGE_PROPERTY].controllerTargets = () => {
         return new Promise((resolve) => pending.push(resolve));
       };
       return pending;
@@ -785,25 +716,14 @@ describe("DetailsPanelController", () => {
       });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       const rows = targetsContent().querySelectorAll(".node");
       expect(rows).toHaveLength(2);
-      expect(rows[0].querySelector(".node-row").dataset.panelNodeIdValue).toBe(
-        "modal-close",
-      );
       expect(rows[0].querySelector(".node-kind").textContent).toBe("button");
       expect(rows[0].querySelector(".node-id").textContent).toBe("modal-close");
       expect(rows[0].querySelector(".element-name").textContent).toBe(
         "closeButton",
-      );
-      const icon = rows[0].querySelector("img.icon-btn");
-      expect(icon).not.toBeNull();
-      expect(icon.getAttribute("src")).toBe("/icons/reveal-in-elements.svg");
-      expect(icon.getAttribute("alt")).toBe("");
-      expect(icon.getAttribute("data-action")).toBe(
-        "click->panel-node#inspect",
       );
       // Plain target name — no badge style or show-details action.
       expect(
@@ -825,16 +745,10 @@ describe("DetailsPanelController", () => {
       });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       const rows = targetsContent().querySelectorAll(".node");
       expect(rows).toHaveLength(2);
-      // The id still needs to be set on the panel-node data attribute so
-      // the reveal icon can inspect it, just hidden from the user.
-      expect(rows[1].querySelector(".node-row").dataset.panelNodeIdValue).toBe(
-        `${ID_PREFIX}-uuid-1`,
-      );
       expect(rows[1].querySelector(".node-id").hidden).toBe(true);
     });
 
@@ -842,8 +756,7 @@ describe("DetailsPanelController", () => {
       mockTargetsResponse({ success: true, targets: [] });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(targetsContent().textContent).toBe("No targets");
       expect(targetsContent().classList.contains("details-note")).toBe(true);
@@ -857,8 +770,7 @@ describe("DetailsPanelController", () => {
       });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(targetsContent().textContent).toBe("Controller not found");
     });
@@ -867,8 +779,7 @@ describe("DetailsPanelController", () => {
       mockTargetsResponse({ success: false });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(targetsContent().textContent).toBe("Controller targets failed");
     });
@@ -878,8 +789,7 @@ describe("DetailsPanelController", () => {
         Promise.reject(new Error(""));
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(targetsContent().textContent).toBe("Controller targets failed");
     });
@@ -889,8 +799,7 @@ describe("DetailsPanelController", () => {
         Promise.reject(new Error("Could not establish connection"));
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(targetsContent().textContent).toBe(
         "Could not establish connection",
@@ -907,7 +816,7 @@ describe("DetailsPanelController", () => {
         success: true,
         targets: [{ id: "dropdown-item", tagName: "li", name: "item" }],
       });
-      await Promise.resolve();
+      await settle();
       expect(targetsContent().querySelectorAll(".node")).toHaveLength(1);
 
       pending[0]({
@@ -916,12 +825,11 @@ describe("DetailsPanelController", () => {
           { id: "modal-close", tagName: "button", name: "closeButton" },
         ],
       });
-      await Promise.resolve();
+      await settle();
       expect(targetsContent().querySelectorAll(".node")).toHaveLength(1);
-      expect(
-        targetsContent().querySelector(".node .node-row").dataset
-          .panelNodeIdValue,
-      ).toBe("dropdown-item");
+      expect(targetsContent().querySelector(".element-name").textContent).toBe(
+        "item",
+      );
     });
 
     it("ignores a stale targets response after the panel was closed", async () => {
@@ -938,7 +846,7 @@ describe("DetailsPanelController", () => {
           { id: "modal-close", tagName: "button", name: "closeButton" },
         ],
       });
-      await Promise.resolve();
+      await settle();
 
       expect(targetsContent().querySelectorAll(".node")).toHaveLength(0);
       expect(targetsContent().textContent).toBe("Loading…");
@@ -948,8 +856,7 @@ describe("DetailsPanelController", () => {
       mockTargetsResponse({ success: true, targets: [] });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
       expect(targetsContent().classList.contains("details-note")).toBe(true);
 
       mockTargetsResponse({
@@ -959,34 +866,29 @@ describe("DetailsPanelController", () => {
         ],
       });
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(targetsContent().classList.contains("details-note")).toBe(false);
       expect(targetsContent().querySelectorAll(".node")).toHaveLength(1);
     });
 
-    it("refetches targets when a scan refresh still finds the controller", async () => {
-      mockTargetsResponse({ success: true, targets: [] });
-
+    it("updates displayed targets after a scan refresh", async () => {
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
+      expect(targetsContent().textContent).toBe("No targets");
 
-      scanRefreshed([
-        { id: "frame-1", tagName: "div", controllers: ["modal", "dropdown"] },
-      ]);
-      await Promise.resolve();
-      await Promise.resolve();
+      mockTargetsResponse({
+        success: true,
+        targets: [
+          { id: "modal-close", tagName: "button", name: "closeButton" },
+        ],
+      });
+      scanRefreshed([{ id: "frame-1", controllers: ["modal"] }]);
+      await settle();
 
-      const targetCalls = calls.filter(
-        ([name]) => name === "controllerTargets",
+      expect(targetsContent().querySelector(".element-name").textContent).toBe(
+        "closeButton",
       );
-
-      expect(targetCalls).toEqual([
-        ["controllerTargets", "frame-1", "modal"],
-        ["controllerTargets", "frame-1", "modal"],
-      ]);
     });
 
     it("reveal icon sends an inspect message for the row's element key", async () => {
@@ -1003,8 +905,7 @@ describe("DetailsPanelController", () => {
       });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       const inspectCallsBefore = calls.filter(
         ([name]) => name === "inspectNode",
@@ -1016,7 +917,7 @@ describe("DetailsPanelController", () => {
       for (const row of rows) {
         const icon = row.querySelector("img.icon-btn");
         icon.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-        await Promise.resolve();
+        await settle();
       }
 
       const inspectCalls = calls
@@ -1038,16 +939,12 @@ describe("DetailsPanelController", () => {
       });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
-      // Allow Stimulus's MutationObserver to flush and wire up the
-      // dynamic panel-node controller on the inserted row.
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await settle();
 
       const row = targetsContent().querySelector(".node .node-row");
       row.dispatchEvent(new MouseEvent("mouseenter", { bubbles: false }));
       row.dispatchEvent(new MouseEvent("mouseleave", { bubbles: false }));
-      await Promise.resolve();
+      await settle();
 
       const highlightMessages = calls.filter(
         ([name, message]) =>
@@ -1068,20 +965,20 @@ describe("DetailsPanelController", () => {
 
   describe("outlets section", () => {
     function outletsContent() {
-      return panel.querySelector("[data-details-panel-target='outlets']");
+      return panel.querySelector(
+        "[data-stimulus-controller-details-target='outlets']",
+      );
     }
 
     function mockOutletsResponse(response) {
-      document[PANEL_BRIDGE_PROPERTY].controllerOutlets = (id, identifier) => {
-        calls.push(["controllerOutlets", id, identifier]);
+      document[PANEL_BRIDGE_PROPERTY].controllerOutlets = () => {
         return Promise.resolve(response);
       };
     }
 
     function mockOutletsDeferred() {
       const pending = [];
-      document[PANEL_BRIDGE_PROPERTY].controllerOutlets = (id, identifier) => {
-        calls.push(["controllerOutlets", id, identifier]);
+      document[PANEL_BRIDGE_PROPERTY].controllerOutlets = () => {
         return new Promise((resolve) => pending.push(resolve));
       };
       return pending;
@@ -1106,20 +1003,14 @@ describe("DetailsPanelController", () => {
       });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       const rows = outletsContent().querySelectorAll(".node");
       expect(rows).toHaveLength(2);
-      expect(rows[0].querySelector(".node-row").dataset.panelNodeIdValue).toBe(
-        "user-status-element",
-      );
       expect(rows[0].querySelector(".node-kind").textContent).toBe("div");
       const name = rows[0].querySelector(".element-name");
       expect(name.textContent).toBe("user-status");
       expect(name.classList.contains("badge")).toBe(true);
-      expect(name.dataset.controllerIdentifier).toBe("user-status");
-      expect(name.dataset.action).toBe("click->panel-node#showDetails");
     });
 
     it("dispatches SHOW_CONTROLLER_DETAILS_EVENT with the outlet element's nodeId and the outlet name when an outlet badge is clicked", async () => {
@@ -1131,16 +1022,17 @@ describe("DetailsPanelController", () => {
       });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       const showListener = vi.fn();
-      document.addEventListener(SHOW_CONTROLLER_DETAILS_EVENT, showListener);
+      document.addEventListener(SHOW_CONTROLLER_DETAILS_EVENT, showListener, {
+        once: true,
+      });
 
       const outletName = outletsContent().querySelector(".element-name");
       outletName.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-      await Promise.resolve();
+      await settle();
 
       expect(showListener).toHaveBeenCalledTimes(1);
       const detail = showListener.mock.calls[0][0].detail;
@@ -1154,8 +1046,7 @@ describe("DetailsPanelController", () => {
       mockOutletsResponse({ success: true, outlets: [] });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(outletsContent().textContent).toBe("No outlets");
       expect(outletsContent().classList.contains("details-note")).toBe(true);
@@ -1169,8 +1060,7 @@ describe("DetailsPanelController", () => {
       });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(outletsContent().textContent).toBe("Controller not found");
     });
@@ -1179,8 +1069,7 @@ describe("DetailsPanelController", () => {
       mockOutletsResponse({ success: false });
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(outletsContent().textContent).toBe("Controller outlets failed");
     });
@@ -1190,8 +1079,7 @@ describe("DetailsPanelController", () => {
         Promise.reject(new Error(""));
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(outletsContent().textContent).toBe("Controller outlets failed");
     });
@@ -1201,8 +1089,7 @@ describe("DetailsPanelController", () => {
         Promise.reject(new Error("Could not establish connection"));
 
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
 
       expect(outletsContent().textContent).toBe(
         "Could not establish connection",
@@ -1219,19 +1106,18 @@ describe("DetailsPanelController", () => {
         success: true,
         outlets: [{ id: "dropdown-outlet", tagName: "div", name: "menu" }],
       });
-      await Promise.resolve();
+      await settle();
       expect(outletsContent().querySelectorAll(".node")).toHaveLength(1);
 
       pending[0]({
         success: true,
         outlets: [{ id: "modal-outlet", tagName: "div", name: "user-status" }],
       });
-      await Promise.resolve();
+      await settle();
       expect(outletsContent().querySelectorAll(".node")).toHaveLength(1);
-      expect(
-        outletsContent().querySelector(".node .node-row").dataset
-          .panelNodeIdValue,
-      ).toBe("dropdown-outlet");
+      expect(outletsContent().querySelector(".element-name").textContent).toBe(
+        "menu",
+      );
     });
 
     it("ignores a stale outlets response after the panel was closed", async () => {
@@ -1246,33 +1132,27 @@ describe("DetailsPanelController", () => {
         success: true,
         outlets: [{ id: "modal-outlet", tagName: "div", name: "user-status" }],
       });
-      await Promise.resolve();
+      await settle();
 
       expect(outletsContent().querySelectorAll(".node")).toHaveLength(0);
       expect(outletsContent().textContent).toBe("Loading…");
     });
 
-    it("refetches outlets when a scan refresh still finds the controller", async () => {
-      mockOutletsResponse({ success: true, outlets: [] });
-
+    it("updates displayed outlets after a scan refresh", async () => {
       showDetails();
-      await Promise.resolve();
-      await Promise.resolve();
+      await settle();
+      expect(outletsContent().textContent).toBe("No outlets");
 
-      scanRefreshed([
-        { id: "frame-1", tagName: "div", controllers: ["modal", "dropdown"] },
-      ]);
-      await Promise.resolve();
-      await Promise.resolve();
+      mockOutletsResponse({
+        success: true,
+        outlets: [{ id: "menu-element", tagName: "nav", name: "menu" }],
+      });
+      scanRefreshed([{ id: "frame-1", controllers: ["modal"] }]);
+      await settle();
 
-      const outletCalls = calls.filter(
-        ([name]) => name === "controllerOutlets",
+      expect(outletsContent().querySelector(".element-name").textContent).toBe(
+        "menu",
       );
-
-      expect(outletCalls).toEqual([
-        ["controllerOutlets", "frame-1", "modal"],
-        ["controllerOutlets", "frame-1", "modal"],
-      ]);
     });
   });
 });
