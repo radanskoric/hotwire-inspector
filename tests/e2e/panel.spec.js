@@ -854,7 +854,7 @@ test.describe("Panel UI", () => {
     );
   });
 
-  test("turbo event details block renders URL inside the collapsed details panel", async ({
+  test("turbo event attributes render immediately", async ({
     browserName,
     page,
   }) => {
@@ -874,11 +874,8 @@ test.describe("Panel UI", () => {
           .locator("#panel-events .event-box .event-box-details")
           .first();
         await expect(details).toHaveCount(1);
-        await expect(details).toHaveJSProperty("tagName", "DETAILS");
-        await expect(details).not.toHaveAttribute("open");
-
-        await details.locator("summary").click();
-        await expect(details).toHaveAttribute("open");
+        await expect(details).toBeVisible();
+        await expect(details.locator("summary")).toHaveCount(0);
 
         const key = details.locator(".event-box-details-key").first();
         const value = details.locator(".event-box-details-value").first();
@@ -916,7 +913,22 @@ test.describe("Panel UI", () => {
         const values = panelPage.locator(
           "#panel-events .event-box-details-value",
         );
-        await expect(values).toHaveText([markup]);
+        await expect(values).toHaveText([markup.slice(0, 140) + "... more"]);
+        await values.locator(".event-more").click();
+        const panel = panelPage.locator("#details-panel");
+        await expect(panel).toHaveClass(/open/);
+        await expect(panel.locator(".details-panel-title")).toHaveText(
+          `${turboEventsFixturePush.name} — html`,
+        );
+        await expect(panel.locator(".event-attribute-content")).toHaveText(
+          markup,
+        );
+        await expect(panel.locator(".details-panel-store")).toBeHidden();
+        await expect(
+          panel.locator(".details-panel-section").first(),
+        ).toBeHidden();
+        await expect(panelPage.locator(".event-box.selected")).toHaveCount(1);
+        await expect(values).toHaveCSS("white-space", "pre-wrap");
         await expect(
           panelPage.locator(
             "#panel-events .event-box-details script, #panel-events .event-box-details img",
@@ -927,7 +939,10 @@ test.describe("Panel UI", () => {
         ).toBeUndefined();
         const error = "HTML omitted: exceeds 65536 code units";
         await pushDetails({ htmlError: error });
-        await expect(values).toHaveText([markup, error]);
+        await expect(values).toHaveText([
+          markup.slice(0, 140) + "... more",
+          error,
+        ]);
         for (let index = 0; index < 500; index++) {
           await pushDetails({ html: markup });
         }
@@ -937,12 +952,17 @@ test.describe("Panel UI", () => {
         await expect(
           panelPage.locator("#panel-events .events-dropped-notice"),
         ).toContainText("2");
+        await expect(panel).not.toHaveClass(/open/);
+        await expect(panel.locator(".event-attribute-content")).toBeEmpty();
+        await values.last().locator(".event-more").click();
+        await expect(panel).toHaveClass(/open/);
         expect(requests).toEqual([]);
         await panelPage.locator("#panel-events .events-clear").click();
         await expect(panelPage.locator("#panel-events .event-box")).toHaveCount(
           0,
         );
         await expect(values).toHaveCount(0);
+        await expect(panel).not.toHaveClass(/open/);
       },
     );
   });

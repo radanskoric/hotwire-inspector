@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PANEL_BRIDGE_PROPERTY,
   TURBO_EVENT_PUSH_TYPE,
+  SHOW_EVENT_ATTRIBUTE_EVENT,
 } from "../../lib/constants.js";
 import { TurboEventsController } from "../../lib/panel/controllers/turbo-events-controller.js";
 
@@ -58,12 +59,12 @@ function mountDom() {
       data-controller="turbo-events"
     >
       <div class="events-header">
-        <a
-          href="#"
-          class="events-clear"
+        <button
+          type="button"
+          class="btn btn-small events-clear"
           data-turbo-events-target="clear"
-          data-action="click->turbo-events#clear:prevent"
-        >Clear</a>
+          data-action="click->turbo-events#clear"
+        >Clear</button>
       </div>
       <p
         class="events-dropped-notice"
@@ -702,94 +703,70 @@ describe("TurboEventsController", () => {
     expect(box.querySelector(".event-reveal")).toBeNull();
   });
 
-  it("createEventBox omits details block when details is empty", () => {
-    const box = controller.createEventBox({
+  it("omits attributes when an incoming event has no captured details", async () => {
+    bridge._onTurboEvent({
       type: TURBO_EVENT_PUSH_TYPE,
       name: "turbo:render",
-      timestamp: 1700000000000,
+      timestamp: 0,
       targetId: null,
       details: {},
     });
-
-    expect(box.querySelector(".event-box-details")).toBeNull();
+    await flushTargetLifecycle();
+    expect(elements.list.querySelector(".event-box-details")).toBeNull();
   });
 
-  it("createEventBox renders a closed details block when details has entries", () => {
-    const box = controller.createEventBox({
-      type: TURBO_EVENT_PUSH_TYPE,
-      name: "turbo:load",
-      timestamp: 1700000000000,
-      targetId: null,
-      details: { url: "https://app.test/dashboard" },
-    });
-
-    const details = box.querySelector(".event-box-details");
-    expect(details).not.toBeNull();
-    expect(details?.tagName).toBe("DETAILS");
-    expect(details?.hasAttribute("open")).toBe(false);
-
-    const summary = details?.querySelector("summary");
-    expect(summary?.textContent).toBe("Details");
-
-    const grid = details?.querySelector(".event-box-details-grid");
-    expect(grid?.tagName).toBe("DL");
-
-    const key = details?.querySelector(".event-box-details-key");
-    expect(key?.tagName).toBe("DT");
-    expect(key?.textContent).toBe("url");
-    expect(key?.classList.contains("event-box-details-key")).toBe(true);
-
-    const value = details?.querySelector(".event-box-details-value");
-    expect(value?.tagName).toBe("DD");
-    expect(value?.textContent).toBe("https://app.test/dashboard");
-  });
-
-  it("createEventBox renders one row per detail when details has multiple keys", () => {
-    const box = controller.createEventBox({
-      type: TURBO_EVENT_PUSH_TYPE,
-      name: "turbo:load",
-      timestamp: 1700000000000,
-      targetId: null,
-      details: {
-        url: "https://app.test/dashboard",
-        frame: "main",
-      },
-    });
-
-    const details = /** @type {HTMLElement} */ (
-      box.querySelector(".event-box-details")
-    );
-    const rows = details.querySelectorAll(".event-box-details-grid > dt");
-    expect(rows).toHaveLength(2);
-
-    const keys = Array.from(rows).map((dt) => dt.textContent);
-    expect(keys).toEqual(["url", "frame"]);
-
-    const values = Array.from(
-      /** @type {NodeListOf<HTMLElement>} */ (
-        details.querySelectorAll(".event-box-details-grid > dd")
-      ),
-    ).map((dd) => dd.textContent);
-    expect(values).toEqual(["https://app.test/dashboard", "main"]);
-  });
-
-  it("bridge-driven push with details renders a closed details block", async () => {
+  it("renders named attributes immediately and truncates only values over 140 characters", async () => {
+    const html = "<turbo-frame>\n" + "x".repeat(150) + "</turbo-frame>";
     bridge._onTurboEvent({
       type: TURBO_EVENT_PUSH_TYPE,
-      name: "turbo:load",
-      timestamp: 1700000000000,
+      name: "turbo:frame-render",
+      timestamp: 0,
       targetId: null,
-      details: { url: "https://app.test/x" },
+      details: { short: "a".repeat(139), boundary: "b".repeat(140), html },
     });
     await flushTargetLifecycle();
+    expect(elements.list.querySelector("details")).toBeNull();
+    expect(
+      Array.from(
+        elements.list.querySelectorAll("dt"),
+        (term) => term.textContent,
+      ),
+    ).toEqual(["short", "boundary", "html"]);
+    expect(
+      Array.from(
+        elements.list.querySelectorAll("dd"),
+        (value) => value.textContent,
+      ),
+    ).toEqual([
+      "a".repeat(139),
+      "b".repeat(140),
+      html.slice(0, 140) + "... more",
+    ]);
+    expect(elements.list.querySelectorAll(".event-more")).toHaveLength(1);
+  });
 
-    const [box] = controller.eventTargets;
-    const details = box.querySelector(".event-box-details");
-    expect(details).not.toBeNull();
-    expect(details?.hasAttribute("open")).toBe(false);
-    expect(details?.querySelector(".event-box-details-value").textContent).toBe(
-      "https://app.test/x",
-    );
+  it("requests the full selected attribute when more is clicked", async () => {
+    const html = "<turbo-frame>" + "x".repeat(150) + "</turbo-frame>";
+    bridge._onTurboEvent({
+      type: TURBO_EVENT_PUSH_TYPE,
+      name: "turbo:frame-render",
+      timestamp: 0,
+      targetId: null,
+      details: { html },
+    });
+    await flushTargetLifecycle();
+    const onShow = vi.fn();
+    document.addEventListener(SHOW_EVENT_ATTRIBUTE_EVENT, onShow, {
+      once: true,
+    });
+    elements.list.querySelector(".event-more").click();
+    expect(onShow).toHaveBeenCalledOnce();
+    expect(onShow.mock.calls[0][0].detail).toEqual({
+      source: elements.list.querySelector(".event-box"),
+      name: "turbo:frame-render",
+      attribute: "html",
+      value: html,
+    });
   });
 
   it("exposes the clear target so a click handler can be wired to it", () => {
@@ -888,12 +865,12 @@ describe("TurboEventsController without tab radio wiring", () => {
       data-controller="turbo-events"
     >
       <div class="events-header">
-        <a
-          href="#"
-          class="events-clear"
+        <button
+          type="button"
+          class="btn btn-small events-clear"
           data-turbo-events-target="clear"
-          data-action="click->turbo-events#clear:prevent"
-        >Clear</a>
+          data-action="click->turbo-events#clear"
+        >Clear</button>
       </div>
       <p
         class="events-dropped-notice"

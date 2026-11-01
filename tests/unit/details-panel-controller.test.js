@@ -62,6 +62,7 @@ describe("DetailsPanelController", () => {
           <button type="button" class="details-panel-close" data-action="click->details-panel#close" aria-label="Close details">×</button>
         </header>
         <div class="details-panel-body">
+          <pre class="event-attribute-content" data-details-panel-target="eventContent"></pre>
           <details class="details-panel-section" open>
             <summary>Values</summary>
             <div class="details-panel-section-content" data-details-panel-target="values"></div>

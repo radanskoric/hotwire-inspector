@@ -30,7 +30,7 @@
           </label>
           <button
             id="refresh-button"
-            class="btn"
+            class="btn btn-large"
             type="button"
             title="Refresh"
             aria-label="Refresh"
@@ -71,13 +71,14 @@
             data-controller="turbo-events"
           >
             <div class="events-header">
-              <a
-                href="#"
-                class="events-clear"
+              <button
+                type="button"
+                class="btn btn-small events-clear"
                 data-turbo-events-target="clear"
-                data-action="click->turbo-events#clear:prevent"
-                >Clear</a
+                data-action="click->turbo-events#clear"
               >
+                Clear
+              </button>
             </div>
             <p
               class="events-dropped-notice"
@@ -97,8 +98,8 @@
           id="details-panel"
           class="details-panel"
           data-controller="details-panel"
-          data-action="hotwire-inspector:show-controller-details@document->details-panel#show hotwire-inspector:scan-refreshed@document->details-panel#refresh keydown.esc@window->details-panel#close"
-          aria-label="Controller details"
+          data-action="hotwire-inspector:show-event-attribute@document->details-panel#showEventAttribute hotwire-inspector:show-controller-details@document->details-panel#show hotwire-inspector:scan-refreshed@document->details-panel#refresh keydown.esc@window->details-panel#close"
+          aria-label="Details"
         >
           <header class="details-panel-header">
             <h2
@@ -129,6 +130,10 @@
             </button>
           </header>
           <div class="details-panel-body">
+            <pre
+              class="event-attribute-content"
+              data-details-panel-target="eventContent"
+            ></pre>
             <details class="details-panel-section" open>
               <summary>Values</summary>
               <div
