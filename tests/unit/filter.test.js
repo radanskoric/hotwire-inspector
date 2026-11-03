@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ControllerFilter } from "../../lib/panel/controller-filter.js";
+import { Filter } from "../../lib/panel/filter.js";
 
 let filter;
 const combo = () => document.querySelector('[role="combobox"]');
@@ -16,7 +16,7 @@ function mount(
   document.body.innerHTML =
     '<select multiple aria-label="Filter controllers"></select><button id="next">Next</button>';
   const changes = [];
-  filter = new ControllerFilter(document.querySelector("select"), (values) =>
+  filter = new Filter(document.querySelector("select"), (values) =>
     changes.push(values),
   );
   filter.update(identifiers, selected);

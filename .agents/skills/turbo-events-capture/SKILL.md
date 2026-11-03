@@ -5,7 +5,7 @@ description: Use when working on Hotwire Inspector's live Turbo event capture �
 
 # Turbo Events capture & rendering
 
-Infer event ownership from `TURBO_EVENT_NAMES`, `MAIN_WORLD_TURBO_EVENT_NAMES`, and `ISOLATED_WORLD_TURBO_EVENT_NAMES` in `lib/turbo-event-watcher.js`. Follow their consumers in `lib/main_world/capture-turbo-events.js` and `ContentInspector.startTurboEventWatcher()` to see where capture runs. 
+Infer event ownership from `TURBO_EVENT_NAMES`, `MAIN_WORLD_TURBO_EVENT_NAMES`, and `ISOLATED_WORLD_TURBO_EVENT_NAMES` in `lib/turbo-event-watcher.js`. Follow their consumers in `lib/main_world/capture-turbo-events.js` and `ContentInspector.startTurboEventWatcher()` to see where capture runs.
 
 Keep capture curated and preserve source-event behavior. Read extraction limits and omission behavior in `turboEventDetailsFor`, and wire validation in `lib/turbo-event-bridge.js`. Identity stays isolated, and bridge validation is not authentication.
 
@@ -211,7 +211,7 @@ When a `TurboEventPush` carries a non-empty `details` record (see "Capturing mor
 - A native `<details>` element (collapsed by default). Keyboard disclosure (Enter on `<summary>`) is preserved for free.
 - A `<summary>Details</summary>` disclosure label, with a `▶` glyph that rotates on `[open]`.
 - A `<dl class="event-box-details-grid">` containing one `<dt>`/`<dd>` pair per `details` entry. The grid is `display: grid; grid-template-columns: max-content 1fr; gap: 0.125rem 1ch;` — a true two-column layout.
-- `<dt class="event-box-details-key">` preserves the helper's key text; 
+- `<dt class="event-box-details-key">` preserves the helper's key text;
 - `<dd class="event-box-details-value">` uses `textContent`, so URLs are safe; `overflow-wrap: anywhere` lets long URLs wrap without breaking the row.
 
 **Rules for adding to the block**:

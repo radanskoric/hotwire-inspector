@@ -705,7 +705,7 @@ export function withExpectedDetailsPanelPinnedOnScroll(
 
     const beforeScroll = await detailsPanel.boundingBox();
 
-    const filter = panelPage.locator(".controller-filter");
+    const filter = panelPage.locator(".filter");
     const filterBeforeScroll = await filter.boundingBox();
     const treeArea = panelPage.locator("#tree");
     await treeArea.evaluate((element) =>
