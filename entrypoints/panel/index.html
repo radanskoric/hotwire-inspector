@@ -60,6 +60,16 @@
             <label class="tab" for="tab-events">Turbo Events</label>
           </fieldset>
           <section class="tab-panel" id="panel-elements">
+            <div class="controller-filter">
+              <label class="visually-hidden" for="controller-filter"
+                >Filter controllers</label
+              >
+              <select
+                id="controller-filter"
+                multiple
+                aria-label="Filter controllers"
+              ></select>
+            </div>
             <div id="empty-state" class="empty-state" hidden>
               No turbo frames or Stimulus controllers found.
             </div>

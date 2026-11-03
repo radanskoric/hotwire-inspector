@@ -84,6 +84,188 @@ async function withPanel(adapter, page, options, testBody) {
 }
 
 test.describe("Panel UI", () => {
+  test("filters controller attachments with a compact searchable combobox", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        const combo = panelPage.getByRole("combobox", {
+          name: "Filter controllers",
+        });
+        await expect(combo).toContainText("All controllers (3)");
+        await openDetailsPanel(panelPage, "modal-controller", "modal");
+        await combo.click();
+        await expect(panelPage.locator(".ts-dropdown .option")).toHaveText([
+          "dropdown",
+          "modal",
+          "sidebar",
+        ]);
+        await panelPage
+          .locator('.ts-dropdown .option[data-value="modal"]')
+          .click();
+        await expect(panelPage.locator("#details-panel")).not.toHaveClass(
+          /open/,
+        );
+        await expect(panelPage.locator("#tree .badge")).toHaveText([
+          "sidebar",
+          "dropdown",
+          "sidebar",
+        ]);
+        await expect(panelPage.locator("#tree .target-badge")).toHaveText([
+          "dropdown#item",
+        ]);
+        await expect(panelPage.locator("#summary")).toHaveText(
+          "2 frames, 3 of 4 controllers",
+        );
+        await panelPage
+          .getByRole("searchbox", { name: "Search controllers" })
+          .fill("side");
+        await expect(panelPage.locator(".ts-dropdown .option")).toHaveText([
+          "sidebar",
+        ]);
+        await panelPage
+          .getByRole("button", { name: "Clear all", exact: true })
+          .click();
+        await expect(combo).toContainText("No controllers selected");
+        await expect(panelPage.locator("#tree .node")).toHaveCount(2);
+        await panelPage
+          .getByRole("button", { name: "Select all", exact: true })
+          .click();
+        await expect(combo).toContainText("All controllers (3)");
+        await expect(panelPage.locator("#tree .node")).toHaveCount(5);
+        await expect(panelPage.locator("#details-panel")).not.toHaveClass(
+          /open/,
+        );
+        await panelPage
+          .getByRole("searchbox", { name: "Search controllers" })
+          .press("Tab");
+        await expect(
+          panelPage.getByRole("button", { name: "Select all", exact: true }),
+        ).toBeFocused();
+        await panelPage.keyboard.press("Tab");
+        await expect(
+          panelPage.getByRole("button", { name: "Clear all", exact: true }),
+        ).toBeFocused();
+        await panelPage.keyboard.press("Escape");
+        await expect(combo).toBeFocused();
+        await expect(combo).toHaveAttribute("aria-expanded", "false");
+        await panelPage.locator('label[for="tab-events"]').click();
+        await expect(combo).toBeHidden();
+      },
+    );
+  });
+
+  test.describe("controller filter persistence", () => {
+    async function withClearedFilter(browserName, page, options, testBody) {
+      const adapter = adaptersByBrowserName[browserName];
+      test.skip(!adapter, `${browserName} does not have a panel adapter`);
+      await withPanel(adapter, page, options, async (panelPage) => {
+        const combo = panelPage.getByRole("combobox", {
+          name: "Filter controllers",
+        });
+        await combo.click();
+        await panelPage
+          .getByRole("button", { name: "Clear all", exact: true })
+          .click();
+        await expect(combo).toContainText("No controllers selected");
+        await testBody(panelPage, combo);
+      });
+    }
+
+    test("preserves choices through refresh", async ({ browserName, page }) => {
+      await withClearedFilter(
+        browserName,
+        page,
+        {
+          scanResponses: [
+            fixtureScanResponse,
+            {
+              items: [
+                ...fixtureScanResponse.items,
+                { id: "new-frame", parentId: null, tagName: "turbo-frame" },
+              ],
+            },
+          ],
+        },
+        async (panelPage, combo) => {
+          await panelPage
+            .getByRole("button", { name: "Refresh", exact: true })
+            .click();
+          await expect(combo).toContainText("No controllers selected");
+          await expect(panelPage.locator("#tree .badge")).toHaveCount(0);
+          await expect(panelPage.locator("#tree .node")).toHaveCount(3);
+        },
+      );
+    });
+
+    test("preserves choices through tab switches", async ({
+      browserName,
+      page,
+    }) => {
+      await withClearedFilter(
+        browserName,
+        page,
+        { scanResponse: fixtureScanResponse },
+        async (panelPage, combo) => {
+          await panelPage.locator('label[for="tab-events"]').click();
+          await panelPage.locator('label[for="tab-elements"]').click();
+          await expect(combo).toContainText("No controllers selected");
+          await expect(panelPage.locator("#tree .badge")).toHaveCount(0);
+        },
+      );
+    });
+
+    test("selects newly discovered identifiers", async ({
+      browserName,
+      page,
+    }) => {
+      const updated = {
+        items: [
+          ...fixtureScanResponse.items,
+          {
+            id: "new-controller",
+            parentId: null,
+            tagName: "div",
+            controllers: ["new"],
+          },
+        ],
+      };
+      await withClearedFilter(
+        browserName,
+        page,
+        { scanResponses: [fixtureScanResponse, updated] },
+        async (panelPage, combo) => {
+          await panelPage
+            .getByRole("button", { name: "Refresh", exact: true })
+            .click();
+          await expect(combo).toContainText("1 of 4 controllers");
+          await expect(panelPage.locator("#tree .badge")).toHaveText(["new"]);
+        },
+      );
+    });
+
+    test("resets choices on navigation", async ({ browserName, page }) => {
+      await withClearedFilter(
+        browserName,
+        page,
+        { scanResponse: fixtureScanResponse },
+        async (panelPage, combo) => {
+          await panelPage.evaluate(() =>
+            globalThis.__hotwireInspectorNavigate("https://example.com/next"),
+          );
+          await expect(combo).toContainText("All controllers (3)");
+          await expect(panelPage.locator("#tree .badge")).toHaveCount(4);
+        },
+      );
+    });
+  });
+
   test("renders heading and summary", async ({ browserName, page }) => {
     const adapter = adaptersByBrowserName[browserName];
     test.skip(!adapter, `${browserName} does not have a panel adapter`);

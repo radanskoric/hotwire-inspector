@@ -56,7 +56,15 @@ export async function addMockPanelApis(
         localStorage.setItem("hotwire-inspector.theme", persistedTheme);
       }
 
+      const navigationListeners = [];
+      globalThis.__hotwireInspectorNavigate = (url) =>
+        navigationListeners.forEach((callback) => callback(url));
       browser.devtools = {
+        network: {
+          onNavigated: {
+            addListener: (callback) => navigationListeners.push(callback),
+          },
+        },
         inspectedWindow: {
           tabId: 1,
           eval: (code, callback) => {
@@ -697,7 +705,9 @@ export function withExpectedDetailsPanelPinnedOnScroll(
 
     const beforeScroll = await detailsPanel.boundingBox();
 
-    const treeArea = panelPage.locator("#panel-elements");
+    const filter = panelPage.locator(".controller-filter");
+    const filterBeforeScroll = await filter.boundingBox();
+    const treeArea = panelPage.locator("#tree");
     await treeArea.evaluate((element) =>
       element.scrollTo(0, element.scrollHeight),
     );
@@ -709,6 +719,7 @@ export function withExpectedDetailsPanelPinnedOnScroll(
 
     const afterScroll = await detailsPanel.boundingBox();
     expect(afterScroll.y).toBe(beforeScroll.y);
+    expect((await filter.boundingBox()).y).toBe(filterBeforeScroll.y);
     await expect(detailsPanel).toBeVisible();
   };
 }

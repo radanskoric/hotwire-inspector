@@ -198,6 +198,169 @@ describe("PanelApp", () => {
     document.body.innerHTML = "";
   });
 
+  describe("controller filtering", () => {
+    let app;
+
+    beforeEach(() => {
+      app = createFrameApp();
+      const items = [
+        {
+          id: "frame",
+          parentId: null,
+          tagName: "turbo-frame",
+          controllers: [],
+        },
+        {
+          id: "outer",
+          parentId: "frame",
+          tagName: "div",
+          controllers: ["modal"],
+        },
+        {
+          id: "child",
+          parentId: "outer",
+          tagName: "div",
+          controllers: ["menu", "modal"],
+          targets: [{ controller: "modal", name: "x" }],
+        },
+        {
+          id: "target",
+          parentId: "child",
+          tagName: "button",
+          controllers: [],
+          targets: [{ controller: "menu", name: "button" }],
+        },
+      ];
+      app.renderTree(items);
+    });
+
+    it("filters controller badges and updates the summary", () => {
+      app.setControllers(["menu"]);
+      expect(
+        [...treeElement.querySelectorAll(".badge")].map((el) => el.textContent),
+      ).toEqual(["menu"]);
+      expect(summaryElement.textContent).toBe("1 frames, 1 of 3 controllers");
+    });
+
+    it("filters target badges", () => {
+      app.setControllers(["menu"]);
+      expect(
+        [...treeElement.querySelectorAll(".target-badge")].map(
+          (el) => el.textContent,
+        ),
+      ).toEqual(["menu#button"]);
+    });
+
+    it("reconnects children past hidden ancestors", () => {
+      app.setControllers(["menu"]);
+      expect(treeElement.querySelector('[data-node-id="outer"]')).toBeNull();
+      expect(
+        treeElement.querySelector(
+          '[data-node-id="frame"] > .node-children > [data-node-id="child"]',
+        ),
+      ).not.toBeNull();
+    });
+
+    it("notifies details listeners with the filtered scan", () => {
+      const events = [];
+      document.addEventListener(
+        SCAN_REFRESHED_EVENT,
+        (event) => events.push(event.detail),
+        { once: true },
+      );
+      app.setControllers(["menu"]);
+      expect(
+        events[0].items.find((item) => item.id === "child").controllers,
+      ).toEqual(["menu"]);
+    });
+
+    it("retains hidden rows' collapsed and expanded state", () => {
+      treeElement
+        .querySelector('[data-node-id="outer"]')
+        .classList.remove("expanded");
+      app.setControllers(["menu"]);
+      app.setControllers(["menu", "modal"]);
+      expect(
+        treeElement
+          .querySelector('[data-node-id="outer"]')
+          .classList.contains("expanded"),
+      ).toBe(false);
+      treeElement
+        .querySelector('[data-node-id="outer"]')
+        .classList.add("expanded");
+      app.setControllers([]);
+      expect(treeElement.querySelectorAll(".node")).toHaveLength(1);
+      app.setControllers(["menu", "modal"]);
+      expect(
+        treeElement
+          .querySelector('[data-node-id="outer"]')
+          .classList.contains("expanded"),
+      ).toBe(true);
+    });
+  });
+
+  it("remembers exclusions across absence and selects newly discovered identifiers", () => {
+    const app = createFrameApp();
+    const controller = (name) => ({
+      id: name,
+      tagName: "div",
+      parentId: null,
+      controllers: [name],
+    });
+    app.renderTree([controller("menu")]);
+    app.setControllers([]);
+    expect(emptyStateElement.textContent).toContain(
+      "No elements match the controller filter",
+    );
+    emptyStateElement.querySelector("button").click();
+    expect(treeElement.querySelectorAll(".node")).toHaveLength(1);
+    app.setControllers([]);
+    app.renderTree([]);
+    app.renderTree([controller("menu"), controller("new")]);
+    expect(
+      [...treeElement.querySelectorAll(".badge")].map((el) => el.textContent),
+    ).toEqual(["new"]);
+    expect(summaryElement.textContent).toBe("0 frames, 1 of 2 controllers");
+  });
+
+  it("resets selection and expansion on inspected-page navigation", async () => {
+    let navigated;
+    const browserApi = createBrowserApi(() => Promise.resolve({}));
+    browserApi.devtools.network = {
+      onNavigated: {
+        addListener: (callback) => {
+          navigated = callback;
+        },
+      },
+    };
+    const items = frameItems();
+    const app = createFrameApp({
+      browserApi,
+      bridge: createBridge(() => Promise.resolve({ items })),
+    });
+    app.start();
+    await Promise.resolve();
+    app.setControllers([]);
+    frameNode().classList.remove("expanded");
+    navigated("https://example.com/next");
+    await Promise.resolve();
+    expect(treeElement.querySelectorAll(".badge")).toHaveLength(1);
+    expect(frameNode().classList.contains("expanded")).toBe(true);
+  });
+
+  it("connects the combobox selection to tree rendering", async () => {
+    const select = document.createElement("select");
+    select.id = "controller-filter";
+    select.multiple = true;
+    document.body.appendChild(select);
+    const app = createFrameApp();
+    app.renderTree(frameItems());
+    document.querySelector('[role="combobox"]').click();
+    document.querySelector('.option[data-value="modal"]').click();
+    expect(treeElement.querySelectorAll(".badge")).toHaveLength(0);
+    app.controllerFilter.destroy();
+  });
+
   it("uses document lookups when elements and templates are not provided", () => {
     const app = new PanelApp({
       document,
