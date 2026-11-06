@@ -1227,6 +1227,42 @@ test.describe("Panel UI", () => {
     );
   });
 
+  test("capped HTML shows its notice only at the bottom of the expanded view", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        await panelPage.locator("label.tab[for='tab-events']").click();
+        const html = "<p>captured HTML</p>\n".repeat(4000).slice(0, 65536);
+        await simulateTurboEvent(panelPage, {
+          ...turboEventsFixturePush,
+          targetId: null,
+          details: { html, htmlOriginalLength: "80000" },
+        });
+        const row = panelPage.locator("#panel-events .event-box");
+        await expect(row.locator("dt")).toHaveText(["html"]);
+        await row.locator(".event-more").click();
+        const panel = panelPage.locator("#details-panel");
+        const notice = panel.locator(".event-attribute-notice");
+        await expect(panel.locator(".event-attribute-content")).toHaveText(
+          html,
+        );
+        await expect(notice).toHaveText(
+          "Showing 65,536 of 80,000 UTF-16 code units. The remaining HTML was omitted for performance.",
+        );
+        await expect(notice).not.toBeInViewport();
+        await notice.scrollIntoViewIfNeeded();
+        await expect(notice).toBeInViewport();
+      },
+    );
+  });
+
   test("full frame HTML and omission errors render as inert text through bursts and clear", async ({
     browserName,
     page,

@@ -11,6 +11,7 @@ import {
   ID_PREFIX,
   PANEL_BRIDGE_PROPERTY,
   SHOW_CONTROLLER_DETAILS_EVENT,
+  SHOW_EVENT_ATTRIBUTE_EVENT,
   SCAN_REFRESHED_EVENT,
   VALUES_CHANGED_PUSH_TYPE,
 } from "../../lib/constants.js";
@@ -96,6 +97,40 @@ describe("Details panel controller integration", () => {
     await settle();
     application.stop();
     delete document[PANEL_BRIDGE_PROPERTY];
+  });
+
+  it("shows the truncation notice after captured text and clears it for the next payload", async () => {
+    const source = document.createElement("div");
+    document.body.append(source);
+    const show = (originalLength) =>
+      document.dispatchEvent(
+        new CustomEvent(SHOW_EVENT_ATTRIBUTE_EVENT, {
+          detail: {
+            source,
+            name: "turbo:before-frame-render",
+            attribute: "html",
+            value: "x".repeat(65535),
+            originalLength,
+          },
+        }),
+      );
+    show(70000);
+    await settle();
+    const content = panel.querySelector(".event-attribute-content");
+    const notice = panel.querySelector(".event-attribute-notice");
+    expect(content.textContent).toBe("x".repeat(65535));
+    expect(
+      content.compareDocumentPosition(notice) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(notice.textContent).toBe(
+      "Showing 65,535 of 70,000 UTF-16 code units. The remaining HTML was omitted for performance.",
+    );
+    expect(notice.hidden).toBe(false);
+    show(undefined);
+    await settle();
+    expect(notice.hidden).toBe(true);
+    expect(notice.textContent).toBe("");
   });
 
   function showDetails(detail = { nodeId: "frame-1", identifier: "modal" }) {

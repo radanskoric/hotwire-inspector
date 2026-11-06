@@ -77,3 +77,35 @@ it("rejects prototype keys and accepts the raw size boundary", () => {
   const raw = JSON.stringify(record());
   expect(parseMainWorldTurboEvent(raw.padEnd(524288))).toEqual(record());
 });
+
+it.each([
+  [65535, "70000"],
+  [65536, "65537"],
+  [65536, String(Number.MAX_SAFE_INTEGER)],
+])(
+  "accepts %i retained units with original length %s",
+  (retainedLength, htmlOriginalLength) => {
+    const value = record({
+      html: "x".repeat(retainedLength),
+      htmlOriginalLength,
+    });
+    expect(parse(value)).toEqual(value);
+  },
+);
+
+it.each(["", "abc", "70000.5", "070000", "65536", "9007199254740992"])(
+  "rejects invalid original length %s",
+  (htmlOriginalLength) => {
+    expect(
+      parse(record({ html: "x".repeat(65536), htmlOriginalLength })),
+    ).toBeNull();
+  },
+);
+it.each([{}, { html: "x".repeat(65534) }])(
+  "rejects original length without capped HTML %#",
+  (details) => {
+    expect(
+      parse(record({ ...details, htmlOriginalLength: "70000" })),
+    ).toBeNull();
+  },
+);

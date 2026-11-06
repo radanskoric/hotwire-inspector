@@ -707,6 +707,12 @@ main:has(#tab-events:checked) #panel-events {
   background: var(--color-selection);
 }
 
+.event-attribute-notice {
+  background: var(--color-warning-surface);
+  color: var(--color-ink-muted);
+  font-size: 0.8125rem;
+}
+
 .event-attribute-content {
   white-space: pre-wrap;
   display: none;

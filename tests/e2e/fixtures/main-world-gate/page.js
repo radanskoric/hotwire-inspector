@@ -147,9 +147,9 @@ async function checkTurboCapture() {
     ),
     empty: JSON.stringify(pushes[2]?.details) === "{}",
     oversized:
-      pushes[3]?.details.htmlError ===
-        "HTML omitted: exceeds 65536 code units" &&
-      !Object.hasOwn(pushes[3].details, "html"),
+      pushes[3]?.details.html === incoming.outerHTML.slice(0, 65536) &&
+      pushes[3]?.details.htmlOriginalLength ===
+        String(incoming.outerHTML.length),
     sourceSafety:
       seen.length === 6 &&
       seen.every(Boolean) &&

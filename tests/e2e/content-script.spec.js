@@ -59,7 +59,13 @@ async function dispatchFrameCaptureScenarios(page) {
     dispatch("turbo:before-frame-render", { newFrame: incoming });
     dispatch("turbo:load", { url: "/isolated-load" });
     dispatch("turbo:click", { url: "/isolated-click" });
-    return { html, timestamp, targetId: source.id };
+    return {
+      html,
+      timestamp,
+      targetId: source.id,
+      cappedHtml: incoming.outerHTML.slice(0, 65536),
+      originalLength: String(incoming.outerHTML.length),
+    };
   });
 }
 
@@ -859,7 +865,8 @@ test.describe("Content Script", () => {
             details: {
               newFrameSrc: "/incoming",
               newFrameId: "incoming",
-              htmlError: "HTML omitted: exceeds 65536 code units",
+              html: expected.cappedHtml,
+              htmlOriginalLength: expected.originalLength,
             },
           },
           {

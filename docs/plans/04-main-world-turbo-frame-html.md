@@ -1,5 +1,13 @@
 # 4. Capture frame HTML through the shared MAIN runtime
 
+This plan records the original omission behavior. Oversized HTML now retains a
+Unicode-safe prefix, with retained and original lengths shown after the expanded
+payload. The collapsed preview stays unchanged. See the
+[capture logic](../../lib/turbo-event-watcher.js),
+[bridge validation](../../lib/turbo-event-bridge.js), and
+[expanded viewer](../../lib/panel/controllers/large-payload-details-controller.js)
+for the current contract.
+
 ## Starting point and definition of full HTML
 
 Execute after plans 1, 2, and 3 on main. Read AGENTS.md, the main-world and

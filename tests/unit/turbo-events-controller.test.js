@@ -934,29 +934,42 @@ describe("TurboEventsController", () => {
     expect(elements.list.querySelectorAll(".event-more")).toHaveLength(1);
   });
 
-  it("requests the full selected attribute when more is clicked", async () => {
-    const html = "<turbo-frame>" + "x".repeat(150) + "</turbo-frame>";
-    bridge._onTurboEvent({
-      type: TURBO_EVENT_PUSH_TYPE,
-      name: "turbo:frame-render",
-      timestamp: 0,
-      targetId: null,
-      details: { html },
-    });
-    await flushTargetLifecycle();
-    const onShow = vi.fn();
-    document.addEventListener(SHOW_EVENT_ATTRIBUTE_EVENT, onShow, {
-      once: true,
-    });
-    elements.list.querySelector(".event-more").click();
-    expect(onShow).toHaveBeenCalledOnce();
-    expect(onShow.mock.calls[0][0].detail).toEqual({
-      source: elements.list.querySelector(".event-box"),
-      name: "turbo:frame-render",
-      attribute: "html",
-      value: html,
-    });
-  });
+  it.each([undefined, "70000"])(
+    "requests the captured attribute with original length %s when more is clicked",
+    async (htmlOriginalLength) => {
+      const html = "x".repeat(htmlOriginalLength ? 65536 : 200);
+      bridge._onTurboEvent({
+        type: TURBO_EVENT_PUSH_TYPE,
+        name: "turbo:before-frame-render",
+        timestamp: 0,
+        targetId: null,
+        details: {
+          html,
+          ...(htmlOriginalLength ? { htmlOriginalLength } : {}),
+        },
+      });
+      await flushTargetLifecycle();
+      expect(
+        Array.from(
+          elements.list.querySelectorAll("dt"),
+          (term) => term.textContent,
+        ),
+      ).toEqual(["html"]);
+      const onShow = vi.fn();
+      document.addEventListener(SHOW_EVENT_ATTRIBUTE_EVENT, onShow, {
+        once: true,
+      });
+      elements.list.querySelector(".event-more").click();
+      expect(onShow).toHaveBeenCalledOnce();
+      expect(onShow.mock.calls[0][0].detail).toEqual({
+        source: elements.list.querySelector(".event-box"),
+        name: "turbo:before-frame-render",
+        attribute: "html",
+        value: html,
+        ...(htmlOriginalLength ? { originalLength: 70000 } : {}),
+      });
+    },
+  );
 
   it("exposes the clear target so a click handler can be wired to it", () => {
     expect(controller.clearTarget).toBe(elements.clear);

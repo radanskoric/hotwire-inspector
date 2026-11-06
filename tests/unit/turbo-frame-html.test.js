@@ -43,13 +43,14 @@ it("snapshots a real incoming frame with its src and id", () => {
   });
 });
 
-it("captures the exact HTML boundary and explicitly omits larger HTML", () => {
+it("captures the exact HTML boundary and truncates larger HTML", () => {
   const frame = document.createElement("turbo-frame");
   frame.textContent = "x".repeat(65536 - frame.outerHTML.length);
   expect(extract(frame)).toEqual({ html: frame.outerHTML });
   frame.append("x");
   expect(extract(frame)).toEqual({
-    htmlError: "HTML omitted: exceeds 65536 code units",
+    html: frame.outerHTML.slice(0, 65536),
+    htmlOriginalLength: String(frame.outerHTML.length),
   });
 });
 
@@ -108,3 +109,14 @@ it.each(["newFrame", "src", "id", "outerHTML"])(
     watcher.stop();
   },
 );
+
+it.each([
+  ["😀", 65536],
+  ["a😀", 65535],
+  ["ab😀", 65536],
+])("preserves Unicode at the cutoff: %s", (ending, retainedLength) => {
+  const html = "x".repeat(65534) + ending + "tail";
+  const result = extract({ outerHTML: html });
+  expect(result.html).toBe(html.slice(0, retainedLength));
+  expect(result.htmlOriginalLength).toBe(String(html.length));
+});
