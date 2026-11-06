@@ -87,6 +87,116 @@ async function withPanel(adapter, page, options, testBody) {
 }
 
 test.describe("Panel UI", () => {
+  test("wraps filter labels within narrow dropdowns", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        await panelPage
+          .locator("#panel-elements .filter")
+          .evaluate((filter) => {
+            filter.style.inlineSize = "70px";
+          });
+        await panelPage
+          .getByRole("combobox", { name: "Filter controllers" })
+          .click();
+        await panelPage
+          .getByRole("searchbox", { name: "Search controllers" })
+          .fill("drop");
+        const option = panelPage.getByRole("option", {
+          name: "dropdown",
+          exact: true,
+        });
+        await expect(option.locator(".highlight")).toHaveText("drop");
+        const layout = await option.evaluate((option) => {
+          const range = document.createRange();
+          range.selectNodeContents(
+            option.querySelector(".filter-option-label"),
+          );
+          return {
+            lines: new Set([...range.getClientRects()].map((rect) => rect.top))
+              .size,
+            width: option.clientWidth,
+            contentWidth: option.scrollWidth,
+          };
+        });
+        expect(layout.lines).toBeGreaterThan(1);
+        expect(layout.contentWidth).toBeLessThanOrEqual(layout.width);
+      },
+    );
+  });
+
+  test("keeps search highlights inline in both filters and themes", async ({
+    browserName,
+    page,
+  }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        for (const [tab, noun, value, query] of [
+          ["elements", "controllers", "sidebar", "ide"],
+          ["events", "events", "turbo:load", "load"],
+        ]) {
+          await panelPage.locator(`label[for="tab-${tab}"]`).click();
+          await panelPage
+            .getByRole("combobox", { name: `Filter ${noun}` })
+            .click();
+          const search = panelPage.getByRole("searchbox", {
+            name: `Search ${noun}`,
+          });
+          await search.fill(query);
+          const option = panelPage.locator(
+            `#panel-${tab} .option[data-value="${value}"]`,
+          );
+          await expect(option.locator(".highlight")).toHaveText(query);
+          for (const theme of ["light", "dark"]) {
+            await panelPage.locator("html").evaluate((html, theme) => {
+              html.dataset.theme = theme;
+            }, theme);
+            const layout = await option.evaluate((option) => {
+              const walker = document.createTreeWalker(
+                option,
+                NodeFilter.SHOW_TEXT,
+              );
+              const rects = [];
+              while (walker.nextNode()) {
+                const node = walker.currentNode;
+                if (!node.textContent) continue;
+                const range = document.createRange();
+                range.selectNodeContents(node);
+                rects.push(range.getBoundingClientRect());
+              }
+              return {
+                largestGap: Math.max(
+                  ...rects
+                    .slice(1)
+                    .map((rect, i) => Math.abs(rect.left - rects[i].right)),
+                ),
+                lineCount: new Set(rects.map((rect) => rect.top)).size,
+                background: getComputedStyle(option.querySelector(".highlight"))
+                  .backgroundColor,
+              };
+            });
+            expect(layout.largestGap).toBeLessThan(1);
+            expect(layout.lineCount).toBe(1);
+            expect(layout.background).not.toBe("rgba(0, 0, 0, 0)");
+          }
+          await search.press("Escape");
+        }
+      },
+    );
+  });
+
   test("filters controller attachments with a compact searchable combobox", async ({
     browserName,
     page,

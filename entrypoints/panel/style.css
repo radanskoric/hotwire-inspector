@@ -834,6 +834,15 @@ main:has(#tab-events:checked) #panel-events {
   background: var(--color-selection);
 }
 
+.filter .filter-option-label {
+  min-inline-size: 0;
+}
+
+.filter .option .highlight {
+  border-radius: 1px;
+  background: oklch(var(--lch-accent) / 25%);
+}
+
 .filter .tomselect-checkbox {
   flex: 0 0 auto;
   margin: 0;

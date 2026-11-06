@@ -53,6 +53,15 @@ afterEach(() => {
 });
 
 describe("controller combobox", () => {
+  it("renders option labels as text even when identifiers contain HTML", () => {
+    const identifier = '<img src=x onerror="alert(1)">';
+    mount([identifier]);
+    openFilter();
+    const option = document.querySelector(".option");
+    expect(option.textContent).toBe(identifier);
+    expect(option.querySelector("img")).toBeNull();
+  });
+
   it("reports selection changes and applies bulk actions to all options while searching", () => {
     const changes = mount();
     expect(document.querySelector(".ts-count-display").textContent).toBe(
