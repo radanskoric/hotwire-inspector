@@ -81,6 +81,17 @@
             data-controller="turbo-events"
           >
             <div class="events-header">
+              <div class="filter">
+                <label class="visually-hidden" for="event-filter"
+                  >Filter events</label
+                >
+                <select
+                  id="event-filter"
+                  multiple
+                  data-turbo-events-target="filter"
+                  disabled
+                ></select>
+              </div>
               <button
                 type="button"
                 class="btn btn-small events-clear"
@@ -102,6 +113,7 @@
               aria-live="polite"
             ></div>
             <p class="events-empty">No Turbo events yet</p>
+            <p class="events-no-matches">No events match the filter</p>
           </section>
         </main>
         <aside

@@ -23,6 +23,7 @@ import {
   turboEventsWithDetailsFixturePush,
 } from "./support/panel-fixtures.js";
 import {
+  addMockPanelApis,
   clearRecordedMessages,
   expectDoubleClickTogglesNodeChildren,
   expectRefreshRescans,
@@ -57,6 +58,8 @@ import {
   withExpectedTagNames,
   withExpectedTargetBadges,
 } from "./support/panel-assertions.js";
+
+import { TURBO_EVENT_NAMES } from "../../lib/turbo-event-watcher.js";
 
 const adaptersByBrowserName = {
   chromium: chromiumAdapter,
@@ -101,13 +104,11 @@ test.describe("Panel UI", () => {
         await expect(combo).toContainText("All controllers (3)");
         await openDetailsPanel(panelPage, "modal-controller", "modal");
         await combo.click();
-        await expect(panelPage.locator(".ts-dropdown .option")).toHaveText([
-          "dropdown",
-          "modal",
-          "sidebar",
-        ]);
+        await expect(
+          panelPage.locator("#panel-elements .ts-dropdown .option"),
+        ).toHaveText(["dropdown", "modal", "sidebar"]);
         await panelPage
-          .locator('.ts-dropdown .option[data-value="modal"]')
+          .locator('#panel-elements .ts-dropdown .option[data-value="modal"]')
           .click();
         await expect(panelPage.locator("#details-panel")).not.toHaveClass(
           /open/,
@@ -126,9 +127,9 @@ test.describe("Panel UI", () => {
         await panelPage
           .getByRole("searchbox", { name: "Search controllers" })
           .fill("side");
-        await expect(panelPage.locator(".ts-dropdown .option")).toHaveText([
-          "sidebar",
-        ]);
+        await expect(
+          panelPage.locator("#panel-elements .ts-dropdown .option"),
+        ).toHaveText(["sidebar"]);
         await panelPage
           .getByRole("button", { name: "Clear all", exact: true })
           .click();
@@ -957,6 +958,112 @@ test.describe("Panel UI", () => {
           "2 frames, 4 controllers",
         );
         await expect(panelPage.locator("#empty-state")).toBeHidden();
+      },
+    );
+  });
+
+  test("filters retained Turbo events", async ({ browserName, page }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        await panelPage.locator("label[for='tab-events']").click();
+        const combo = panelPage.getByRole("combobox", {
+          name: "Filter events",
+        });
+        const dropdown = panelPage.locator("#panel-events .ts-dropdown");
+        await expect(combo).toContainText(
+          `All events (${TURBO_EVENT_NAMES.length})`,
+        );
+        await expect(panelPage.locator(".events-no-matches")).toBeHidden();
+        await simulateTurboEvent(panelPage, {
+          ...turboEventsFixturePush,
+          name: "turbo:load",
+        });
+        await simulateTurboEvent(panelPage, {
+          ...turboEventsFixturePush,
+          name: "turbo:visit",
+        });
+        await combo.click();
+        await expect(dropdown.locator(".option")).toHaveText(
+          [...TURBO_EVENT_NAMES].sort(),
+        );
+        await dropdown.getByRole("button", { name: "Clear all" }).click();
+        await expect(panelPage.locator(".events-no-matches")).toBeVisible();
+        await dropdown.locator('.option[data-value="turbo:load"]').click();
+        await expect(
+          panelPage.locator(".event-box:visible .event-name"),
+        ).toHaveText(["turbo:load"]);
+        await simulateTurboEvent(panelPage, {
+          ...turboEventsFixturePush,
+          name: "turbo:visit",
+        });
+        await expect(panelPage.locator(".event-box")).toHaveCount(3);
+        await expect(panelPage.locator(".event-box:visible")).toHaveCount(1);
+      },
+    );
+  });
+
+  test("persists and shares the selection", async ({ browserName, page }) => {
+    const adapter = adaptersByBrowserName[browserName];
+    test.skip(!adapter, `${browserName} does not have a panel adapter`);
+    test.skip(
+      !adapter.capabilities.loadsExtension,
+      "Requires real extension storage",
+    );
+    await withPanel(
+      adapter,
+      page,
+      { scanResponse: fixtureScanResponse },
+      async (panelPage) => {
+        await panelPage.locator("label[for='tab-events']").click();
+        const combo = panelPage.getByRole("combobox", {
+          name: "Filter events",
+        });
+        const dropdown = panelPage.locator("#panel-events .ts-dropdown");
+        await expect(combo).toContainText(
+          `All events (${TURBO_EVENT_NAMES.length})`,
+        );
+        await combo.click();
+        await dropdown.getByRole("button", { name: "Clear all" }).click();
+        await dropdown.locator('.option[data-value="turbo:load"]').click();
+        await simulateTurboEvent(panelPage, {
+          ...turboEventsFixturePush,
+          name: "turbo:load",
+        });
+        const other = await panelPage.context().newPage();
+        await addMockPanelApis(other, { scanResponse: fixtureScanResponse });
+        await other.goto(panelPage.url());
+        await other.locator("label[for='tab-events']").click();
+        const otherCombo = other.getByRole("combobox", {
+          name: "Filter events",
+        });
+        await expect(otherCombo).toContainText(
+          `1 of ${TURBO_EVENT_NAMES.length} events`,
+        );
+        await panelPage.reload();
+        await panelPage.locator("label[for='tab-events']").click();
+        await expect(combo).toContainText(
+          `1 of ${TURBO_EVENT_NAMES.length} events`,
+        );
+        await expect(panelPage.locator(".events-empty")).toBeVisible();
+        await expect(panelPage.locator(".event-box")).toHaveCount(0);
+
+        await combo.click();
+        await dropdown.getByRole("button", { name: "Clear all" }).click();
+        await expect(otherCombo).toContainText("No events selected");
+        await panelPage.reload();
+        await panelPage.locator("label[for='tab-events']").click();
+        await expect(combo).toContainText("No events selected");
+        await combo.click();
+        await dropdown.getByRole("button", { name: "Select all" }).click();
+        await expect(otherCombo).toContainText(
+          `All events (${TURBO_EVENT_NAMES.length})`,
+        );
+        await other.close();
       },
     );
   });

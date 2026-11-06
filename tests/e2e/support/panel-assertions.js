@@ -46,7 +46,11 @@ export async function addMockPanelApis(
       controllerOutletsMessageType,
       inspectMessageType,
     }) => {
+      // Keep real extension storage while replacing panel messaging APIs.
+      const extensionStorage =
+        globalThis.browser?.storage ?? globalThis.chrome?.storage;
       globalThis.browser ??= {};
+      if (extensionStorage) globalThis.browser.storage = extensionStorage;
       globalThis.browser.runtime ??= {};
       globalThis.chrome ??= globalThis.browser;
       globalThis.__hotwireInspectorMessages = [];
@@ -705,7 +709,7 @@ export function withExpectedDetailsPanelPinnedOnScroll(
 
     const beforeScroll = await detailsPanel.boundingBox();
 
-    const filter = panelPage.locator(".filter");
+    const filter = panelPage.locator("#panel-elements .filter");
     const filterBeforeScroll = await filter.boundingBox();
     const treeArea = panelPage.locator("#tree");
     await treeArea.evaluate((element) =>

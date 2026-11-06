@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import { readFileSync } from "node:fs";
 import { Application } from "@hotwired/stimulus";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -7,36 +8,37 @@ import {
   TURBO_EVENT_PUSH_TYPE,
   SHOW_EVENT_ATTRIBUTE_EVENT,
 } from "../../lib/constants.js";
+import { Filter } from "../../lib/panel/filter.js";
 import { TurboEventsController } from "../../lib/panel/controllers/turbo-events-controller.js";
+
+import { TURBO_EVENT_NAMES } from "../../lib/turbo-event-watcher.js";
+
+const preference = vi.hoisted(() => ({
+  getItem: vi.fn(async () => []),
+  setItem: vi.fn(async () => {}),
+  watch: vi.fn(() => vi.fn()),
+}));
+vi.mock("wxt/utils/storage", () => ({ storage: preference }));
+
+// The shared widget owns checkbox/search behavior; this controller owns rows
+// and sends selection updates to the widget.
+vi.mock("../../lib/panel/filter.js", () => ({
+  Filter: vi.fn(function (element, onChange) {
+    this.change = onChange;
+    this.select = { disable: vi.fn() };
+    this.update = vi.fn();
+    this.destroy = vi.fn();
+  }),
+}));
 
 const MAX_EVENTS_DEFAULT = 500;
 
-// The empty-state placeholder and list visibility are pure CSS (`:empty` +
-// adjacent-sibling combinator); unit tests inject the relevant rules so
-// `getComputedStyle` reports the same display value the real stylesheet
-// would in the browser.
-const EVENTS_PANEL_CSS = `
-  .events-dropped-notice { display: none; }
-  .events-list:not(:empty) {
-    display: flex;
-    flex: 1;
-    min-block-size: 0;
-    overflow-y: auto;
-  }
-  .events-list:empty { display: none; }
-  .events-empty {
-    display: none;
-    flex: 1;
-    min-block-size: 0;
-    align-items: center;
-    justify-content: center;
-    margin: 0;
-    padding: 1.5rem 3rem;
-    color: var(--color-ink-muted);
-    text-align: center;
-  }
-  .events-list:empty + .events-empty { display: flex; }
-`;
+// Exercise the production CSS that owns empty and filtered-out states.
+const stylesheet = readFileSync("entrypoints/panel/style.css", "utf8");
+const EVENTS_PANEL_CSS = stylesheet.slice(
+  stylesheet.indexOf(".events-empty,"),
+  stylesheet.indexOf(".events-dropped-notice {"),
+);
 
 function mountDom() {
   document.body.innerHTML = `
@@ -58,7 +60,7 @@ function mountDom() {
       class="tab-panel"
       data-controller="turbo-events"
     >
-      <div class="events-header">
+      <div class="events-header"><select multiple data-turbo-events-target="filter"></select>
         <button
           type="button"
           class="btn btn-small events-clear"
@@ -77,7 +79,7 @@ function mountDom() {
         role="log"
         aria-live="polite"
       ></div>
-      <p class="events-empty">No Turbo events yet</p>
+      <p class="events-empty">No Turbo events yet</p><p class="events-no-matches">No events match the filter</p>
     </section>
   `;
   const style = document.createElement("style");
@@ -185,6 +187,9 @@ describe("TurboEventsController", () => {
   let bridge;
 
   beforeEach(async () => {
+    vi.clearAllMocks();
+    preference.getItem.mockResolvedValue([]);
+    preference.setItem.mockResolvedValue();
     elements = mountDom();
     ({ bridge } = createStubBridge());
     document[PANEL_BRIDGE_PROPERTY] = bridge;
@@ -208,6 +213,187 @@ describe("TurboEventsController", () => {
     delete document[PANEL_BRIDGE_PROPERTY];
     vi.restoreAllMocks();
   });
+
+  it("offers the complete registry and reversibly filters retained and incoming rows", async () => {
+    const filter = Filter.mock.instances.at(-1);
+    expect(filter.update).toHaveBeenLastCalledWith(
+      TURBO_EVENT_NAMES,
+      TURBO_EVENT_NAMES,
+    );
+    for (const name of ["turbo:load", "turbo:visit"]) {
+      bridge._onTurboEvent({ name, timestamp: 0, targetId: null });
+    }
+    await flushTargetLifecycle();
+    filter.change(["turbo:load"]);
+    expect([...elements.list.children].map((row) => row.hidden)).toEqual([
+      false,
+      true,
+    ]);
+    bridge._onTurboEvent({ name: "turbo:visit", timestamp: 1, targetId: null });
+    await flushTargetLifecycle();
+    expect(elements.list.lastElementChild.hidden).toBe(true);
+    expect(preference.setItem).toHaveBeenLastCalledWith(
+      "local:excludedTurboEvents",
+      TURBO_EVENT_NAMES.filter((name) => name !== "turbo:load"),
+    );
+    filter.change([]);
+    expect([...elements.list.children].every((row) => row.hidden)).toBe(true);
+    expect(
+      getComputedStyle(elements.section.querySelector(".events-no-matches"))
+        .display,
+    ).toBe("flex");
+    expect(getComputedStyle(elements.empty).display).toBe("none");
+    filter.change(TURBO_EVENT_NAMES);
+    expect([...elements.list.children].every((row) => !row.hidden)).toBe(true);
+    expect(filter.update).toHaveBeenLastCalledWith(
+      TURBO_EVENT_NAMES,
+      TURBO_EVENT_NAMES,
+    );
+  });
+
+  it("applies shared storage updates without writing them back", () => {
+    const notify = preference.watch.mock.calls.at(-1)[1];
+    const filter = Filter.mock.instances.at(-1);
+    notify(["turbo:load"]);
+    expect(filter.update).toHaveBeenLastCalledWith(
+      TURBO_EVENT_NAMES,
+      TURBO_EVENT_NAMES.filter((name) => name !== "turbo:load"),
+    );
+    notify(TURBO_EVENT_NAMES);
+    expect(filter.update).toHaveBeenLastCalledWith(TURBO_EVENT_NAMES, []);
+    notify([]);
+    expect(filter.update).toHaveBeenLastCalledWith(
+      TURBO_EVENT_NAMES,
+      TURBO_EVENT_NAMES,
+    );
+    expect(preference.setItem).not.toHaveBeenCalled();
+  });
+
+  it("keeps the cap and dropped count across hidden traffic without scrolling", async () => {
+    controller.maxEventsValue = 2;
+    activateEventsTab();
+    setScrollMetrics(elements.list, { scrollHeight: 100, clientHeight: 10 });
+    const filter = Filter.mock.instances.at(-1);
+    filter.change([]);
+    for (let i = 0; i < 3; i++) {
+      bridge._onTurboEvent({
+        name: "turbo:load",
+        timestamp: i,
+        targetId: null,
+      });
+      await flushTargetLifecycle();
+    }
+    expect(controller.eventTargets).toHaveLength(2);
+    expect(controller.droppedCountValue).toBe(1);
+    expect(elements.list.scrollTop).toBe(0);
+    filter.update.mockClear();
+    controller.clear();
+    expect(elements.list.children).toHaveLength(0);
+    expect(filter.update).not.toHaveBeenCalled();
+    expect(controller.droppedCountValue).toBe(0);
+  });
+
+  it("restores saved exclusions on reconnect and removes its subscription", async () => {
+    const unwatch = preference.watch.mock.results.at(-1).value;
+    elements.section.removeAttribute("data-controller");
+    await flushTargetLifecycle();
+    expect(unwatch).toHaveBeenCalledOnce();
+    preference.getItem.mockResolvedValue(["turbo:load", 42]);
+    elements.section.setAttribute("data-controller", "turbo-events");
+    await flushTargetLifecycle();
+    const filter = Filter.mock.instances.at(-1);
+    expect(filter.update).toHaveBeenLastCalledWith(
+      TURBO_EVENT_NAMES,
+      TURBO_EVENT_NAMES.filter((name) => name !== "turbo:load"),
+    );
+  });
+
+  it("keeps collection running during loading and ignores a late read after disconnect", async () => {
+    elements.section.removeAttribute("data-controller");
+    await flushTargetLifecycle();
+    const { promise, resolve } = Promise.withResolvers();
+    preference.getItem.mockReturnValue(promise);
+    elements.section.setAttribute("data-controller", "turbo-events");
+    await flushTargetLifecycle();
+    const filter = Filter.mock.instances.at(-1);
+    expect(filter.select.disable).toHaveBeenCalledOnce();
+    bridge._onTurboEvent({ name: "turbo:load", timestamp: 0, targetId: null });
+    await flushTargetLifecycle();
+    expect(elements.list.children).toHaveLength(1);
+    elements.section.removeAttribute("data-controller");
+    await flushTargetLifecycle();
+    filter.update.mockClear();
+    resolve(["turbo:load"]);
+    await flushTargetLifecycle();
+    expect(filter.destroy).toHaveBeenCalledOnce();
+    expect(filter.update).not.toHaveBeenCalled();
+    expect(elements.list.firstElementChild.hidden).toBe(false);
+  });
+
+  it("does not let a slow initial read overwrite a newer shared update", async () => {
+    elements.section.removeAttribute("data-controller");
+    await flushTargetLifecycle();
+    const { promise, resolve } = Promise.withResolvers();
+    preference.getItem.mockReturnValue(promise);
+    elements.section.setAttribute("data-controller", "turbo-events");
+    await flushTargetLifecycle();
+    const notify = preference.watch.mock.calls.at(-1)[1];
+    notify(["turbo:visit"]);
+    resolve(["turbo:load"]);
+    await flushTargetLifecycle();
+    const filter = Filter.mock.instances.at(-1);
+    expect(filter.update).toHaveBeenLastCalledWith(
+      TURBO_EVENT_NAMES,
+      TURBO_EVENT_NAMES.filter((name) => name !== "turbo:visit"),
+    );
+    notify(null);
+    expect(filter.update).toHaveBeenLastCalledWith(
+      TURBO_EVENT_NAMES,
+      TURBO_EVENT_NAMES,
+    );
+  });
+
+  it("falls back to usable filtering on load failure and contains write failure", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    elements.section.removeAttribute("data-controller");
+    await flushTargetLifecycle();
+    preference.getItem.mockRejectedValue(new Error("read failed"));
+    elements.section.setAttribute("data-controller", "turbo-events");
+    await flushTargetLifecycle();
+    const filter = Filter.mock.instances.at(-1);
+    expect(filter.update).toHaveBeenLastCalledWith(
+      TURBO_EVENT_NAMES,
+      TURBO_EVENT_NAMES,
+    );
+    preference.setItem.mockRejectedValue(new Error("write failed"));
+    filter.change([]);
+    await flushTargetLifecycle();
+    expect(filter.update).toHaveBeenLastCalledWith(TURBO_EVENT_NAMES, []);
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([false, true])(
+    "contains a failed late read (disconnect: %s)",
+    async (disconnect) => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      elements.section.removeAttribute("data-controller");
+      await flushTargetLifecycle();
+      const { promise, reject } = Promise.withResolvers();
+      preference.getItem.mockReturnValue(promise);
+      elements.section.setAttribute("data-controller", "turbo-events");
+      await flushTargetLifecycle();
+      preference.watch.mock.calls.at(-1)[1](["turbo:load"]);
+      const filter = Filter.mock.instances.at(-1);
+      if (disconnect) {
+        elements.section.removeAttribute("data-controller");
+        await flushTargetLifecycle();
+      }
+      filter.update.mockClear();
+      reject(new Error("read failed"));
+      await flushTargetLifecycle();
+      expect(filter.update).not.toHaveBeenCalled();
+    },
+  );
 
   it("starts with an empty list and shows the empty placeholder", () => {
     expect(controller.eventTargets).toHaveLength(0);
@@ -623,8 +809,11 @@ describe("TurboEventsController", () => {
   });
 
   it("re-subscribes to the bridge on a fresh application start", async () => {
+    elements.section.removeAttribute("data-controller");
+    await flushTargetLifecycle();
     application.stop();
-    expect(bridge._onTurboEvent).not.toBeNull();
+    expect(bridge._onTurboEvent).toBeNull();
+    elements.section.setAttribute("data-controller", "turbo-events");
 
     const resetBridge = createStubBridge().bridge;
     document[PANEL_BRIDGE_PROPERTY] = resetBridge;
@@ -864,7 +1053,7 @@ describe("TurboEventsController without tab radio wiring", () => {
       class="tab-panel"
       data-controller="turbo-events"
     >
-      <div class="events-header">
+      <div class="events-header"><select multiple data-turbo-events-target="filter"></select>
         <button
           type="button"
           class="btn btn-small events-clear"
@@ -883,7 +1072,7 @@ describe("TurboEventsController without tab radio wiring", () => {
         role="log"
         aria-live="polite"
       ></div>
-      <p class="events-empty">No Turbo events yet</p>
+      <p class="events-empty">No Turbo events yet</p><p class="events-no-matches">No events match the filter</p>
     </section>`;
     ({ bridge: document[PANEL_BRIDGE_PROPERTY] } = createStubBridge());
   });

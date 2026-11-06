@@ -26,7 +26,7 @@ export default defineConfig({
         },
       },
     },
-    permissions: ["activeTab", "scripting", "tabs"],
+    permissions: ["activeTab", "scripting", "tabs", "storage"],
     devtools_page: "devtools.html",
   },
   webExt: {

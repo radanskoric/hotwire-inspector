@@ -154,3 +154,28 @@ describe("controller combobox", () => {
     expect(combo().getAttribute("aria-expanded")).toBe("false");
   });
 });
+
+it("supports event labels without changing selection behavior", () => {
+  document.body.innerHTML = "<select multiple></select>";
+  filter = new Filter(document.querySelector("select"), () => {}, "events");
+  filter.update(["turbo:load", "turbo:visit"], ["turbo:load"]);
+  expect(document.querySelector('[aria-label="Filter events"]')).not.toBeNull();
+  expect(
+    document.querySelector('[aria-label="Search events"]').placeholder,
+  ).toBe("Search events…");
+  expect(document.querySelector(".ts-count-display").textContent).toBe(
+    "1 of 2 events",
+  );
+  action("clear").click();
+  expect(document.querySelector(".ts-count-display").textContent).toBe(
+    "No events selected",
+  );
+  action("all").click();
+  expect(document.querySelector(".ts-count-display").textContent).toBe(
+    "All events (2)",
+  );
+  filter.update([], []);
+  expect(document.querySelector(".ts-count-display").textContent).toBe(
+    "No events available",
+  );
+});
