@@ -112,6 +112,10 @@ These are the steps for it:
 - expect to reload the extension manually in the host browser after changes instead of relying on full automatic hot reload
 - refresh the inspected page or reopen the DevTools panel if the updated extension state is not picked up immediately
 
+## Website
+
+The single-page Jekyll website lives in `website/` and builds independently of the extension. See the [website README](website/README.md) for local development, devcontainer setup, production builds, and publication instructions.
+
 ## How E2E tests work
 
 The default Playwright suite loads the built extension in Chromium. Because Playwright's bundled Chromium does not render custom DevTools panels, messaging and panel rendering are tested separately:

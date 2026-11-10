@@ -1,0 +1,62 @@
+name: Website
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: website
+          ruby-version: .ruby-version
+          bundler-cache: true
+      - name: Configure Pages
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+      - name: Build
+        env:
+          JEKYLL_ENV: production
+        run: bundle exec jekyll build --trace --baseurl ""
+      - name: Verify artifact
+        run: |
+          test -f _site/index.html
+          test "$(find _site -name '*.html' | wc -l)" -eq 1
+          test ! -e _site/Gemfile
+          test ! -e _site/Gemfile.lock
+          test ! -d _site/vendor
+          test ! -d _site/docs
+          grep -q 'https://inspector.masterhotwire.com/' _site/index.html
+      - uses: actions/upload-pages-artifact@v4
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        with:
+          path: website/_site
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: website-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

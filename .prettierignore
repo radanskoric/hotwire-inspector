@@ -2,3 +2,10 @@ output/
 coverage/
 .wxt/
 test-results/
+
+# Jekyll website local files
+website/_site/
+website/.jekyll-cache/
+website/.jekyll-metadata
+website/.bundle/
+website/vendor/

@@ -1,0 +1,16 @@
+/* stylelint-disable selector-class-pattern -- Selectors belong to the upstream theme. */
+
+/* This single-page site keeps appearance and GitHub visible at every width. */
+.VPNavBar .VPNavBarSearch,
+.VPNavBar .VPNavBarMenu,
+.VPNavBar .VPNavBarExtra,
+.VPNavBar .VPNavBarHamburger,
+.VPNavScreen {
+  display: none;
+}
+
+.VPNavBar .VPNavBarAppearance,
+.VPNavBar .VPNavBarSocialLinks {
+  display: flex;
+  align-items: center;
+}

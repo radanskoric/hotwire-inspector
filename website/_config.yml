@@ -1,0 +1,21 @@
+title: Hotwire Inspector
+description: A browser extension for inspecting Hotwire applications.
+url: https://inspector.masterhotwire.com
+baseurl: ""
+lang: en-US
+theme: jekyll-vitepress-theme
+plugins:
+  - jekyll-vitepress-theme
+
+jekyll_vitepress:
+  branding:
+    site_title: Hotwire Inspector
+  footer:
+    enabled: false
+
+exclude:
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - .bundle

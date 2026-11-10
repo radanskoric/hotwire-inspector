@@ -7,14 +7,19 @@
   "remoteUser": "node",
   "updateRemoteUserUID": true,
   "overrideCommand": false,
-  "forwardPorts": [4173],
+  "forwardPorts": [4173, 4000],
   "portsAttributes": {
+    "4000": {
+      "label": "Jekyll website",
+      "onAutoForward": "notify"
+    },
     "4173": {
       "label": "WXT Dev Server",
       "onAutoForward": "notify"
     }
   },
   "features": {
+    "ghcr.io/devcontainers/features/ruby:1": { "version": "4.0.2" },
     "ghcr.io/schlich/devcontainer-features/playwright:0": {}
   },
   "postCreateCommand": "npm install",

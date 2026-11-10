@@ -26,3 +26,10 @@ test-results
 *.njsproj
 *.sln
 *.sw?
+
+# Jekyll website local files
+website/_site/
+website/.jekyll-cache/
+website/.jekyll-metadata
+website/.bundle/
+website/vendor/

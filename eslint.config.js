@@ -6,7 +6,15 @@ import autoImports from "./.wxt/eslint-auto-imports.mjs";
 
 export default [
   {
-    ignores: ["output/", "coverage/", ".wxt/", "test-results/"],
+    ignores: [
+      "output/",
+      "coverage/",
+      ".wxt/",
+      "test-results/",
+      "website/_site/",
+      "website/vendor/",
+      "website/.jekyll-cache/",
+    ],
   },
 
   js.configs.recommended,
