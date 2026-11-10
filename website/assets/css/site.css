@@ -1,5 +1,33 @@
 /* stylelint-disable selector-class-pattern -- Selectors belong to the upstream theme. */
 
+:root {
+  --vp-font-family-base:
+    -apple-system, "BlinkMacSystemFont", "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", sans-serif;
+  --site-title-color: #1e3a8a;
+  --vp-c-brand-1: oklch(50% 0.16 275deg);
+  --vp-c-brand-2: oklch(47% 0.16 275deg);
+  --vp-c-brand-3: var(--vp-c-brand-1);
+  --vp-c-brand-soft: oklch(50% 0.16 275deg / 12%);
+  --vp-button-brand-text: #fff;
+  --vp-button-brand-hover-text: var(--vp-button-brand-text);
+  --vp-button-brand-active-text: var(--vp-button-brand-text);
+  --vp-home-hero-name-color: var(--site-title-color);
+  --vp-home-hero-name-background: none;
+}
+
+.dark {
+  --site-title-color: oklch(80% 0.09 266deg);
+  --vp-c-brand-1: oklch(78% 0.11 275deg);
+  --vp-c-brand-2: oklch(83% 0.08 275deg);
+  --vp-c-brand-soft: oklch(78% 0.11 275deg / 12%);
+  --vp-button-brand-text: oklch(16% 0.035 255deg);
+}
+
+.VPNavBarTitle .title {
+  color: var(--site-title-color);
+}
+
 /* This single-page site keeps appearance and GitHub visible at every width. */
 .VPNavBar .VPNavBarSearch,
 .VPNavBar .VPNavBarMenu,
