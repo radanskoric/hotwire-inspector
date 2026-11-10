@@ -14,7 +14,9 @@
   --lch-ink: 22% 0.035 255;
   --lch-ink-muted: 50% 0.035 255;
   --lch-border: 86% 0.018 255;
-  --lch-accent: 54% 0.13 255;
+  --lch-accent: 50% 0.16 275;
+  --lch-accent-hover: 47% 0.16 275;
+  --lch-title: 38% 0.135 266;
   --lch-accent-contrast: 100% 0 0;
   --lch-positive: 58% 0.16 155;
   --lch-warning: 70% 0.16 60;
@@ -26,7 +28,8 @@
   --color-border: oklch(var(--lch-border));
   --color-border-soft: oklch(var(--lch-border) / 70%);
   --color-accent: oklch(var(--lch-accent));
-  --color-accent-hover: oklch(48% 0.14 255deg);
+  --color-accent-hover: oklch(var(--lch-accent-hover));
+  --color-title: oklch(var(--lch-title));
   --color-accent-contrast: oklch(var(--lch-accent-contrast));
   --color-selection: oklch(var(--lch-accent) / 12%);
   --color-positive: oklch(var(--lch-positive));
@@ -55,7 +58,9 @@
     --lch-ink: 97% 0.006 255;
     --lch-ink-muted: 80% 0.025 255;
     --lch-border: 40% 0.04 255;
-    --lch-accent: 70% 0.11 255;
+    --lch-accent: 78% 0.11 275;
+    --lch-accent-hover: 83% 0.08 275;
+    --lch-title: 80% 0.09 266;
     --lch-accent-contrast: 16% 0.035 255;
     --lch-positive: 78% 0.14 155;
     --lch-warning: 80% 0.16 60;
@@ -71,7 +76,9 @@
   --lch-ink: 22% 0.035 255;
   --lch-ink-muted: 50% 0.035 255;
   --lch-border: 86% 0.018 255;
-  --lch-accent: 54% 0.13 255;
+  --lch-accent: 50% 0.16 275;
+  --lch-accent-hover: 47% 0.16 275;
+  --lch-title: 38% 0.135 266;
   --lch-accent-contrast: 100% 0 0;
   --lch-positive: 58% 0.16 155;
   --lch-warning: 70% 0.16 60;
@@ -86,7 +93,9 @@
   --lch-ink: 97% 0.006 255;
   --lch-ink-muted: 80% 0.025 255;
   --lch-border: 40% 0.04 255;
-  --lch-accent: 70% 0.11 255;
+  --lch-accent: 78% 0.11 275;
+  --lch-accent-hover: 83% 0.08 275;
+  --lch-title: 80% 0.09 266;
   --lch-accent-contrast: 16% 0.035 255;
   --lch-positive: 78% 0.14 155;
   --lch-warning: 80% 0.16 60;
@@ -138,6 +147,7 @@ select {
 }
 
 .toolbar h1 {
+  color: var(--color-title);
   margin: 0;
   font-size: 1rem;
 }

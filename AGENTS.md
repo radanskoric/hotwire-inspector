@@ -78,6 +78,7 @@ Core tooling currently includes:
 - Preserve the current in-memory element identity approach unless there is a strong reason to change it. Always ask before making such changes.
 - Prefer changes that keep the inspected page behavior as close to untouched runtime behavior as possible.
 - Keep the extension cross-browser friendly.
+- When working on the panel UI, consult the [design system](docs/design-system.md) and [typography guidance](docs/typography.md), following [ADR 3](docs/decisions/3%20-%20panel%20css%20theme%20architecture.md) for theme architecture. Preserve functionality and compact interface density when applying branding.
 - If you change central behavior in the content script or panel messaging, review the related E2E tests.
 
 ### Messaging architecture
