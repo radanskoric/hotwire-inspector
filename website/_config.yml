@@ -10,6 +10,8 @@ plugins:
 jekyll_vitepress:
   branding:
     site_title: Hotwire Inspector
+    logo:
+      default: /assets/images/icon.png
   footer:
     enabled: false
 

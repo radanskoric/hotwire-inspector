@@ -28,6 +28,16 @@
   color: var(--site-title-color);
 }
 
+.VPHero .name::before {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.25em;
+  background: url("../images/icon.png") center / contain no-repeat;
+  vertical-align: -0.1em;
+  content: "";
+}
+
 /* This single-page site keeps appearance and GitHub visible at every width. */
 .VPNavBar .VPNavBarSearch,
 .VPNavBar .VPNavBarMenu,
