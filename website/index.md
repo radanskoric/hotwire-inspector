@@ -3,7 +3,7 @@ layout: home
 permalink: /
 hero:
   name: Hotwire Inspector
-  image: 
+  image:
     src: /assets/images/hi-tree-view-on-campfire.png
     alt: Hotwire Inspector showing Turbo Frames and Stimulus controllers in a tree view
   tagline: >-

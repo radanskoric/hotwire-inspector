@@ -225,7 +225,7 @@ export function withExpectedHeadingAndSummary(heading, summary) {
     );
     await expect(book).toHaveAttribute("href", "https://masterhotwire.com/");
     await expect(
-      panelPage.getByText("Built by Radan Skorić, author of"),
+      panelPage.getByText(/Built by\s+Radan Skorić\s*, author of/),
     ).toBeVisible();
     for (const link of [homepage, book]) {
       await expect(link).toHaveAttribute("target", "_blank");
