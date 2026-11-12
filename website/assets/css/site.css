@@ -14,6 +14,8 @@
   --vp-button-brand-active-text: var(--vp-button-brand-text);
   --vp-home-hero-name-color: var(--site-title-color);
   --vp-home-hero-name-background: none;
+  --vp-home-hero-image-background-image: none;
+  --vp-home-hero-image-filter: none;
 }
 
 .dark {
@@ -36,6 +38,68 @@
   background: url("../images/icon.png") center / contain no-repeat;
   vertical-align: -0.1em;
   content: "";
+}
+
+.VPHero .image {
+  order: 3;
+  margin: 32px 0 0;
+  min-width: 0;
+}
+
+.VPHero .image-container {
+  width: 100%;
+  max-width: 640px;
+  height: auto;
+  transform: none;
+}
+
+.VPHero .image-src {
+  position: static;
+  max-width: 100%;
+  max-height: none;
+  height: auto;
+  padding: 0;
+  transform: none;
+}
+
+@media (width >= 960px) {
+  .VPHero.has-image .container {
+    align-items: center;
+    gap: 48px;
+  }
+
+  .VPHero.has-image .main {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+  }
+
+  .VPHero .image {
+    order: 2;
+    flex: 1.2;
+    margin: 0;
+  }
+}
+
+.hero-subtitle {
+  display: block;
+  margin-top: 0.5em;
+  font-size: 0.8em;
+}
+
+.hero-subtitle a {
+  color: var(--vp-c-brand-1);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.hero-subtitle a:hover {
+  color: var(--vp-c-brand-2);
+}
+
+.hero-subtitle a:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
 }
 
 /* This single-page site keeps appearance and GitHub visible at every width. */

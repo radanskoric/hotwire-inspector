@@ -214,6 +214,23 @@ export async function getRecordedEvalCalls(panelPage) {
 export function withExpectedHeadingAndSummary(heading, summary) {
   return async (panelPage) => {
     await expect(panelPage.locator("h1")).toHaveText(heading);
+    const homepage = panelPage.getByRole("link", { name: "Hotwire Inspector" });
+    const book = panelPage.getByRole("link", {
+      name: "Master Hotwire",
+      exact: true,
+    });
+    await expect(homepage).toHaveAttribute(
+      "href",
+      "https://inspector.masterhotwire.com/",
+    );
+    await expect(book).toHaveAttribute("href", "https://masterhotwire.com/");
+    await expect(
+      panelPage.getByText("Built by Radan Skorić, author of"),
+    ).toBeVisible();
+    for (const link of [homepage, book]) {
+      await expect(link).toHaveAttribute("target", "_blank");
+      await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    }
     await expect(panelPage.locator("#summary")).toHaveText(summary);
   };
 }
