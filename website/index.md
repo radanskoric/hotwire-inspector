@@ -25,6 +25,37 @@ features:
     details: Captures Turbo events and displays them in a timeline with details for easy inspecting.
 ---
 
+<section class="feature-showcase" aria-label="Explore the features">
+  <article class="feature-row">
+    <div class="feature-copy"><h2>See how your page fits together</h2><p>Explore nested Turbo Frames, Stimulus controllers, and their targets in one tree. Find the element you need without digging through the full page DOM.</p></div>
+    <div class="feature-image">
+      <img class="feature-light" src="/assets/images/features/tree-light.png" alt="Nested ToDo frames with Stimulus controllers and targets" loading="lazy">
+      <img class="feature-dark" src="/assets/images/features/tree-dark.png" alt="Nested ToDo frames with Stimulus controllers and targets" loading="lazy">
+    </div>
+  </article>
+  <article class="feature-row">
+    <div class="feature-copy"><h2>Focus on the controllers that matter</h2><p>Use the searchable controller selector to narrow the tree while keeping the surrounding frame structure in view.</p></div>
+    <div class="feature-image">
+      <img class="feature-light" src="/assets/images/features/filter-light.png" alt="Open controller selector filtering the ToDo tree" loading="lazy">
+      <img class="feature-dark" src="/assets/images/features/filter-dark.png" alt="Open controller selector filtering the ToDo tree" loading="lazy">
+    </div>
+  </article>
+  <article class="feature-row">
+    <div class="feature-copy"><h2>Look inside a Stimulus controller</h2><p>Check typed values, find target elements, and follow outlet connections from the controller details panel. Stimulus values live update as they change on the page.</p></div>
+    <div class="feature-image">
+      <img class="feature-light" src="/assets/images/features/controller-light.png" alt="ToDo list controller values, clear target, and counter outlet" loading="lazy">
+      <img class="feature-dark" src="/assets/images/features/controller-dark.png" alt="ToDo list controller values, clear target, and counter outlet" loading="lazy">
+    </div>
+  </article>
+  <article class="feature-row">
+    <div class="feature-copy"><h2>Follow a Turbo update</h2><p>See Turbo events in order, identify their target frame, and inspect captured details to understand what happened. Turbo events are filterable, just like the tree view.</p></div>
+    <div class="feature-image">
+      <img class="feature-light" src="/assets/images/features/events-light.png" alt="Turbo frame update events with captured HTML details" loading="lazy">
+      <img class="feature-dark" src="/assets/images/features/events-dark.png" alt="Turbo frame update events with captured HTML details" loading="lazy">
+    </div>
+  </article>
+</section>
+
 ## Why Hotwire Inspector?
 
 Hotwire Inspector exists to make it easier to understand the structure of Hotwire-powered pages, especially Turbo Frames and Stimulus controllers, directly from the browser's DevTools.

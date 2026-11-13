@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ToDo</title>
+  </head>
+  <body>
+    <h1>Today's tasks</h1>
+    <turbo-frame
+      id="todos"
+      src="/todos"
+      data-controller="todo-list"
+      data-todo-list-count-value="2"
+      data-todo-list-filter-value="all"
+      data-todo-list-counter-outlet="#task-count"
+    >
+      <form id="new-task" data-controller="task-form">
+        <input
+          id="task-title"
+          aria-label="New task"
+          data-task-form-target="input"
+          value="Write release notes"
+        />
+        <button id="add-task" data-task-form-target="submit">Add task</button>
+      </form>
+      <turbo-frame id="task-1">
+        <article id="first-task" data-controller="todo">
+          <input
+            id="first-done"
+            type="checkbox"
+            aria-label="Review pull request"
+            data-todo-target="checkbox"
+          />
+          <span id="first-title" data-todo-target="title"
+            >Review pull request</span
+          >
+        </article>
+      </turbo-frame>
+      <turbo-frame id="task-2">
+        <article id="second-task" data-controller="todo">
+          <input
+            id="second-done"
+            type="checkbox"
+            aria-label="Write release notes"
+            data-todo-target="checkbox"
+          />
+          <span id="second-title" data-todo-target="title"
+            >Write release notes</span
+          >
+        </article>
+      </turbo-frame>
+      <button id="clear-tasks" data-todo-list-target="clear">
+        Clear completed
+      </button>
+    </turbo-frame>
+    <p id="task-count" data-controller="counter">2 tasks remaining</p>
+  </body>
+</html>
