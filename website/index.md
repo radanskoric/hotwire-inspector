@@ -8,7 +8,7 @@ hero:
     alt: Hotwire Inspector showing Turbo Frames and Stimulus controllers in a tree view
   tagline: >-
     A browser extension for inspecting Hotwire applications.
-    <span class="hero-subtitle">Built by the author of <a href="https://masterhotwire.com/">Master Hotwire</a> book.</span>
+    <span class="hero-subtitle">Built by the author of <a href="https://masterhotwire.com/" class="book-link">Master Hotwire <img src="/assets/images/master-hotwire.ico" width="16" height="16" alt=""></a> book.</span>
   actions:
     - theme: brand
       text: Install for Chrome
@@ -72,3 +72,13 @@ The inspector aims to keep the page close to its normal runtime behavior:
 - Access to Stimulus controllers and their definitions happens on request. These queries create no page globals; the only globals created are those storing a controller in a `window.tempN` variable, at explicit user request.
 
 Inspection still runs code in the page's environment. Looking up controllers and reading metadata can invoke page-owned methods or getters.
+
+<div class="install-actions">
+  {% for action in page.hero.actions %}
+  <a class="VPButton medium {{ action.theme }} no-icon" href="{{ action.link }}" target="_blank" rel="noreferrer">{{ action.text }}</a>
+  {% endfor %}
+</div>
+
+<footer class="site-footer">
+  <p>Hotwire Inspector is built by <a href="https://radan.dev/">Radan Skorić</a>, author of <a href="https://masterhotwire.com/" class="book-link">Master Hotwire <img src="/assets/images/master-hotwire.ico" width="16" height="16" alt=""></a></p>
+</footer>

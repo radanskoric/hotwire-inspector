@@ -102,6 +102,18 @@
   outline-offset: 3px;
 }
 
+.book-link {
+  white-space: nowrap;
+}
+
+.book-link img {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  vertical-align: -2px;
+}
+
 /* This single-page site keeps appearance and GitHub visible at every width. */
 .VPNavBar .VPNavBarSearch,
 .VPNavBar .VPNavBarMenu,
@@ -119,6 +131,28 @@
 
 .feature-showcase {
   margin-block: 48px 64px;
+}
+
+.install-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 32px;
+  padding-block: 32px;
+}
+
+.install-actions .VPButton {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.site-footer {
+  border-top: 1px solid var(--vp-c-divider);
+  padding-block: 24px;
+  color: var(--vp-c-text-2);
+  text-align: center;
+  font-size: 14px;
 }
 
 .feature-row {
